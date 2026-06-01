@@ -1,4 +1,4 @@
-import { HeartPulse, Hospital, Phone } from 'lucide-react'
+import { HeartPulse, Hospital, ShieldCheck, Stethoscope } from 'lucide-react'
 import type React from 'react'
 import { NavLink } from 'react-router-dom'
 import { hospital } from '../../data/patientPortalData'
@@ -31,10 +31,11 @@ export function PatientShell({ children }: { children: React.ReactNode }) {
             </NavLink>
           ))}
         </nav>
-        <a className="hospital-phone" href={`tel:${hospital.phone.replace(/\D/g, '')}`}>
-          <Phone size={16} />
-          {hospital.phone}
-        </a>
+        <nav className="portal-switcher" aria-label="Switch portal view">
+          <NavLink to="/patient/home"><HeartPulse size={15} /> Patient</NavLink>
+          <NavLink to="/staff/doctor"><Stethoscope size={15} /> Clinician</NavLink>
+          <NavLink to="/governance"><ShieldCheck size={15} /> AI Governance</NavLink>
+        </nav>
       </header>
       {children}
     </div>

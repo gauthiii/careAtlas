@@ -81,7 +81,6 @@ label {
 .brand,
 .portal-nav,
 .portal-nav a,
-.directory-button,
 .action,
 .panel-title,
 .mfa-note,
@@ -146,30 +145,10 @@ label {
   background: #17324d;
 }
 
-.directory-button {
-  justify-self: end;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 14px;
-  border: 2px solid #17324d;
-  border-radius: 999px;
-  background: #fffdfa;
-  color: #17324d;
-  font-weight: 950;
-  box-shadow: 4px 4px 0 rgba(23, 50, 77, 0.18);
-}
-
 .atlas-stage {
   width: min(1760px, calc(100% - 28px));
   margin: 0 auto;
   padding: 14px 0 48px;
-}
-
-.floating-directory {
-  position: fixed;
-  right: 22px;
-  bottom: 22px;
-  z-index: 25;
 }
 
 .patient-portal {
@@ -181,7 +160,7 @@ label {
   top: 0;
   z-index: 18;
   display: grid;
-  grid-template-columns: minmax(230px, 1fr) auto minmax(170px, 1fr);
+  grid-template-columns: minmax(230px, 0.9fr) minmax(360px, 1.25fr) minmax(310px, 0.95fr);
   gap: 18px;
   align-items: center;
   padding: 14px clamp(14px, 3vw, 28px);
@@ -195,6 +174,7 @@ label {
 .hospital-brand,
 .hospital-brand small,
 .patient-nav,
+.portal-switcher,
 .hospital-phone,
 .patient-button,
 .patient-panel-title,
@@ -267,6 +247,33 @@ label {
 .patient-nav a.active {
   background: #0f5f8c;
   color: white;
+}
+
+.portal-switcher {
+  justify-self: end;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #d7e5ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.portal-switcher a {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 9px;
+  color: #53687b;
+  font-size: 0.82rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.portal-switcher a.active {
+  background: #e7f3f8;
+  color: #0f5f8c;
 }
 
 .hospital-phone {
@@ -1469,87 +1476,15 @@ label {
   font-weight: 900;
 }
 
-.directory {
-  position: fixed;
-  top: 0;
-  right: 0;
-  z-index: 40;
-  width: min(420px, 92vw);
-  height: 100vh;
-  padding: 20px;
-  border-left: 3px solid #17324d;
-  background: #fffdfa;
-  box-shadow: -20px 0 60px rgba(23, 50, 77, 0.24);
-  transform: translateX(104%);
-  transition: transform 180ms ease;
-}
-
-.directory.open {
-  transform: translateX(0);
-}
-
-.directory-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.directory-head h2 {
-  margin: 10px 0 0;
-}
-
-.directory-head button {
-  width: 42px;
-  height: 42px;
-  border: 2px solid #17324d;
-  border-radius: 12px;
-  background: white;
-}
-
-.directory-list {
-  display: grid;
-  gap: 8px;
-  margin-top: 22px;
-}
-
-.directory-list a {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px;
-  border: 2px solid #d9e5e7;
-  border-radius: 12px;
-  color: #405265;
-  font-weight: 900;
-}
-
-.directory-list a.active {
-  border-color: #17324d;
-  background: #e8fff2;
-  color: #17324d;
-}
-
-.scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  border: 0;
-  background: rgba(19, 34, 56, 0.28);
-}
-
 @media (max-width: 1100px) {
   .hospital-header {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
   }
 
-  .patient-nav {
-    grid-column: 1 / -1;
+  .patient-nav,
+  .portal-switcher {
     justify-self: stretch;
     overflow-x: auto;
-  }
-
-  .hospital-phone {
-    display: none;
   }
 
   .hospital-hero,

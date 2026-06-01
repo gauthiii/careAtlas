@@ -15,12 +15,12 @@ export function PortalHeader({ label }: { label: string }) {
           <small>{label}</small>
         </span>
       </NavLink>
-      <nav className="patient-nav" aria-label="Portal navigation">
+      <nav className="portal-switcher" aria-label="Switch portal view">
         <NavLink to="/patient/home"><HeartPulse size={15} /> Patient</NavLink>
         <NavLink to="/staff/doctor"><Stethoscope size={15} /> Clinician</NavLink>
         <NavLink to="/governance"><ShieldCheck size={15} /> AI Governance</NavLink>
       </nav>
-      <NavLink className="hospital-phone" to="/role-picker">Switch view</NavLink>
+      <NavLink className="hospital-phone" to="/">All views</NavLink>
     </header>
   )
 }
