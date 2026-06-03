@@ -44,8 +44,8 @@ function App() {
 
 function Shell() {
   return (
-    <div className="atlas-shell">
-      <div className="atlas-stage">
+    <div className="min-h-screen">
+      <div className="mx-auto flex min-h-screen w-[min(1760px,calc(100%-28px))] flex-col pt-3.5 max-[720px]:w-[min(calc(100%-18px),1760px)] max-[720px]:pt-3.5">
         <Outlet />
       </div>
     </div>

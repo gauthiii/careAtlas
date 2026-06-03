@@ -29,8 +29,11 @@ export const hospital = {
   name: 'Northstar General Hospital',
   portalName: 'Patient Portal',
   phone: '(602) 555-0100',
-  hours: 'Monday-Friday, 8:00 AM-6:00 PM',
-  address: '400 E Careway Drive, Phoenix, AZ 85004',
+  hours: 'Monday–Friday',
+  timing: '8:00 AM – 6:00 PM',
+  addressLine1: '400 E Careway Drive',
+  addressLine2: 'Phoenix, AZ 85004',
+  email: 'support@northstarhospital.org',
 }
 
 export const patient = {
@@ -159,7 +162,7 @@ export const bookingSlots: Appointment[] = [
 export const registrationSections: RegistrationSection[] = [
   {
     title: 'Personal information',
-    description: 'These details identify the patient account and support appointment access needs.',
+    description: 'These details identify the patient account and support appointment access needs',
     fields: [
       { label: 'First name', required: true, value: patient.firstName },
       { label: 'Last name', required: true, value: patient.lastName },
@@ -173,7 +176,7 @@ export const registrationSections: RegistrationSection[] = [
   },
   {
     title: 'Address',
-    description: 'Used for identity verification and clinic communications.',
+    description: 'Used for identity verification and clinic communications',
     fields: [
       { label: 'Street address line 1', required: true, value: patient.street1 },
       { label: 'Street address line 2', optional: true, value: patient.street2 },
@@ -183,7 +186,7 @@ export const registrationSections: RegistrationSection[] = [
   },
   {
     title: 'Health information',
-    description: 'These fields influence scheduling priority and appointment fit.',
+    description: 'These fields influence scheduling priority and appointment fit',
     fields: [
       { label: 'Primary health condition category', type: 'select', required: true, options: ['General', 'Chronic condition', 'Mental health', 'Urgent', 'Preventative care'], value: patient.condition, sensitive: true },
       { label: 'Do you have any mobility or accessibility requirements?', type: 'select', required: true, options: ['Yes', 'No'], value: patient.accessibility },
@@ -195,7 +198,7 @@ export const registrationSections: RegistrationSection[] = [
   },
   {
     title: 'Account credentials',
-    description: 'Used for secure portal access.',
+    description: 'Used for secure portal access',
     fields: [
       { label: 'Create a username', required: true, value: patient.username },
       { label: 'Create a password', type: 'password', required: true },

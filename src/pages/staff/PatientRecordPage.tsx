@@ -14,14 +14,14 @@ export function PatientRecordPage() {
       title={`${record.name} record view`}
       intro="Read-only clinician record with appointment history and the AI decision audit trail for this patient."
     >
-      <div className="profile-layout">
-        <section className="profile-field-ledger">
+      <div className="grid gap-4 grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] max-[1100px]:grid-cols-1">
+        <section className="grid gap-4">
           <PortalPanel title="Patient demographic details" icon={<UserRound size={21} />} tone="secure">
-            <div className="profile-field-grid">
+            <div className="grid grid-cols-2 gap-3.5 max-[720px]:grid-cols-1">
               {Object.entries(record).map(([label, value]) => (
-                <div className="patient-read-field" key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
+                <div className="grid gap-[5px] rounded-[10px] border border-[#e5eef3] bg-white p-3" key={label}>
+                  <span className="text-[0.74rem] font-black uppercase tracking-[0.06em] text-[#607487]">{label}</span>
+                  <strong className="[overflow-wrap:anywhere] text-[#102033]">{value}</strong>
                 </div>
               ))}
             </div>
@@ -33,13 +33,13 @@ export function PatientRecordPage() {
             />
           </PortalPanel>
         </section>
-        <aside className="profile-side">
+        <aside className="grid gap-4">
           <PortalPanel title="AI decision log" icon={<Bot size={21} />} tone="warning">
             <PortalTable
               columns={['Time', 'Confidence', 'Weighted factors']}
               rows={aiDecisions.map((decision) => [decision.time, decision.confidence, decision.factors])}
             />
-            <button className="patient-button secondary"><Flag size={17} /> Flag for review</button>
+            <button className="mt-4 inline-flex min-h-[42px] w-max cursor-pointer items-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-extrabold text-[#0f5f8c] max-[720px]:w-full"><Flag size={17} /> Flag for review</button>
           </PortalPanel>
         </aside>
       </div>

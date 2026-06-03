@@ -1,26 +1,65 @@
 import type { ReactNode } from 'react'
 import { HeartPulse, Hospital, ShieldCheck, Stethoscope } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { cn } from '../../lib/cn'
+import type { PanelTone } from '../patient/PatientPanel'
 import { hospital } from '../../data/patientPortalData'
 
 export type PortalTone = 'patient' | 'staff' | 'admin' | 'governance' | 'risk' | 'neutral'
 
+const panelTopBorder: Record<PanelTone, string> = {
+  default: 'border-t-[#0f5f8c]',
+  success: 'border-t-[#12805c]',
+  warning: 'border-t-[#d97706]',
+  danger: 'border-t-[#dc2626]',
+  secure: 'border-t-[#40566b]',
+}
+
 export function PortalHeader({ label }: { label: string }) {
   return (
-    <header className="hospital-header">
-      <NavLink className="hospital-brand" to="/">
-        <span className="hospital-logo"><Hospital size={24} /></span>
+    <header className="sticky top-0 z-[18] grid grid-cols-[1fr_auto] items-center gap-0 border border-[#d7e5ec] rounded-[14px] bg-white/96 px-[clamp(14px,3vw,28px)] py-3.5 shadow-[0_10px_26px_rgba(25,64,93,0.08)] backdrop-blur-[14px] max-[1100px]:grid-cols-1 max-[720px]:static max-[720px]:p-2.5">
+      <NavLink className="flex items-center gap-3" to="/">
+        <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#143A57] text-white"><Hospital size={24} /></span>
         <span>
-          <strong>{hospital.name}</strong>
-          <small>{label}</small>
+          <strong className="block text-[1.02rem] tracking-normal text-[#102033] max-[720px]:text-[0.94rem]">{hospital.name}</strong>
+          <small className="mt-0.5 flex items-center gap-[5px] text-[0.78rem] font-[750] text-[#607487]">{label}</small>
         </span>
       </NavLink>
-      <nav className="portal-switcher" aria-label="Switch portal view">
-        <NavLink to="/patient/home"><HeartPulse size={15} /> Patient</NavLink>
-        <NavLink to="/staff/doctor"><Stethoscope size={15} /> Clinician</NavLink>
-        <NavLink to="/governance"><ShieldCheck size={15} /> AI Governance</NavLink>
+      <nav className="justify-self-end flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto" aria-label="Switch portal view">
+        <NavLink
+          to="/patient/home"
+          className={({ isActive }) =>
+            cn(
+              'inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b]',
+              isActive && 'bg-[#e7f3f8] text-[#0f5f8c]',
+            )
+          }
+        >
+          <HeartPulse size={15} /> Patient Portal
+        </NavLink>
+        <NavLink
+          to="/staff/doctor"
+          className={({ isActive }) =>
+            cn(
+              'inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b]',
+              isActive && 'bg-[#e7f3f8] text-[#0f5f8c]',
+            )
+          }
+        >
+          <Stethoscope size={15} /> Clinician Portal
+        </NavLink>
+        <NavLink
+          to="/governance"
+          className={({ isActive }) =>
+            cn(
+              'inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b]',
+              isActive && 'bg-[#e7f3f8] text-[#0f5f8c]',
+            )
+          }
+        >
+          <ShieldCheck size={15} /> AI Governance
+        </NavLink>
       </nav>
-      <NavLink className="hospital-phone" to="/">All views</NavLink>
     </header>
   )
 }
@@ -39,13 +78,13 @@ export function PortalPage({
   children: ReactNode
 }) {
   return (
-    <div className="patient-portal">
+    <div className="min-h-[calc(100vh-30px)]">
       <PortalHeader label={label} />
-      <main className="patient-page">
-        <section className="patient-page-heading">
-          <span>{eyebrow}</span>
-          <h1>{title}</h1>
-          {intro && <p>{intro}</p>}
+      <main className="grid gap-5 px-0 py-5 pb-[42px] max-[720px]:pt-3">
+        <section className="rounded-[14px] border border-[#d7e5ec] border-l-[5px] border-l-[#0f5f8c] bg-[linear-gradient(100deg,rgba(239,249,255,0.96),rgba(255,255,255,0.92)),#fff] p-[clamp(22px,4vw,38px)] shadow-[0_12px_30px_rgba(25,64,93,0.07)] max-[720px]:rounded-xl">
+          <span className="inline-flex w-max rounded-full bg-[#e7f3f8] px-2.5 py-1.5 text-[0.72rem] font-black uppercase tracking-[0.08em] text-[#0f5f8c]">{eyebrow}</span>
+          <h1 className="mt-2.5 max-w-[880px] text-[clamp(2rem,4.5vw,4.4rem)] leading-none tracking-normal text-[#102033] max-[720px]:text-[clamp(2rem,12vw,3.2rem)]">{title}</h1>
+          {intro && <p className="mt-3 max-w-[760px] text-[1.02rem] font-semibold leading-[1.55] text-[#53687b]">{intro}</p>}
         </section>
         {children}
       </main>
@@ -57,18 +96,26 @@ export function PortalPanel({
   title,
   icon,
   tone = 'default',
+  className,
   children,
 }: {
   title: string
   icon?: ReactNode
-  tone?: 'default' | 'success' | 'warning' | 'danger' | 'secure'
+  tone?: PanelTone
+  className?: string
   children: ReactNode
 }) {
   return (
-    <section className={`patient-panel patient-panel-${tone}`}>
-      <div className="patient-panel-title">
-        {icon && <span>{icon}</span>}
-        <h2>{title}</h2>
+    <section
+      className={cn(
+        'min-w-0 rounded-[14px] border border-[#d7e5ec] border-t-4 bg-white p-[18px] shadow-[0_12px_30px_rgba(25,64,93,0.07)] max-[720px]:rounded-xl',
+        panelTopBorder[tone],
+        className,
+      )}
+    >
+      <div className="mb-3.5 flex items-center gap-2.5">
+        {icon && <span className="grid h-9 w-9 place-items-center rounded-[9px] bg-[#e7f3f8] text-[#0f5f8c]">{icon}</span>}
+        <h2 className="m-0 text-[1.08rem] tracking-normal text-[#102033]">{title}</h2>
       </div>
       {children}
     </section>
@@ -77,13 +124,17 @@ export function PortalPanel({
 
 export function PortalTable({ columns, rows }: { columns: string[]; rows: string[][] }) {
   return (
-    <div className="patient-table" role="table">
-      <div className="patient-table-head" role="row">
-        {columns.map((column) => <span key={column} role="columnheader">{column}</span>)}
+    <div className="grid gap-2" role="table">
+      <div className="grid grid-cols-3 gap-3 border-b border-[#d7e5ec] px-3 py-2.5 max-[720px]:grid-cols-1" role="row">
+        {columns.map((column) => (
+          <span className="text-[0.74rem] font-black uppercase tracking-[0.06em] text-[#607487]" key={column} role="columnheader">{column}</span>
+        ))}
       </div>
       {rows.map((row, index) => (
-        <div className="patient-table-row" role="row" key={`${row.join('-')}-${index}`}>
-          {row.map((cell, cellIndex) => <span role="cell" key={`${cell}-${cellIndex}`}>{cell}</span>)}
+        <div className="grid grid-cols-3 gap-3 rounded-[10px] border border-[#e5eef3] bg-white px-3 py-2.5 max-[720px]:grid-cols-1" role="row" key={`${row.join('-')}-${index}`}>
+          {row.map((cell, cellIndex) => (
+            <span className="min-w-0 [overflow-wrap:anywhere] font-bold text-[#40566b]" role="cell" key={`${cell}-${cellIndex}`}>{cell}</span>
+          ))}
         </div>
       ))}
     </div>

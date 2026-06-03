@@ -14,18 +14,18 @@ export function DashboardPage() {
       title={`Welcome back, ${patient.firstName}`}
       intro="Your central place for appointments, profile status, and clinic messages."
     >
-      <section className="patient-welcome-band">
-        <div>
-          <span>Profile status</span>
-          <strong>{patient.profileStatus}</strong>
+      <section className="grid grid-cols-2 gap-4 rounded-[14px] border border-[#d7e5ec] border-l-[5px] border-l-[#12805c] bg-white p-[18px] shadow-[0_12px_30px_rgba(25,64,93,0.07)] max-[720px]:grid-cols-1">
+        <div className="grid gap-[7px]">
+          <span className="text-[0.74rem] font-black uppercase tracking-[0.06em] text-[#607487]">Profile status</span>
+          <strong className="text-[1.25rem] text-[#102033]">{patient.profileStatus}</strong>
           <StatusBadge tone="success">Complete profile supports better slot assignment</StatusBadge>
         </div>
-        <div>
-          <span>Next appointment</span>
-          <strong>{upcomingAppointment.date}, {upcomingAppointment.time}</strong>
+        <div className="grid gap-[7px]">
+          <span className="text-[0.74rem] font-black uppercase tracking-[0.06em] text-[#607487]">Next appointment</span>
+          <strong className="text-[1.25rem] text-[#102033]">{upcomingAppointment.date}, {upcomingAppointment.time}</strong>
         </div>
       </section>
-      <div className="patient-dashboard-grid">
+      <div className="grid gap-4 grid-cols-2 max-[1100px]:grid-cols-1">
         <PatientPanel title="Upcoming appointment" icon={<CalendarCheck size={21} />} tone="success">
           <AppointmentCard appointment={upcomingAppointment} />
         </PatientPanel>
@@ -36,9 +36,9 @@ export function DashboardPage() {
           />
         </PatientPanel>
         <PatientPanel title="Quick actions" icon={<UserRound size={21} />}>
-          <div className="patient-action-list">
+          <div className="grid gap-2.5">
             {dashboardActions.map((action, index) => (
-              <Link to={action.to} key={action.label}>
+              <Link className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-[#d7e5ec] bg-white px-3 py-2.5 font-extrabold text-[#102033]" to={action.to} key={action.label}>
                 {actionIcons[index]}
                 {action.label}
               </Link>
@@ -46,8 +46,10 @@ export function DashboardPage() {
           </div>
         </PatientPanel>
         <PatientPanel title="Clinic notifications" icon={<Bell size={21} />} tone="secure">
-          <div className="notification-list">
-            {notifications.map((note) => <p key={note}>{note}</p>)}
+          <div className="grid gap-2.5">
+            {notifications.map((note) => (
+              <p className="m-0 rounded-[9px] border-l-4 border-l-[#0f5f8c] bg-[#f7fbfd] p-3" key={note}>{note}</p>
+            ))}
           </div>
         </PatientPanel>
       </div>
