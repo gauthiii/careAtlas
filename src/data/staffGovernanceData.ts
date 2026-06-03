@@ -54,7 +54,14 @@ export const adminCases = [
   { ref: 'CASE-7788', subject: 'Technical issue', patient: 'Rina Shah', age: '4h', status: 'Waiting' },
 ]
 
-export const weeklyAvailability = [
+export type AvailabilityTone = 'green' | 'blue' | 'gray'
+
+export const weeklyAvailability: {
+  day: string
+  label: string
+  time: string
+  tone: AvailabilityTone
+}[] = [
   { day: 'Mon', label: 'Available', time: '09:00-12:00', tone: 'green' },
   { day: 'Tue', label: 'Booked', time: '10:00-11:00', tone: 'blue' },
   { day: 'Wed', label: 'Training', time: '13:00-16:00', tone: 'gray' },

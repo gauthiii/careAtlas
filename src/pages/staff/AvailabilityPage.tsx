@@ -1,9 +1,9 @@
 import { CalendarCheck, Clock3 } from 'lucide-react'
 import { PortalPage, PortalPanel } from '../../components/portal/PortalShell'
-import { weeklyAvailability } from '../../data/staffGovernanceData'
+import { weeklyAvailability, type AvailabilityTone } from '../../data/staffGovernanceData'
 import { cn } from '../../lib/cn'
 
-const availabilityBg = {
+const availabilityBg: Record<AvailabilityTone, string> = {
   green: 'bg-[#e8fff2]',
   blue: 'bg-[#e6f2ff]',
   gray: 'bg-[#eef2f3]',
