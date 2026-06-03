@@ -52,7 +52,7 @@ export function StatusBadge({ children, tone = 'info' }: { children: ReactNode; 
   return (
     <span
       className={cn(
-        'inline-flex w-max max-w-full rounded-full px-[9px] py-[5px] text-[0.75rem] font-black max-[720px]:w-full',
+        'inline-flex w-max max-w-full rounded-full px-[9px] py-[5px] text-[0.75rem] font-bold max-[720px]:w-full',
         statusBadgeTone[tone],
       )}
     >

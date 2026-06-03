@@ -1,6 +1,7 @@
 import { Bot, Flag, UserRound } from 'lucide-react'
 import { useParams } from 'react-router-dom'
-import { PortalPage, PortalPanel, PortalTable } from '../../components/portal/PortalShell'
+import { DoctorPage } from '../../components/staff/DoctorShell'
+import { PortalPanel, PortalTable } from '../../components/portal/PortalShell'
 import { aiDecisions, staffAppointments, staffPatients } from '../../data/staffGovernanceData'
 
 export function PatientRecordPage() {
@@ -8,9 +9,7 @@ export function PatientRecordPage() {
   const record = staffPatients.find((item) => item.id === id) ?? staffPatients[0]
 
   return (
-    <PortalPage
-      label="Clinical staff portal"
-      eyebrow="Patient record"
+    <DoctorPage
       title={`${record.name} record view`}
       intro="Read-only clinician record with appointment history and the AI decision audit trail for this patient."
     >
@@ -39,10 +38,12 @@ export function PatientRecordPage() {
               columns={['Time', 'Confidence', 'Weighted factors']}
               rows={aiDecisions.map((decision) => [decision.time, decision.confidence, decision.factors])}
             />
-            <button className="mt-4 inline-flex min-h-[42px] w-max cursor-pointer items-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-extrabold text-[#0f5f8c] max-[720px]:w-full"><Flag size={17} /> Flag for review</button>
+            <button className="mt-4 inline-flex min-h-[42px] w-max cursor-pointer items-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-extrabold text-[#0f5f8c] max-[720px]:w-full">
+              <Flag size={17} /> Flag for review
+            </button>
           </PortalPanel>
         </aside>
       </div>
-    </PortalPage>
+    </DoctorPage>
   )
 }

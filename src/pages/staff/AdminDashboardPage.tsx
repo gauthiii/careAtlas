@@ -1,12 +1,11 @@
 import { Activity, CalendarCheck, MessageSquare, Search, UserCheck } from 'lucide-react'
-import { PortalPage, PortalPanel, PortalTable } from '../../components/portal/PortalShell'
+import { DoctorPage } from '../../components/staff/DoctorShell'
+import { PortalPanel, PortalTable } from '../../components/portal/PortalShell'
 import { adminCases, pendingApprovals, staffAppointments } from '../../data/staffGovernanceData'
 
 export function AdminDashboardPage() {
   return (
-    <PortalPage
-      label="Clinical staff portal"
-      eyebrow="Admin dashboard"
+    <DoctorPage
       title="Master schedule and intake queue"
       intro="A receptionist/admin view for all appointments, patient lookup, manual actions, registration approvals, and contact cases."
     >
@@ -23,9 +22,15 @@ export function AdminDashboardPage() {
         </PortalPanel>
         <PortalPanel title="Quick actions" icon={<Activity size={21} />}>
           <div className="grid gap-2.5">
-            <button className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-[#d7e5ec] bg-white px-3 py-2.5 font-extrabold text-[#102033]">Create manual appointment</button>
-            <button className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-[#d7e5ec] bg-white px-3 py-2.5 font-extrabold text-[#102033]">Cancel appointment</button>
-            <button className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-[#d7e5ec] bg-white px-3 py-2.5 font-extrabold text-[#102033]">Mark patient as arrived</button>
+            <button className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-[#d7e5ec] bg-white px-3 py-2.5 font-extrabold text-[#102033]">
+              Create manual appointment
+            </button>
+            <button className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-[#d7e5ec] bg-white px-3 py-2.5 font-extrabold text-[#102033]">
+              Cancel appointment
+            </button>
+            <button className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-[#d7e5ec] bg-white px-3 py-2.5 font-extrabold text-[#102033]">
+              Mark patient as arrived
+            </button>
           </div>
         </PortalPanel>
         <PortalPanel title="Pending registration approvals" icon={<UserCheck size={21} />} tone="warning">
@@ -41,6 +46,6 @@ export function AdminDashboardPage() {
           />
         </PortalPanel>
       </div>
-    </PortalPage>
+    </DoctorPage>
   )
 }

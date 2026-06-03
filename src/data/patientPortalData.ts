@@ -106,7 +106,6 @@ export const appointmentHistory: Appointment[] = [
 ]
 
 export const bookingSlots: Appointment[] = [
-  upcomingAppointment,
   {
     id: 'SLOT-2201',
     date: 'June 5, 2026',

@@ -32,7 +32,7 @@ export function ContactPage() {
           </label>
           <label className="grid gap-[7px] text-[0.84rem] font-bold py-3">
             <span className="flex flex-wrap items-baseline gap-1.5">Message</span>
-            <textarea className="w-full rounded-[9px] border border-[#cbdde6] bg-white px-3 py-[11px] text-inherit" placeholder="Please describe your request. Include any relevant dates, appointment details, or reference numbers." rows={5} />
+            <textarea className="w-full rounded-[9px] border border-[#cbdde6] bg-white px-3 py-[11px] text-inherit" placeholder="Please describe your request. Include any relevant dates, appointment details, or reference numbers" rows={5} />
           </label>
           <button className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#143A57] px-[15px] font-bold text-white max-[720px]:w-full text-md">Submit case</button>
         </PatientPanel>

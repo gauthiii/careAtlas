@@ -6,7 +6,7 @@ export function SignInPage() {
   return (
     <PatientPage
       title="Access your patient dashboard"
-      intro="Use your patient portal credentials. A one-time MFA code is sent after username and password validation"
+      intro="Use your patient portal credentials. A one-time MFA code is sent after username and password validation."
     >
       <div className="flex items-center justify-center">
       <section className="grid w-[540px] gap-4 rounded-[14px] border border-[#d7e5ec] bg-white p-[22px] shadow-[0_12px_30px_rgba(25,64,93,0.07)]">

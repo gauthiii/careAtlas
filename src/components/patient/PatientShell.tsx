@@ -1,23 +1,33 @@
-import { HeartPulse, Hospital, ShieldCheck, Stethoscope } from 'lucide-react'
+import { HeartPulse, Hospital, LockKeyhole, ShieldCheck, Stethoscope, Home, UserPlus, LayoutDashboard, CalendarCheck, User, MessageCircle } from 'lucide-react'
 import type React from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn'
+import {
+  isClinicianPortalPath,
+  isGovernancePortalPath,
+  isPatientPortalPath,
+  portalSwitcherActive,
+  portalSwitcherLink,
+} from '../../lib/portalNav'
 import { hospital } from '../../data/patientPortalData'
 
+
 const patientNav = [
-  { label: 'Home', to: '/patient/home' },
-  { label: 'Register', to: '/patient/register' },
-  { label: 'Sign in', to: '/patient/sign-in' },
-  { label: 'Dashboard', to: '/patient/dashboard' },
-  { label: 'Book', to: '/patient/book' },
-  { label: 'Profile', to: '/patient/profile' },
-  { label: 'Contact', to: '/patient/contact' },
+  { label: 'Home', to: '/patient/home', icon: Home },
+  { label: 'Register', to: '/patient/register', icon: UserPlus },
+  { label: 'Sign in', to: '/patient/sign-in', icon: LockKeyhole },
+  { label: 'Dashboard', to: '/patient/dashboard', icon: LayoutDashboard },
+  { label: 'Book', to: '/patient/book', icon: CalendarCheck },
+  { label: 'Profile', to: '/patient/profile', icon: User },
+  { label: 'Contact', to: '/patient/contact', icon: MessageCircle },
 ]
 
 export function PatientShell({ children }: { children: React.ReactNode }) {
+  const location = useLocation()
+
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <header className="sticky top-0 z-[18] grid grid-cols-[auto_1fr_auto] items-center gap-3 border border-[#d7e5ec] rounded-[14px] bg-white/96 px-[clamp(14px,3vw,28px)] py-3.5 shadow-[0_10px_26px_rgba(25,64,93,0.08)] backdrop-blur-[14px] max-[1100px]:grid-cols-1 max-[720px]:static max-[720px]:p-2.5">
+    <div className="flex w-full min-h-0 flex-1 flex-col">
+      <header className="sticky top-0 z-30 shrink-0 grid grid-cols-[auto_1fr_auto] items-center gap-3 border border-[#d7e5ec] rounded-[14px] bg-white px-[clamp(14px,3vw,28px)] py-3.5 shadow-[0_10px_26px_rgba(25,64,93,0.08)] backdrop-blur-[14px] max-[1100px]:grid-cols-1 max-[720px]:p-2.5">
         <NavLink className="flex items-center gap-3" to="/">
           <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#143A57] text-white"><Hospital size={24} /></span>
           <span>
@@ -38,41 +48,26 @@ export function PatientShell({ children }: { children: React.ReactNode }) {
                 )
               }
             >
-              {item.label}
+            {item.icon && <item.icon size={15} />} {item.label}
             </NavLink>
           ))}
         </nav>
         <nav className="min-w-0 justify-self-end flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto" aria-label="Switch portal view">
           <NavLink
             to="/patient/home"
-            className={({ isActive }) =>
-              cn(
-                'inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b]',
-                isActive && 'bg-[#0397AE] !text-white',
-              )
-            }
+            className={cn(portalSwitcherLink, isPatientPortalPath(location.pathname) && portalSwitcherActive)}
           >
-            <HeartPulse size={15} /> Patient
+            <HeartPulse size={15} /> Patient Portal
           </NavLink>
           <NavLink
             to="/staff/doctor"
-            className={({ isActive }) =>
-              cn(
-                'inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b]',
-                isActive && 'bg-[#e7f3f8] text-[#0f5f8c]',
-              )
-            }
+            className={cn(portalSwitcherLink, isClinicianPortalPath(location.pathname) && portalSwitcherActive)}
           >
-            <Stethoscope size={15} /> Clinician
+            <Stethoscope size={15} /> Clinician Portal
           </NavLink>
           <NavLink
             to="/governance"
-            className={({ isActive }) =>
-              cn(
-                'inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b]',
-                isActive && 'bg-[#e7f3f8] text-[#0f5f8c]',
-              )
-            }
+            className={cn(portalSwitcherLink, isGovernancePortalPath(location.pathname) && portalSwitcherActive)}
           >
             <ShieldCheck size={15} /> AI Governance
           </NavLink>

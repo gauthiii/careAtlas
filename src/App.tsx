@@ -1,4 +1,5 @@
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 
 import { GovernanceDashboardPage } from './pages/governance/GovernanceDashboardPage'
 import { ViewChooserPage } from './pages/home/ViewChooserPage'
@@ -43,6 +44,12 @@ function App() {
 }
 
 function Shell() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 })
+  }, [pathname])
+
   return (
     <div className="min-h-screen">
       <div className="mx-auto flex min-h-screen w-[min(1760px,calc(100%-28px))] flex-col pt-3.5 max-[720px]:w-[min(calc(100%-18px),1760px)] max-[720px]:pt-3.5">

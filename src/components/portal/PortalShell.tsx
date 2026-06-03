@@ -1,7 +1,14 @@
 import type { ReactNode } from 'react'
 import { HeartPulse, Hospital, ShieldCheck, Stethoscope } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn'
+import {
+  isClinicianPortalPath,
+  isGovernancePortalPath,
+  isPatientPortalPath,
+  portalSwitcherActive,
+  portalSwitcherLink,
+} from '../../lib/portalNav'
 import type { PanelTone } from '../patient/PatientPanel'
 import { hospital } from '../../data/patientPortalData'
 
@@ -16,6 +23,8 @@ const panelTopBorder: Record<PanelTone, string> = {
 }
 
 export function PortalHeader({ label }: { label: string }) {
+  const location = useLocation()
+
   return (
     <header className="sticky top-0 z-[18] grid grid-cols-[1fr_auto] items-center gap-0 border border-[#d7e5ec] rounded-[14px] bg-white/96 px-[clamp(14px,3vw,28px)] py-3.5 shadow-[0_10px_26px_rgba(25,64,93,0.08)] backdrop-blur-[14px] max-[1100px]:grid-cols-1 max-[720px]:static max-[720px]:p-2.5">
       <NavLink className="flex items-center gap-3" to="/">
@@ -28,34 +37,19 @@ export function PortalHeader({ label }: { label: string }) {
       <nav className="justify-self-end flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto" aria-label="Switch portal view">
         <NavLink
           to="/patient/home"
-          className={({ isActive }) =>
-            cn(
-              'inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b]',
-              isActive && 'bg-[#e7f3f8] text-[#0f5f8c]',
-            )
-          }
+          className={cn(portalSwitcherLink, isPatientPortalPath(location.pathname) && portalSwitcherActive)}
         >
           <HeartPulse size={15} /> Patient Portal
         </NavLink>
         <NavLink
           to="/staff/doctor"
-          className={({ isActive }) =>
-            cn(
-              'inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b]',
-              isActive && 'bg-[#e7f3f8] text-[#0f5f8c]',
-            )
-          }
+          className={cn(portalSwitcherLink, isClinicianPortalPath(location.pathname) && portalSwitcherActive)}
         >
           <Stethoscope size={15} /> Clinician Portal
         </NavLink>
         <NavLink
           to="/governance"
-          className={({ isActive }) =>
-            cn(
-              'inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b]',
-              isActive && 'bg-[#e7f3f8] text-[#0f5f8c]',
-            )
-          }
+          className={cn(portalSwitcherLink, isGovernancePortalPath(location.pathname) && portalSwitcherActive)}
         >
           <ShieldCheck size={15} /> AI Governance
         </NavLink>
@@ -66,13 +60,11 @@ export function PortalHeader({ label }: { label: string }) {
 
 export function PortalPage({
   label,
-  eyebrow,
   title,
   intro,
   children,
 }: {
   label: string
-  eyebrow: string
   title: string
   intro?: string
   children: ReactNode
@@ -80,10 +72,9 @@ export function PortalPage({
   return (
     <div className="min-h-[calc(100vh-30px)]">
       <PortalHeader label={label} />
-      <main className="grid gap-5 px-0 py-5 pb-[42px] max-[720px]:pt-3">
-        <section className="rounded-[14px] border border-[#d7e5ec] border-l-[5px] border-l-[#0f5f8c] bg-[linear-gradient(100deg,rgba(239,249,255,0.96),rgba(255,255,255,0.92)),#fff] p-[clamp(22px,4vw,38px)] shadow-[0_12px_30px_rgba(25,64,93,0.07)] max-[720px]:rounded-xl">
-          <span className="inline-flex w-max rounded-full bg-[#e7f3f8] px-2.5 py-1.5 text-[0.72rem] font-black uppercase tracking-[0.08em] text-[#0f5f8c]">{eyebrow}</span>
-          <h1 className="mt-2.5 max-w-[880px] text-[clamp(2rem,4.5vw,4.4rem)] leading-none tracking-normal text-[#102033] max-[720px]:text-[clamp(2rem,12vw,3.2rem)]">{title}</h1>
+      <main className="grid gap-5 px-0 py-5 max-[720px]:pt-3">
+        <section className="px-6 pt-6">
+        <h1 className="text-3xl font-bold">{title}</h1>
           {intro && <p className="mt-3 max-w-[760px] text-[1.02rem] font-semibold leading-[1.55] text-[#53687b]">{intro}</p>}
         </section>
         {children}
@@ -108,14 +99,13 @@ export function PortalPanel({
   return (
     <section
       className={cn(
-        'min-w-0 rounded-[14px] border border-[#d7e5ec] border-t-4 bg-white p-[18px] shadow-[0_12px_30px_rgba(25,64,93,0.07)] max-[720px]:rounded-xl',
-        panelTopBorder[tone],
+        'min-w-0 rounded-xl border border-[#d7e5ec] bg-white p-6',
         className,
       )}
     >
       <div className="mb-3.5 flex items-center gap-2.5">
         {icon && <span className="grid h-9 w-9 place-items-center rounded-[9px] bg-[#e7f3f8] text-[#0f5f8c]">{icon}</span>}
-        <h2 className="m-0 text-[1.08rem] tracking-normal text-[#102033]">{title}</h2>
+        <h2 className="m-0 text-lg font-bold">{title}</h2>
       </div>
       {children}
     </section>
