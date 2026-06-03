@@ -7,7 +7,6 @@ import { verificationStates } from '../../data/patientPortalData'
 export function EmailVerificationPage() {
   return (
     <PatientPage
-      eyebrow="Email verification"
       title="Verify your portal access"
       intro="The portal displays the successful verification state and an expired-link state for demo review."
     >

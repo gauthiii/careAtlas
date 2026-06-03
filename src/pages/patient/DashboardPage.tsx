@@ -10,7 +10,6 @@ const actionIcons = [<CalendarCheck size={18} />, <UserRound size={18} />, <Bell
 export function DashboardPage() {
   return (
     <PatientPage
-      eyebrow="Patient dashboard"
       title={`Welcome back, ${patient.firstName}`}
       intro="Your central place for appointments, profile status, and clinic messages."
     >
