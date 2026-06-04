@@ -37,11 +37,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Generate ServiceNow snapshot
         env:
           SNOW_INSTANCE: ${{ secrets.SNOW_INSTANCE }}
           SNOW_USERNAME: ${{ secrets.SNOW_USERNAME }}
           SNOW_PASSWORD: ${{ secrets.SNOW_PASSWORD }}
+        run: npm run generate:snow-snapshot
+
+      - name: Build
         run: npm run build
 
       - name: Upload artifact

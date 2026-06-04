@@ -3,7 +3,8 @@
 // Confirmed table (from /sn_aia_agent.do XML export):
 //   sn_aia_agent
 //
-// Proxy base: /api/snow  (Vite dev server injects Basic Auth header — see vite.config.ts)
+// Local dev uses /api/snow (Vite injects Basic Auth — see vite.config.ts).
+// GitHub Pages is static, so deployed builds read a generated snapshot JSON.
 
 export interface SnowAISystem {
   sys_id: string
@@ -30,6 +31,21 @@ interface RawRecord {
   active: SnowField
 }
 
+function getServiceNowInventoryUrl(params: URLSearchParams): string {
+  const proxyBase = import.meta.env.VITE_SNOW_API_BASE
+
+  if (proxyBase) {
+    const normalizedBase = proxyBase.replace(/\/$/, '')
+    return `${normalizedBase}/api/now/table/sn_aia_agent?${params}`
+  }
+
+  if (import.meta.env.DEV) {
+    return `/api/snow/api/now/table/sn_aia_agent?${params}`
+  }
+
+  return `${import.meta.env.BASE_URL}snow-ai-agent-inventory.json`
+}
+
 export async function fetchUnmanagedAIStewardSystems(): Promise<SnowAISystem[]> {
   const params = new URLSearchParams({
     sysparm_query: 'ORDERBYDESCsys_created_on',
@@ -45,7 +61,7 @@ export async function fetchUnmanagedAIStewardSystems(): Promise<SnowAISystem[]> 
     sysparm_limit: '10',
   })
 
-  const res = await fetch(`/api/snow/api/now/table/sn_aia_agent?${params}`, {
+  const res = await fetch(getServiceNowInventoryUrl(params), {
     headers: { Accept: 'application/json' },
   })
 
