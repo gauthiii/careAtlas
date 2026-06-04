@@ -38,6 +38,10 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          SNOW_INSTANCE: ${{ secrets.SNOW_INSTANCE }}
+          SNOW_USERNAME: ${{ secrets.SNOW_USERNAME }}
+          SNOW_PASSWORD: ${{ secrets.SNOW_PASSWORD }}
         run: npm run build
 
       - name: Upload artifact
