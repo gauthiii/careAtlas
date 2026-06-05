@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { HeartPulse, Home, Hospital, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
+import { Bot, HeartPulse, Home, Hospital, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import {
@@ -24,6 +24,7 @@ const panelTopBorder: Record<PanelTone, string> = {
 
 const governanceNav = [
   { label: 'Home', to: '/governance', icon: Home, end: true },
+  { label: 'AI Agents', to: '/governance/ai-agents', icon: Bot, end: true },
   { label: 'ACL', to: '/governance/acl', icon: UserCog, end: true },
 ] as const
 
