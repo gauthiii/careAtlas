@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "generate:snow-snapshot": "node scripts/generateServiceNowSnapshot.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
