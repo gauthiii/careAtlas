@@ -18,6 +18,8 @@ touches a backend lives in [`server/`](server/):
 
 - `GET  /api/agents` — AI agent inventory from the ServiceNow `sn_aia_agent` table.
 - `POST /api/auth/validate` — validates a username/password against ServiceNow `sys_user`.
+- `POST /api/auth/entra/*` — Microsoft Entra External ID Native Auth signup,
+  login, MFA challenge/verification, strong-auth registration, and token refresh.
 - `GET  /api/health` — liveness check.
 
 ## Prerequisites
@@ -71,6 +73,20 @@ make sure the backend is running first. Key pages:
 | `SNOW_PASSWORD`        | yes      | —                       | Service account password                                 |
 | `CORS_ORIGINS`         | no       | `http://localhost:5173` | Comma-separated browser origins allowed to call the API  |
 | `AGENTS_CREATED_SINCE` | no       | `2026-06-02 00:00:00`   | Only return agents created on/after this UTC datetime     |
+| `ENTRA_APP_ID`         | yes      | —                       | Entra app registration Application (client) ID            |
+| `ENTRA_TENANT_ID`      | yes      | —                       | Entra external tenant Directory (tenant) ID               |
+| `ENTRA_TENANT_SUBDOMAIN` | yes    | —                       | Prefix in `https://<subdomain>.ciamlogin.com/common`      |
+| `ENTRA_TENANT_DOMAIN`  | no       | `<subdomain>.onmicrosoft.com` | External tenant domain used in Native Auth API paths |
+| `ENTRA_SCOPES`         | no       | `openid offline_access profile` | Scopes requested when issuing or refreshing tokens |
+
+### Entra External ID test endpoints
+
+The Entra Native Auth backend endpoints are available in the FastAPI docs at
+<http://localhost:8000/docs> under `/api/auth/entra/*`. The email + password
+flow starts with `/signin/start`, continues with `/signin/password`, and returns
+either JSON tokens or an MFA/registration next step. If MFA is required, use the
+`/signin/mfa/*` endpoints for existing methods or `/mfa/register/*` to register a
+strong authentication method, then finish with `/token/continue`.
 
 ### Frontend — `.env` (repo root)
 

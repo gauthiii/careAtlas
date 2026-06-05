@@ -10,10 +10,12 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import Settings, get_settings
+from .entra_native_auth import router as entra_auth_router
 from .models import AISystem, ValidateRequest, ValidateResponse
 from .servicenow import ServiceNowError, fetch_agents, validate_user
 
 api = APIRouter(prefix="/api")
+api.include_router(entra_auth_router)
 
 
 @api.get("/health")
