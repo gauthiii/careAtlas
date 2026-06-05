@@ -1,7 +1,10 @@
 import { useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 
+import { GovernanceAclPage } from './pages/governance/GovernanceAclPage'
+import { GovernanceAiAgentsPage } from './pages/governance/GovernanceAiAgentsPage'
 import { GovernanceDashboardPage } from './pages/governance/GovernanceDashboardPage'
+import { GovernanceDemoPage } from './pages/governance/GovernanceDemoPage'
 import { ViewChooserPage } from './pages/home/ViewChooserPage'
 import { BookAppointmentPage } from './pages/patient/BookAppointmentPage'
 import { ContactPage } from './pages/patient/ContactPage'
@@ -37,6 +40,9 @@ function App() {
         <Route path="/staff/patient/:id" element={<PatientRecordPage />} />
         <Route path="/staff/availability" element={<AvailabilityPage />} />
         <Route path="/governance" element={<GovernanceDashboardPage />} />
+        <Route path="/governance/ai-agents" element={<GovernanceAiAgentsPage />} />
+        <Route path="/governance/acl" element={<GovernanceAclPage />} />
+        <Route path="/governance/demo" element={<GovernanceDemoPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

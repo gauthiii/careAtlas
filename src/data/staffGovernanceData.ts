@@ -101,3 +101,133 @@ export const auditLog = [
   { action: 'scheduling decision', subject: 'Jordan Brooks', trail: 'profile factors -> fairness check -> doctor availability query' },
   { action: 'identity queue', subject: 'Avery Long', trail: 'verification confidence below threshold -> human review' },
 ]
+
+export type NHIPermission = {
+  op: 'read' | 'write' | 'insert' | 'deny'
+  target: string
+  description: string
+}
+
+export type NHIAclRule = {
+  label: string
+  table: string
+  level: 'table' | 'field' | 'deny'
+}
+
+export type NonHumanIdentity = {
+  userId: string
+  firstName: string
+  lastName: string
+  email: string
+  group: string
+  description: string
+  iconKey: 'ShieldCheck' | 'CalendarDays' | 'Bell' | 'ClipboardList' | 'Activity'
+  accentColor: string
+  iconBg: string
+  permissions: NHIPermission[]
+  aclRules: NHIAclRule[]
+  roles: string[]
+}
+
+export const nonHumanIdentities: NonHumanIdentity[] = [
+  {
+    userId: 'svc-identity-verification-agent',
+    firstName: 'Identity Verification',
+    lastName: 'Agent',
+    email: 'svc-identity@noreply.internal',
+    group: 'grp-identity-agent',
+    description: 'Verifies patient identity by cross-referencing registration data, assigning confidence scores, and updating registration status. Has full read access to the patient table.',
+    iconKey: 'ShieldCheck',
+    accentColor: '#0f5f8c',
+    iconBg: '#0f5f8c',
+    permissions: [
+      { op: 'read',  target: 'u_patient (all fields)',          description: 'Full table-level read access' },
+      { op: 'write', target: 'u_patient.u_registration_status', description: 'Update registration status' },
+      { op: 'write', target: 'u_patient.u_confidence_score',    description: 'Set identity confidence score' },
+    ],
+    aclRules: [
+      { label: 'table read',  table: 'u_patient',             level: 'table' },
+      { label: 'field write', table: 'u_registration_status', level: 'field' },
+      { label: 'field write', table: 'u_confidence_score',    level: 'field' },
+    ],
+    roles: ['role_identity_read_patient', 'role_identity_write_status'],
+  },
+  {
+    userId: 'svc-scheduling-agent',
+    firstName: 'Scheduling',
+    lastName: 'Agent',
+    email: 'svc-scheduling@noreply.internal',
+    group: 'grp-scheduling-agent',
+    description: 'Ranks appointment slots based on health condition, accessibility, and time preferences. Reads only 5 non-PII patient fields; all identity fields are explicitly denied.',
+    iconKey: 'CalendarDays',
+    accentColor: '#5b21b6',
+    iconBg: '#5b21b6',
+    permissions: [
+      { op: 'read',   target: 'u_patient (5 fields)',     description: 'patient_id, health_condition, accessibility, time_preference, account_status' },
+      { op: 'insert', target: 'u_ai_decision_log',        description: 'Log scheduling decisions for audit trail' },
+      { op: 'deny',   target: 'u_patient PII (7 fields)', description: 'ethnicity, gender, first/last name, email, phone, DOB — all denied' },
+    ],
+    aclRules: [
+      { label: 'field read ×5', table: 'u_patient',         level: 'field' },
+      { label: 'table insert',  table: 'u_ai_decision_log', level: 'table' },
+      { label: 'PII deny ×7',   table: 'u_patient',         level: 'deny'  },
+    ],
+    roles: ['role_scheduling_read_patient', 'role_scheduling_write_decision_log'],
+  },
+  {
+    userId: 'svc-reminder-agent',
+    firstName: 'Reminder',
+    lastName: 'Agent',
+    email: 'svc-reminder@noreply.internal',
+    group: 'grp-reminder-agent',
+    description: 'Reads upcoming appointment records to dispatch patient reminders. Strictly read-only — no write, update, or delete permissions on any table.',
+    iconKey: 'Bell',
+    accentColor: '#b45309',
+    iconBg: '#b45309',
+    permissions: [
+      { op: 'read', target: 'u_appointment', description: 'Full table-level read for reminder dispatch' },
+    ],
+    aclRules: [
+      { label: 'table read', table: 'u_appointment', level: 'table' },
+    ],
+    roles: ['role_reminder_read_appointment'],
+  },
+  {
+    userId: 'svc-notes-agent',
+    firstName: 'Notes Summary',
+    lastName: 'Agent',
+    email: 'svc-notes@noreply.internal',
+    group: 'grp-notes-agent',
+    description: 'Summarises completed appointment notes and writes the patient summary field. A Business Rule blocks all field writes except u_patient_summary.',
+    iconKey: 'ClipboardList',
+    accentColor: '#0f6b4f',
+    iconBg: '#0f6b4f',
+    permissions: [
+      { op: 'read',  target: 'u_appointment (completed)',    description: 'Read completed appointment notes' },
+      { op: 'write', target: 'u_patient.u_patient_summary',  description: 'Write patient summary field only' },
+    ],
+    aclRules: [
+      { label: 'table read',  table: 'u_appointment',    level: 'table' },
+      { label: 'field write', table: 'u_patient_summary', level: 'field' },
+    ],
+    roles: ['role_notes_read_appointment', 'role_notes_write_summary'],
+  },
+  {
+    userId: 'svc-triage-agent',
+    firstName: 'Triage',
+    lastName: 'Agent',
+    email: 'svc-triage@noreply.internal',
+    group: 'grp-triage-agent',
+    description: 'Reads session reason text and health conditions to assign triage priority scores. Minimum-privilege access — only 2 patient fields visible.',
+    iconKey: 'Activity',
+    accentColor: '#a22828',
+    iconBg: '#a22828',
+    permissions: [
+      { op: 'read', target: 'u_patient (2 fields)', description: 'u_reason_text and u_health_condition only' },
+    ],
+    aclRules: [
+      { label: 'field read ×2', table: 'u_patient', level: 'field' },
+    ],
+    roles: ['role_triage_read_session'],
+  },
+]
