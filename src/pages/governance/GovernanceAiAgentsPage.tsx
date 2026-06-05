@@ -25,9 +25,9 @@ export function GovernanceAiAgentsPage() {
     <PortalPage
       label="AI Governance Officer"
       title="AI Agents"
-      intro="Most recent agent records from the ServiceNow AI Control Tower table sn_aia_agent. Expand an agent to inspect its strategy, role, proficiency and operating instructions."
+      intro="Agent records created in the ServiceNow AI Control Tower table sn_aia_agent since June 2, 2026. Expand an agent to inspect its strategy, role, proficiency and operating instructions."
     >
-      <section className="px-6 pb-6">
+      <section className="min-w-0 px-6 pb-6">
         <AgentInventory />
       </section>
     </PortalPage>
@@ -45,11 +45,14 @@ function AgentInventory() {
       return next
     })
 
+  const title =
+    state === 'ok' ? `AI Agent Inventory — ${systems.length} agents` : 'AI Agent Inventory'
+
   return (
-    <PortalPanel title="AI Agent Inventory — Latest 10" icon={<ShieldAlert size={18} />}>
+    <PortalPanel title={title} icon={<ShieldAlert size={18} />}>
       <p className="mb-4 text-xs text-[#53687b]">
-        Most recent agent records from ServiceNow AI Control Tower table{' '}
-        <span className="font-semibold text-[#143A57]">sn_aia_agent</span>.
+        Agents created in ServiceNow AI Control Tower table{' '}
+        <span className="font-semibold text-[#143A57]">sn_aia_agent</span> since June 2, 2026.
       </p>
 
       {state === 'loading' && (
@@ -151,7 +154,7 @@ function AgentCard({
         <div className="space-y-5 border-t border-[#eef3f7] px-4 py-4">
           {agent.role && (
             <DetailSection icon={<UserRound size={14} />} title="Role">
-              <p className="rounded-lg border-l-[3px] border-[#0f5f8c] bg-[#f5f9fb] px-3.5 py-3 text-sm leading-[1.6] text-[#40566b]">
+              <p className="break-words rounded-lg border-l-[3px] border-[#0f5f8c] bg-[#f5f9fb] px-3.5 py-3 text-sm leading-[1.6] text-[#40566b]">
                 {agent.role}
               </p>
             </DetailSection>
@@ -159,7 +162,7 @@ function AgentCard({
 
           {agent.description && (
             <DetailSection icon={<Sparkles size={14} />} title="Description">
-              <p className="text-sm leading-[1.6] text-[#40566b]">{agent.description}</p>
+              <p className="break-words text-sm leading-[1.6] text-[#40566b]">{agent.description}</p>
             </DetailSection>
           )}
 
@@ -170,7 +173,7 @@ function AgentCard({
                   {proficiency.map((item, i) => (
                     <li key={i} className="flex gap-2.5 text-sm leading-[1.55] text-[#40566b]">
                       <Check size={15} className="mt-0.5 flex-shrink-0 text-[#12805c]" />
-                      <span>{item}</span>
+                      <span className="min-w-0 break-words">{item}</span>
                     </li>
                   ))}
                 </ul>
@@ -189,7 +192,7 @@ function AgentCard({
                       <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#143A57] text-[11px] font-bold text-white">
                         {i + 1}
                       </span>
-                      <span>{step}</span>
+                      <span className="min-w-0 break-words">{step}</span>
                     </li>
                   ))}
                 </ol>

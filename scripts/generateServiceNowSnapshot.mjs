@@ -14,7 +14,7 @@ if (!SNOW_INSTANCE || !SNOW_USERNAME || !SNOW_PASSWORD) {
 }
 
 const params = new URLSearchParams({
-  sysparm_query: 'ORDERBYDESCsys_created_on',
+  sysparm_query: 'sys_created_on>=2026-06-02 00:00:00^ORDERBYDESCsys_created_on',
   sysparm_fields: [
     'sys_id',
     'name',
@@ -28,7 +28,6 @@ const params = new URLSearchParams({
     'condition',
   ].join(','),
   sysparm_display_value: 'true',
-  sysparm_limit: '10',
 })
 
 const credentials = Buffer.from(`${SNOW_USERNAME}:${SNOW_PASSWORD}`).toString('base64')

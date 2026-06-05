@@ -53,6 +53,9 @@ const AGENT_FIELDS = [
   'condition',
 ] as const
 
+// Show every agent created on or after this date (newest first), not just a fixed page.
+const AGENT_QUERY = 'sys_created_on>=2026-06-02 00:00:00^ORDERBYDESCsys_created_on'
+
 function getServiceNowInventoryUrl(params: URLSearchParams): string {
   const proxyBase = import.meta.env.VITE_SNOW_API_BASE
 
@@ -87,10 +90,9 @@ function normalizeBase(base: string): string {
 
 export async function fetchUnmanagedAIStewardSystems(): Promise<SnowAISystem[]> {
   const params = new URLSearchParams({
-    sysparm_query: 'ORDERBYDESCsys_created_on',
+    sysparm_query: AGENT_QUERY,
     sysparm_fields: AGENT_FIELDS.join(','),
     sysparm_display_value: 'true',
-    sysparm_limit: '10',
   })
 
   const res = await fetch(getServiceNowInventoryUrl(params), {
