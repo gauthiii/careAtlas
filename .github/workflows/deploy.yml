@@ -39,9 +39,6 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-          VITE_API_PROXY_TARGET: ${{ vars.VITE_API_PROXY_TARGET }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
