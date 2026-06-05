@@ -5,6 +5,7 @@ import { GovernanceAclPage } from './pages/governance/GovernanceAclPage'
 import { GovernanceAiAgentsPage } from './pages/governance/GovernanceAiAgentsPage'
 import { GovernanceDashboardPage } from './pages/governance/GovernanceDashboardPage'
 import { GovernanceDemoPage } from './pages/governance/GovernanceDemoPage'
+import { EntraTestPage } from './pages/entra/EntraTestPage'
 import { ViewChooserPage } from './pages/home/ViewChooserPage'
 import { BookAppointmentPage } from './pages/patient/BookAppointmentPage'
 import { ContactPage } from './pages/patient/ContactPage'
@@ -43,6 +44,8 @@ function App() {
         <Route path="/governance/ai-agents" element={<GovernanceAiAgentsPage />} />
         <Route path="/governance/acl" element={<GovernanceAclPage />} />
         <Route path="/governance/demo" element={<GovernanceDemoPage />} />
+        {/* Temporary: Entra native-auth test console. Remove when no longer needed. */}
+        <Route path="/entra" element={<EntraTestPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

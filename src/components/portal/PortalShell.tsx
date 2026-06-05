@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
-import { Bot, HeartPulse, Home, Hospital, Presentation, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
+import { Bot, HeartPulse, Home, Hospital, KeyRound, Presentation, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import {
   isClinicianPortalPath,
+  isEntraPortalPath,
   isGovernancePortalPath,
   isPatientPortalPath,
   portalSwitcherActive,
@@ -89,6 +90,13 @@ export function PortalHeader({ label }: { label: string }) {
           className={cn(portalSwitcherLink, isGovernancePortalPath(location.pathname) && portalSwitcherActive)}
         >
           <ShieldCheck size={15} /> AI Governance
+        </NavLink>
+        {/* Temporary: Entra native-auth test console. Remove when no longer needed. */}
+        <NavLink
+          to="/entra"
+          className={cn(portalSwitcherLink, isEntraPortalPath(location.pathname) && portalSwitcherActive)}
+        >
+          <KeyRound size={15} /> Entra
         </NavLink>
       </nav>
     </header>

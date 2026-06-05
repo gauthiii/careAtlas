@@ -14,3 +14,8 @@ export function isClinicianPortalPath(pathname: string) {
 export function isGovernancePortalPath(pathname: string) {
   return pathname.startsWith('/governance')
 }
+
+// Temporary: Entra native-auth test console. Remove with the /entra route.
+export function isEntraPortalPath(pathname: string) {
+  return pathname.startsWith('/entra')
+}
