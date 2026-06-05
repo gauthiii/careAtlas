@@ -1,15 +1,23 @@
 // Customer-facing demo of the Microsoft Entra External ID native-auth flows.
-// Two cards — Register and Sign in — each backed by the FastAPI proxy. When a
-// flow needs a one-time code (email verification on sign-up, or MFA on
-// sign-in) the card swaps to an OTP step. Outcomes surface as a green success
-// modal or a red error modal.
 //
-// NOTE: Temporary surface reachable from the "Entra" nav tab; remove once
-// native auth is wired into the real patient flow.
+// Two cards — Register and Sign in — backed by the FastAPI proxy.
+//
+//   Register : email + password -> verify with an emailed code -> account
+//              secured with email multi-factor verification.
+//   Sign in  : email + password -> (if MFA required) emailed one-time code
+//              -> success.
+//
+// NOTE: Entra External ID native authentication does NOT support TOTP /
+// authenticator apps. The only second factors it offers are email OTP and SMS
+// OTP, so the "second factor" here is an emailed one-time code. Outcomes
+// surface as a green success modal or a red error modal.
+//
+// Temporary surface reachable from the "Entra" nav tab; remove once native
+// auth is wired into the real patient flow.
 
 import { type FormEvent, type ReactNode, useState } from 'react'
 import {
-  AlertTriangle,
+  Check,
   CheckCircle2,
   KeyRound,
   Loader2,
@@ -27,6 +35,9 @@ import { PortalPage } from '../../components/portal/PortalShell'
 import { cn } from '../../lib/cn'
 import {
   EntraApiError,
+  mfaRegisterChallenge,
+  mfaRegisterMethods,
+  mfaRegisterVerify,
   signinMfaChallenge,
   signinMfaMethods,
   signinMfaVerify,
@@ -35,6 +46,8 @@ import {
   signupChallenge,
   signupStart,
   signupVerify,
+  tokenContinue,
+  type EntraMethod,
   type EntraResponse,
 } from '../../services/entraAuth'
 
@@ -47,7 +60,7 @@ type Modal =
   | { variant: 'error'; title: string; message: string }
 
 const cardClass =
-  'grid gap-4 rounded-[14px] border border-[#d7e5ec] bg-white p-[26px] shadow-[0_12px_30px_rgba(25,64,93,0.07)]'
+  'grid gap-5 rounded-[14px] border border-[#d7e5ec] bg-white p-[26px] shadow-[0_12px_30px_rgba(25,64,93,0.07)]'
 
 const inputClass =
   'w-full rounded-[9px] border border-[#cbdde6] bg-white px-3 py-[11px] text-inherit outline-none focus:border-[#0397AE]'
@@ -61,6 +74,10 @@ function messageFromError(err: unknown): string {
   if (err instanceof EntraApiError) return err.message
   if (err instanceof Error) return err.message
   return 'Something went wrong. Please try again.'
+}
+
+function firstMethod(methods?: EntraMethod[]): EntraMethod | undefined {
+  return methods?.find((m) => typeof m.id === 'string' && m.id) ?? methods?.[0]
 }
 
 function Field({
@@ -120,9 +137,33 @@ function CardHeader({
   )
 }
 
-// One-time-code entry, reused by both flows.
+function Steps({ steps, current }: { steps: string[]; current: number }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[0.72rem] font-bold">
+      {steps.map((label, i) => (
+        <div key={label} className="flex items-center gap-2">
+          <span
+            className={cn(
+              'grid h-5 w-5 place-items-center rounded-full text-[0.66rem]',
+              i < current
+                ? 'bg-[#12805c] text-white'
+                : i === current
+                  ? 'bg-[#143A57] text-white'
+                  : 'bg-[#e5eef3] text-[#8aa0b3]',
+            )}
+          >
+            {i < current ? <Check size={11} /> : i + 1}
+          </span>
+          <span className={i === current ? 'text-[#143A57]' : 'text-[#8aa0b3]'}>{label}</span>
+          {i < steps.length - 1 && <span className="h-px w-4 bg-[#d7e5ec]" />}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// One-time-code entry, reused by every OTP step.
 function OtpStep({
-  title,
   description,
   code,
   setCode,
@@ -133,7 +174,6 @@ function OtpStep({
   resending,
   submitLabel,
 }: {
-  title: string
   description: ReactNode
   code: string
   setCode: (v: string) => void
@@ -151,7 +191,7 @@ function OtpStep({
         <span>{description}</span>
       </div>
       <label className="grid gap-[7px] text-[0.92rem] font-bold text-[#40566b]">
-        <span>{title}</span>
+        <span>Verification code</span>
         <input
           className={cn(inputClass, 'text-center font-mono text-xl tracking-[0.4em]')}
           inputMode="numeric"
@@ -184,11 +224,13 @@ function OtpStep({
 }
 
 // ---------------------------------------------------------------------------
-// Register card
+// Register card — account -> verify email -> secured
 // ---------------------------------------------------------------------------
 
+type RegisterStep = 'form' | 'otp' | 'secured'
+
 function RegisterCard({ notify }: { notify: (m: Modal) => void }) {
-  const [step, setStep] = useState<'form' | 'otp'>('form')
+  const [step, setStep] = useState<RegisterStep>('form')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -198,7 +240,16 @@ function RegisterCard({ notify }: { notify: (m: Modal) => void }) {
   const [busy, setBusy] = useState(false)
   const [resending, setResending] = useState(false)
 
-  function resetToForm() {
+  function startOver() {
+    setStep('form')
+    setFullName('')
+    setEmail('')
+    setPassword('')
+    setCode('')
+    setToken('')
+  }
+
+  function backToForm() {
     setStep('form')
     setCode('')
     setToken('')
@@ -216,11 +267,7 @@ function RegisterCard({ notify }: { notify: (m: Modal) => void }) {
       setCode('')
       setStep('otp')
     } catch (err) {
-      notify({
-        variant: 'error',
-        title: 'Registration failed',
-        message: messageFromError(err),
-      })
+      notify({ variant: 'error', title: 'Registration failed', message: messageFromError(err) })
     } finally {
       setBusy(false)
     }
@@ -235,12 +282,9 @@ function RegisterCard({ notify }: { notify: (m: Modal) => void }) {
         notify({
           variant: 'success',
           title: 'Account created',
-          message: `Welcome${fullName ? `, ${fullName}` : ''}! Your account for ${email} is ready — you can now sign in.`,
+          message: `Welcome${fullName ? `, ${fullName}` : ''}! Your account for ${email} is verified and ready.`,
         })
-        setFullName('')
-        setEmail('')
-        setPassword('')
-        resetToForm()
+        setStep('secured')
       } else {
         notify({
           variant: 'error',
@@ -280,8 +324,12 @@ function RegisterCard({ notify }: { notify: (m: Modal) => void }) {
         title="Create your account"
         subtitle="Register with Microsoft Entra native authentication"
       />
+      <Steps
+        steps={['Account', 'Verify email', 'Secured']}
+        current={step === 'form' ? 0 : step === 'otp' ? 1 : 2}
+      />
 
-      {step === 'form' ? (
+      {step === 'form' && (
         <form onSubmit={handleRegister} className="grid gap-4">
           <Field
             label="Full name"
@@ -314,40 +362,63 @@ function RegisterCard({ notify }: { notify: (m: Modal) => void }) {
             {busy ? 'Creating account…' : 'Create account'}
           </button>
         </form>
-      ) : (
+      )}
+
+      {step === 'otp' && (
         <OtpStep
-          title="Verification code"
           description={
             <>
-              We emailed a verification code to <strong>{target}</strong>. Enter it to finish creating
-              your account.
+              We emailed a verification code to <strong>{target}</strong>. Enter it to confirm your
+              email and finish creating your account.
             </>
           }
           code={code}
           setCode={setCode}
           onSubmit={handleVerify}
           onResend={handleResend}
-          onBack={resetToForm}
+          onBack={backToForm}
           busy={busy}
           resending={resending}
-          submitLabel="Verify & create account"
+          submitLabel="Verify email"
         />
+      )}
+
+      {step === 'secured' && (
+        <div className="grid gap-4">
+          <div className="flex items-start gap-3 rounded-xl border border-[#bfe6d4] bg-[#eaf8f1] px-4 py-4">
+            <ShieldCheck size={22} className="mt-0.5 flex-shrink-0 text-[#12805c]" />
+            <div>
+              <div className="font-bold text-[#0f6f4f]">Multi-factor security is on</div>
+              <p className="mt-1 text-sm leading-[1.55] text-[#40566b]">
+                Each time you sign in we'll email a one-time security code to{' '}
+                <strong>{email}</strong> to confirm it's really you. No authenticator app needed.
+              </p>
+            </div>
+          </div>
+          <button type="button" className={primaryBtn} onClick={startOver}>
+            <CheckCircle2 size={17} /> Done
+          </button>
+        </div>
       )}
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Login card
+// Login card — password -> (MFA email code if required) -> success
 // ---------------------------------------------------------------------------
+
+type OtpMode = 'mfa' | 'register'
 
 function LoginCard({ notify }: { notify: (m: Modal) => void }) {
   const [step, setStep] = useState<'form' | 'otp'>('form')
+  const [otpMode, setOtpMode] = useState<OtpMode>('mfa')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const [token, setToken] = useState('')
   const [methodId, setMethodId] = useState('')
+  const [channel, setChannel] = useState('')
   const [target, setTarget] = useState('')
   const [busy, setBusy] = useState(false)
   const [resending, setResending] = useState(false)
@@ -357,9 +428,10 @@ function LoginCard({ notify }: { notify: (m: Modal) => void }) {
     setCode('')
     setToken('')
     setMethodId('')
+    setChannel('')
   }
 
-  function welcome(res: EntraResponse) {
+  function finish(res: EntraResponse) {
     const claims = decodeIdToken(res.tokens?.idToken)
     const name =
       (claims && (claims.name || claims.given_name || claims.preferred_username)) || email
@@ -373,15 +445,38 @@ function LoginCard({ notify }: { notify: (m: Modal) => void }) {
     setPassword('')
   }
 
+  // mfa_required: a method is already registered — challenge it.
   async function beginMfa(continuationToken: string) {
-    const methods = await signinMfaMethods(continuationToken)
-    const first = methods.methods?.[0]
-    const id = (first && typeof first.id === 'string' && first.id) || ''
-    const ct = methods.continuationToken ?? continuationToken
+    const intro = await signinMfaMethods(continuationToken)
+    const method = firstMethod(intro.methods)
+    const id = (method && typeof method.id === 'string' && method.id) || ''
+    const ct = intro.continuationToken ?? continuationToken
     const challenged = await signinMfaChallenge(ct, id)
+    setOtpMode('mfa')
     setMethodId(id)
     setToken(challenged.continuationToken ?? ct)
-    setTarget(challenged.challengeTargetLabel || first?.loginHint || email)
+    setTarget(challenged.challengeTargetLabel || method?.loginHint || email)
+    setCode('')
+    setStep('otp')
+  }
+
+  // registration_required: enrol a second factor first, then challenge it.
+  async function beginRegister(continuationToken: string) {
+    const intro = await mfaRegisterMethods(continuationToken)
+    const method = firstMethod(intro.methods)
+    const id = (method && typeof method.id === 'string' && method.id) || ''
+    const ch = method?.challengeChannel ?? ''
+    const ct = intro.continuationToken ?? continuationToken
+    const challenged = await mfaRegisterChallenge({
+      continuationToken: ct,
+      methodId: id,
+      challengeChannel: ch,
+    })
+    setOtpMode('register')
+    setMethodId(id)
+    setChannel(ch)
+    setToken(challenged.continuationToken ?? ct)
+    setTarget(challenged.challengeTargetLabel || method?.challengeTarget || email)
     setCode('')
     setStep('otp')
   }
@@ -394,16 +489,11 @@ function LoginCard({ notify }: { notify: (m: Modal) => void }) {
       const res = await signinPassword(started.continuationToken ?? '', password)
 
       if (res.status === 'authenticated') {
-        welcome(res)
+        finish(res)
       } else if (res.status === 'mfa_required') {
         await beginMfa(res.continuationToken ?? '')
       } else if (res.status === 'registration_required') {
-        notify({
-          variant: 'error',
-          title: 'Extra security setup needed',
-          message:
-            'This account must register a multi-factor method before signing in. Complete MFA enrolment in Microsoft Entra, then try again.',
-        })
+        await beginRegister(res.continuationToken ?? '')
       } else {
         notify({
           variant: 'error',
@@ -422,15 +512,16 @@ function LoginCard({ notify }: { notify: (m: Modal) => void }) {
     e.preventDefault()
     setBusy(true)
     try {
-      const res = await signinMfaVerify(token, code)
-      if (res.status === 'authenticated') {
-        welcome(res)
+      if (otpMode === 'mfa') {
+        const res = await signinMfaVerify(token, code)
+        if (res.status === 'authenticated') finish(res)
+        else notifyIncomplete(res)
       } else {
-        notify({
-          variant: 'error',
-          title: 'Verification incomplete',
-          message: res.errorDescription || 'The code was accepted but sign-in did not complete.',
-        })
+        // Confirm the new factor, then redeem the continuation token for tokens.
+        const registered = await mfaRegisterVerify(token, code)
+        const res = await tokenContinue(registered.continuationToken ?? token)
+        if (res.status === 'authenticated') finish(res)
+        else notifyIncomplete(res)
       }
     } catch (err) {
       notify({ variant: 'error', title: 'Verification failed', message: messageFromError(err) })
@@ -439,11 +530,22 @@ function LoginCard({ notify }: { notify: (m: Modal) => void }) {
     }
   }
 
+  function notifyIncomplete(res: EntraResponse) {
+    notify({
+      variant: 'error',
+      title: 'Verification incomplete',
+      message: res.errorDescription || 'The code was accepted but sign-in did not complete.',
+    })
+  }
+
   async function handleResend() {
     if (!token) return
     setResending(true)
     try {
-      const res = await signinMfaChallenge(token, methodId)
+      const res =
+        otpMode === 'mfa'
+          ? await signinMfaChallenge(token, methodId)
+          : await mfaRegisterChallenge({ continuationToken: token, methodId, challengeChannel: channel })
       setToken(res.continuationToken ?? token)
       notify({
         variant: 'success',
@@ -464,6 +566,7 @@ function LoginCard({ notify }: { notify: (m: Modal) => void }) {
         title="Sign in"
         subtitle="Authenticate with Microsoft Entra native authentication"
       />
+      <Steps steps={['Password', 'Verify']} current={step === 'form' ? 0 : 1} />
 
       {step === 'form' ? (
         <form onSubmit={handleSignIn} className="grid gap-4">
@@ -492,12 +595,18 @@ function LoginCard({ notify }: { notify: (m: Modal) => void }) {
         </form>
       ) : (
         <OtpStep
-          title="Verification code"
           description={
-            <>
-              For your security, we sent a verification code to <strong>{target}</strong>. Enter it to
-              finish signing in.
-            </>
+            otpMode === 'register' ? (
+              <>
+                Set up your second factor: we sent a code to <strong>{target}</strong>. Enter it to
+                enrol this verification method and sign in.
+              </>
+            ) : (
+              <>
+                For your security, we sent a one-time code to <strong>{target}</strong>. Enter it to
+                finish signing in.
+              </>
+            )
           }
           code={code}
           setCode={setCode}
@@ -506,7 +615,7 @@ function LoginCard({ notify }: { notify: (m: Modal) => void }) {
           onBack={resetToForm}
           busy={busy}
           resending={resending}
-          submitLabel="Verify & sign in"
+          submitLabel={otpMode === 'register' ? 'Verify & enrol' : 'Verify & sign in'}
         />
       )}
     </div>
@@ -530,12 +639,7 @@ function ResultModal({ modal, onClose }: { modal: Modal; onClose: () => void }) 
         className="w-full max-w-[440px] overflow-hidden rounded-[16px] border border-[#d7e5ec] bg-white shadow-[0_18px_50px_rgba(12,37,54,0.28)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className={cn(
-            'flex items-center gap-3 px-6 py-5',
-            success ? 'bg-[#e9f8f0]' : 'bg-[#fdecec]',
-          )}
-        >
+        <div className={cn('flex items-center gap-3 px-6 py-5', success ? 'bg-[#e9f8f0]' : 'bg-[#fdecec]')}>
           <span
             className={cn(
               'grid h-11 w-11 flex-shrink-0 place-items-center rounded-full text-white',
@@ -577,7 +681,7 @@ export function EntraTestPage() {
     <PortalPage
       label="Entra Native Auth (test)"
       title="Microsoft Entra account access"
-      intro="Create an account or sign in using Microsoft Entra External ID native authentication. A one-time code keeps your sign-in secure."
+      intro="Create an account or sign in using Microsoft Entra External ID native authentication. A one-time code emailed to you keeps every sign-in secure."
     >
       <section className="px-6 pb-10">
         <div className="mx-auto grid w-full max-w-[1040px] items-start gap-6 lg:grid-cols-2">
@@ -585,8 +689,9 @@ export function EntraTestPage() {
           <LoginCard notify={setModal} />
         </div>
 
-        <p className="mx-auto mt-6 flex max-w-[1040px] items-center justify-center gap-2 text-[0.8rem] font-semibold text-[#8aa0b3]">
-          <KeyRound size={14} /> Secured by Microsoft Entra External ID · Native Authentication
+        <p className="mx-auto mt-6 flex max-w-[1040px] items-center justify-center gap-2 text-center text-[0.8rem] font-semibold text-[#8aa0b3]">
+          <KeyRound size={14} /> Secured by Microsoft Entra External ID · Native Authentication · email
+          one-time codes
         </p>
       </section>
 
