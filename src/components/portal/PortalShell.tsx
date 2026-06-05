@@ -117,13 +117,13 @@ export function PortalTable({ columns, rows }: { columns: string[]; rows: string
     <div className="grid gap-2" role="table">
       <div className="grid grid-cols-3 gap-3 border-b border-[#d7e5ec] px-3 py-2.5 max-[720px]:grid-cols-1" role="row">
         {columns.map((column) => (
-          <span className="text-[0.74rem] font-black uppercase tracking-[0.06em] text-[#607487]" key={column} role="columnheader">{column}</span>
+          <span className="text-[0.74rem] font-bold uppercase tracking-[0.06em] text-[#607487]" key={column} role="columnheader">{column}</span>
         ))}
       </div>
       {rows.map((row, index) => (
-        <div className="grid grid-cols-3 gap-3 rounded-[10px] border border-[#e5eef3] bg-white px-3 py-2.5 max-[720px]:grid-cols-1" role="row" key={`${row.join('-')}-${index}`}>
+        <div className="grid grid-cols-3 gap-3 border-b border-[#d7e5ec] px-3 py-2.5 max-[720px]:grid-cols-1" role="row" key={`${row.join('-')}-${index}`}>
           {row.map((cell, cellIndex) => (
-            <span className="min-w-0 [overflow-wrap:anywhere] font-bold text-[#40566b]" role="cell" key={`${cell}-${cellIndex}`}>{cell}</span>
+            <span className="min-w-0 [overflow-wrap:anywhere]" role="cell" key={`${cell}-${cellIndex}`}>{cell}</span>
           ))}
         </div>
       ))}
