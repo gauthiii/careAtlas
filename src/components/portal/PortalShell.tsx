@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { HeartPulse, Hospital, ShieldCheck, Stethoscope } from 'lucide-react'
+import { HeartPulse, Home, Hospital, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import {
@@ -22,11 +22,17 @@ const panelTopBorder: Record<PanelTone, string> = {
   secure: 'border-t-[#40566b]',
 }
 
+const governanceNav = [
+  { label: 'Home', to: '/governance', icon: Home, end: true },
+  { label: 'ACL', to: '/governance/acl', icon: UserCog, end: true },
+] as const
+
 export function PortalHeader({ label }: { label: string }) {
   const location = useLocation()
+  const showGovernanceNav = isGovernancePortalPath(location.pathname)
 
   return (
-    <header className="sticky top-0 z-[18] grid grid-cols-[1fr_auto] items-center gap-0 border border-[#d7e5ec] rounded-[14px] bg-white/96 px-[clamp(14px,3vw,28px)] py-3.5 shadow-[0_10px_26px_rgba(25,64,93,0.08)] backdrop-blur-[14px] max-[1100px]:grid-cols-1 max-[720px]:static max-[720px]:p-2.5">
+    <header className="sticky top-0 z-[18] grid grid-cols-[auto_1fr_auto] items-center gap-3 border border-[#d7e5ec] rounded-[14px] bg-white/96 px-[clamp(14px,3vw,28px)] py-3.5 shadow-[0_10px_26px_rgba(25,64,93,0.08)] backdrop-blur-[14px] max-[1100px]:grid-cols-1 max-[720px]:static max-[720px]:p-2.5">
       <NavLink className="flex items-center gap-3" to="/">
         <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#143A57] text-white"><Hospital size={24} /></span>
         <span>
@@ -34,7 +40,36 @@ export function PortalHeader({ label }: { label: string }) {
           <small className="mt-0.5 flex items-center gap-[5px] text-[0.78rem] font-[750] text-[#607487]">{label}</small>
         </span>
       </NavLink>
-      <nav className="justify-self-end flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto" aria-label="Switch portal view">
+
+      {showGovernanceNav && (
+        <nav
+          className="min-w-0 justify-self-center flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-[#f7fbfd] p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto"
+          aria-label="AI governance navigation"
+        >
+          {governanceNav.map((item) => {
+            const Icon = item.icon
+
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  cn(
+                    'inline-flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
+                    isActive && 'bg-[#143A57] !text-white',
+                  )
+                }
+              >
+                <Icon size={15} />
+                {item.label}
+              </NavLink>
+            )
+          })}
+        </nav>
+      )}
+
+      <nav className="min-w-0 justify-self-end flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto" aria-label="Switch portal view">
         <NavLink
           to="/patient/home"
           className={cn(portalSwitcherLink, isPatientPortalPath(location.pathname) && portalSwitcherActive)}

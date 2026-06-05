@@ -22,10 +22,18 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/api\/snow/, ''),
           configure: (proxy) => {
             const proxyWithEvents = proxy as unknown as {
-              on: (event: 'proxyReq', handler: (proxyReq: { setHeader: (name: string, value: string) => void }) => void) => void
+              on: (event: 'proxyReq', handler: (proxyReq: {
+                getHeader: (name: string) => string | undefined
+                setHeader: (name: string, value: string) => void
+              }) => void) => void
             }
 
             proxyWithEvents.on('proxyReq', (proxyReq) => {
+              if (proxyReq.getHeader('Authorization')) {
+                proxyReq.setHeader('Accept', 'application/json')
+                return
+              }
+
               const credentials = Buffer.from(
                 `${env.SNOW_USERNAME}:${env.SNOW_PASSWORD}`
               ).toString('base64')
