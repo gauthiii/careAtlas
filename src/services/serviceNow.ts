@@ -9,27 +9,49 @@
 export interface SnowAISystem {
   sys_id: string
   name: string
+  display_name: string
   agent_type: string
+  strategy: string
   role: string
   description: string
-  active: string
+  proficiency: string
+  instructions: string
+  condition: string
 }
 
 // ServiceNow returns reference fields as { value, display_value } when sysparm_display_value=true
 type SnowField = { display_value: string; value: string } | string
 
-function displayVal(f: SnowField): string {
+function displayVal(f: SnowField | undefined): string {
   return typeof f === 'object' && f !== null ? f.display_value : (f ?? '')
 }
 
 interface RawRecord {
   sys_id: SnowField
   name: SnowField
+  internal_name: SnowField
   agent_type: SnowField
+  strategy: SnowField
   role: SnowField
   description: SnowField
-  active: SnowField
+  proficiency: SnowField
+  instructions: SnowField
+  condition: SnowField
 }
+
+// Fields pulled from sn_aia_agent for the AI Agent inventory view.
+const AGENT_FIELDS = [
+  'sys_id',
+  'name',
+  'internal_name',
+  'agent_type',
+  'strategy',
+  'role',
+  'description',
+  'proficiency',
+  'instructions',
+  'condition',
+] as const
 
 function getServiceNowInventoryUrl(params: URLSearchParams): string {
   const proxyBase = import.meta.env.VITE_SNOW_API_BASE
@@ -66,14 +88,7 @@ function normalizeBase(base: string): string {
 export async function fetchUnmanagedAIStewardSystems(): Promise<SnowAISystem[]> {
   const params = new URLSearchParams({
     sysparm_query: 'ORDERBYDESCsys_created_on',
-    sysparm_fields: [
-      'sys_id',
-      'name',
-      'agent_type',
-      'role',
-      'description',
-      'active',
-    ].join(','),
+    sysparm_fields: AGENT_FIELDS.join(','),
     sysparm_display_value: 'true',
     sysparm_limit: '10',
   })
@@ -98,10 +113,14 @@ export async function fetchUnmanagedAIStewardSystems(): Promise<SnowAISystem[]> 
   return (data.result ?? []).map((r) => ({
     sys_id: displayVal(r.sys_id),
     name: displayVal(r.name),
+    display_name: displayVal(r.internal_name),
     agent_type: displayVal(r.agent_type),
+    strategy: displayVal(r.strategy),
     role: displayVal(r.role),
     description: displayVal(r.description),
-    active: displayVal(r.active),
+    proficiency: displayVal(r.proficiency),
+    instructions: displayVal(r.instructions),
+    condition: displayVal(r.condition),
   }))
 }
 
