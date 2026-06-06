@@ -46,7 +46,10 @@ class ExecuteAgentRequest(BaseModel):
 
 
 class ExecuteAgentResponse(BaseModel):
-    output: str
+    request_id: str
+    output: str = ""
     context_id: str | None = None
     task_id: str | None = None
     state: str | None = None
+    status: str = "completed"
+    error: str | None = None

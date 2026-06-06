@@ -17,7 +17,9 @@ The frontend never talks to ServiceNow directly and holds no secrets. Everything
 touches a backend lives in [`server/`](server/):
 
 - `GET  /api/agents` — AI agent inventory from the ServiceNow `sn_aia_agent` table.
-- `POST /api/agents/execute` — runs a Zurich ServiceNow AI Agent over A2A by `sn_aia_agent.sys_id`.
+- `POST /api/agents/execute` — submits a Zurich ServiceNow AI Agent over asynchronous A2A.
+- `GET  /api/agents/execute/{request_id}` — polls for an async A2A callback result.
+- `POST /api/a2a/callback/{agent_sys_id}` — receives ServiceNow async A2A callbacks.
 - `POST /api/auth/validate` — validates a username/password against ServiceNow `sys_user`.
 - `POST /api/auth/entra/*` — Microsoft Entra External ID Native Auth signup,
   login, MFA challenge/verification, strong-auth registration, and token refresh.
@@ -75,6 +77,8 @@ make sure the backend is running first. Key pages:
 | `SNOW_A2A_CLIENT_ID`   | yes for agent execution | —             | OAuth client id for Zurich A2A agent invocation          |
 | `SNOW_A2A_CLIENT_SECRET` | yes for agent execution | —           | OAuth client secret for Zurich A2A agent invocation      |
 | `SNOW_A2A_TOKEN_SKEW_SECONDS` | no | `60`                  | Refresh cached A2A tokens this many seconds before expiry |
+| `A2A_CALLBACK_BASE_URL` | yes for agent execution | —            | Public backend origin for ServiceNow callbacks, e.g. `https://careatlas.onrender.com` |
+| `A2A_CALLBACK_TOKEN`   | yes for agent execution | —             | Long shared token expected from ServiceNow callback auth  |
 | `CORS_ORIGINS`         | no       | `http://localhost:5173` | Comma-separated browser origins allowed to call the API  |
 | `AGENTS_CREATED_SINCE` | no       | `2026-06-02 00:00:00`   | Only return agents created on/after this UTC datetime     |
 | `ENTRA_APP_ID`         | yes      | —                       | Entra app registration Application (client) ID            |
@@ -97,9 +101,9 @@ ServiceNow setup:
 
 1. In **AI Agent Studio > Settings > External AI Agents > Discoverability**, turn on
    **Allow third party to access ServiceNow AI Agents**.
-2. Set the External AI Agents communication mode to **Synchronous**. CareAtlas does
-   not currently implement asynchronous callback registration, and its A2A
-   `message/send` payload uses `blocking: true` and `returnImmediately: false`.
+2. Set the External AI Agents communication mode to **Asynchronous** if ServiceNow
+   requires it. CareAtlas sends `pushNotificationConfig` and polls its own backend
+   for the callback result.
 3. In **System Properties > sys_properties.list**, confirm this property exists and
    is set to `true`:
 
@@ -124,22 +128,49 @@ ServiceNow setup:
      governance setup, `sn_ai_governance.ai_steward`.
 9. Save the user, save the OAuth app, then regenerate the client secret if it has
    been exposed or copied before the final configuration was saved.
-10. Put the OAuth client id and secret in `server/.env`:
+10. Put the OAuth client id, secret, callback base URL, callback token, and allowed
+    browser origins in `server/.env`:
 
     ```env
     SNOW_A2A_CLIENT_ID=your_client_id_here
     SNOW_A2A_CLIENT_SECRET=your_client_secret_here
     SNOW_A2A_TOKEN_SKEW_SECONDS=60
+    A2A_CALLBACK_BASE_URL=https://careatlas.onrender.com
+    A2A_CALLBACK_TOKEN=choose-a-long-random-token
+    CORS_ORIGINS=http://localhost:5173,https://gauthiii.github.io
     ```
 
-11. Restart the FastAPI backend after editing `server/.env`.
+11. In Render, set the same env vars in the backend service dashboard.
+12. In **External Agent Callback Registry**
+    (`sn_aia_external_agent_callback_registry`), create one callback registry record
+    per agent. Use this URL pattern:
+
+    ```text
+    https://careatlas.onrender.com/api/a2a/callback/<agent_sys_id>
+    ```
+
+    For the current governance agent:
+
+    ```text
+    https://careatlas.onrender.com/api/a2a/callback/90ef57251b1d8b14b72fc9d3604bcbce
+    ```
+
+13. Configure callback authentication so ServiceNow sends:
+
+    ```text
+    Authorization: Bearer <A2A_CALLBACK_TOKEN>
+    ```
+
+14. Click **Verify URL** and confirm the callback registry record becomes **Verified**.
+15. Restart the FastAPI backend after editing local `server/.env`.
 
 After a CareAtlas run, verify ServiceNow received it in the Execution Plan
 [`sn_aia_execution_plan`] table by finding an Objective that contains the prompt you submitted.
 The `/governance/ai-agents` page opens each agent in a local slide-out chat drawer.
-Each chat turn uses synchronous A2A (`blocking: true`, `returnImmediately: false`)
-and sends returned `contextId` / `taskId` values on follow-up turns when
-ServiceNow provides them.
+Each chat turn submits asynchronous A2A with `pushNotificationConfig`, then polls
+`GET /api/agents/execute/{request_id}` every two seconds until the ServiceNow
+callback arrives. CareAtlas keeps returned `contextId` / `taskId` values on
+follow-up turns when ServiceNow provides them.
 
 Token test:
 
@@ -168,8 +199,7 @@ not reached agent execution yet. Recheck the client secret, saved OAuth app, OAu
 Application User, `glide.oauth.inbound.client.credential.grant_type.enabled`, and
 whether **Password needs reset** is still checked on the integration user.
 
-A manual synchronous A2A execution payload must include `blocking: true` and
-`returnImmediately: false`:
+A manual asynchronous A2A execution payload should include `pushNotificationConfig`:
 
 ```bash
 curl -X POST "https://<your-instance>.service-now.com/api/sn_aia/a2a/v2/agent/id/<agent-sys-id>" \
@@ -183,10 +213,17 @@ curl -X POST "https://<your-instance>.service-now.com/api/sn_aia/a2a/v2/agent/id
     "params": {
       "configuration": {
         "acceptedOutputModes": ["application/json"],
-        "blocking": true,
-        "returnImmediately": false,
-        "return_immediately": false,
-        "historyLength": 0
+        "blocking": false,
+        "returnImmediately": true,
+        "return_immediately": true,
+        "historyLength": 0,
+        "pushNotificationConfig": {
+          "url": "https://careatlas.onrender.com/api/a2a/callback/<agent-sys-id>",
+          "token": "<A2A_CALLBACK_TOKEN>",
+          "authentication": {
+            "schemes": ["Bearer"]
+          }
+        }
       },
       "message": {
         "kind": "message",

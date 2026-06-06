@@ -21,7 +21,12 @@ import {
 import { PortalPage, PortalPanel } from '../../components/portal/PortalShell'
 import { cn } from '../../lib/cn'
 import { useUnmanagedAISystems } from '../../hooks/useUnmanagedAISystems'
-import { executeAgent, type SnowAISystem } from '../../services/serviceNow'
+import {
+  executeAgent,
+  fetchAgentExecution,
+  type ExecuteAgentResponse,
+  type SnowAISystem,
+} from '../../services/serviceNow'
 
 export function GovernanceAiAgentsPage() {
   return (
@@ -245,7 +250,7 @@ function AgentCard({
 
 type ChatMessage = {
   id: string
-  role: 'user' | 'agent' | 'error'
+  role: 'user' | 'agent' | 'error' | 'pending'
   text: string
   timestamp: string
 }
@@ -262,6 +267,26 @@ const newId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+const CALLBACK_POLL_INTERVAL_MS = 2000
+const CALLBACK_POLL_TIMEOUT_MS = 60_000
+const PENDING_AGENT_STATES = new Set(['accepted', 'submitted', 'working', 'running', 'pending'])
+
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
+function isPendingExecution(response: ExecuteAgentResponse): boolean {
+  const status = response.status?.toLowerCase()
+  const state = response.state?.toLowerCase()
+  return (
+    status === 'pending' ||
+    Boolean(state && PENDING_AGENT_STATES.has(state)) ||
+    (!response.output && status !== 'completed' && status !== 'error')
+  )
+}
+
+function replaceMessage(messages: ChatMessage[], id: string, next: ChatMessage): ChatMessage[] {
+  return messages.map((message) => (message.id === id ? next : message))
+}
 
 function AgentChatDrawer({
   agent,
@@ -310,9 +335,15 @@ function AgentChatDrawer({
       text,
       timestamp: now,
     }
+    const pendingMessage: ChatMessage = {
+      id: newId(),
+      role: 'pending',
+      text: 'Waiting for ServiceNow callback...',
+      timestamp: now,
+    }
     const optimisticSession: ChatSession = {
       ...activeSession,
-      messages: [...activeSession.messages, userMessage],
+      messages: [...activeSession.messages, userMessage, pendingMessage],
       pending: true,
     }
 
@@ -321,30 +352,83 @@ function AgentChatDrawer({
 
     try {
       const response = await executeAgent(agent.sys_id, text, activeSession.contextId, activeSession.taskId)
-      const agentMessage: ChatMessage = {
-        id: newId(),
-        role: 'agent',
-        text: response.output || 'Agent executed successfully.',
-        timestamp: new Date().toISOString(),
-      }
-      updateSession({
+      let nextSession: ChatSession = {
         ...optimisticSession,
-        messages: [...optimisticSession.messages, agentMessage],
         contextId: response.context_id ?? optimisticSession.contextId,
         taskId: response.task_id ?? optimisticSession.taskId,
         state: response.state ?? optimisticSession.state,
+      }
+      let latest = response
+
+      if (response.request_id && isPendingExecution(response)) {
+        const deadline = Date.now() + CALLBACK_POLL_TIMEOUT_MS
+        while (Date.now() < deadline) {
+          await sleep(CALLBACK_POLL_INTERVAL_MS)
+          latest = await fetchAgentExecution(response.request_id)
+          nextSession = {
+            ...nextSession,
+            contextId: latest.context_id ?? nextSession.contextId,
+            taskId: latest.task_id ?? nextSession.taskId,
+            state: latest.state ?? nextSession.state,
+          }
+          if (!isPendingExecution(latest)) break
+        }
+      }
+
+      if (isPendingExecution(latest)) {
+        const timeoutMessage: ChatMessage = {
+          id: pendingMessage.id,
+          role: 'error',
+          text: 'Timed out waiting for the ServiceNow callback. Try again in a moment.',
+          timestamp: new Date().toISOString(),
+        }
+        updateSession({
+          ...nextSession,
+          messages: replaceMessage(optimisticSession.messages, pendingMessage.id, timeoutMessage),
+          pending: false,
+        })
+        return
+      }
+
+      if (latest.status === 'error' || latest.error) {
+        const errorMessage: ChatMessage = {
+          id: pendingMessage.id,
+          role: 'error',
+          text: latest.error || latest.output || 'ServiceNow returned a callback error.',
+          timestamp: new Date().toISOString(),
+        }
+        updateSession({
+          ...nextSession,
+          messages: replaceMessage(optimisticSession.messages, pendingMessage.id, errorMessage),
+          pending: false,
+        })
+        return
+      }
+
+      const agentMessage: ChatMessage = {
+        id: pendingMessage.id,
+        role: 'agent',
+        text: latest.output || 'Agent executed successfully.',
+        timestamp: new Date().toISOString(),
+      }
+      updateSession({
+        ...nextSession,
+        messages: replaceMessage(optimisticSession.messages, pendingMessage.id, agentMessage),
+        contextId: latest.context_id ?? nextSession.contextId,
+        taskId: latest.task_id ?? nextSession.taskId,
+        state: latest.state ?? nextSession.state,
         pending: false,
       })
     } catch (e) {
       const errorMessage: ChatMessage = {
-        id: newId(),
+        id: pendingMessage.id,
         role: 'error',
         text: e instanceof Error ? e.message : 'Failed to run the agent.',
         timestamp: new Date().toISOString(),
       }
       updateSession({
         ...optimisticSession,
-        messages: [...optimisticSession.messages, errorMessage],
+        messages: replaceMessage(optimisticSession.messages, pendingMessage.id, errorMessage),
         pending: false,
       })
     }
@@ -408,13 +492,6 @@ function AgentChatDrawer({
               {activeSession.messages.map((message) => (
                 <ChatBubble key={message.id} message={message} />
               ))}
-              {pending && (
-                <div className="flex justify-start">
-                  <div className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm text-[#53687b] shadow-sm">
-                    <Loader2 size={14} className="animate-spin" /> Agent is thinking…
-                  </div>
-                </div>
-              )}
               <div ref={messagesEndRef} />
             </div>
           )}
@@ -456,6 +533,7 @@ function AgentChatDrawer({
 function ChatBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user'
   const isError = message.role === 'error'
+  const isPending = message.role === 'pending'
 
   return (
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
@@ -465,8 +543,10 @@ function ChatBubble({ message }: { message: ChatMessage }) {
           isUser && 'bg-[#143A57] text-white',
           !isUser && !isError && 'bg-white text-[#40566b]',
           isError && 'border border-red-200 bg-red-50 text-red-700',
+          isPending && 'inline-flex items-center gap-2 text-[#53687b]',
         )}
       >
+        {isPending && <Loader2 size={14} className="flex-shrink-0 animate-spin" />}
         {message.text}
       </div>
     </div>

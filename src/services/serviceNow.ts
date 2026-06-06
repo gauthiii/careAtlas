@@ -19,10 +19,13 @@ export interface SnowAISystem {
 }
 
 export interface ExecuteAgentResponse {
+  request_id: string
   output: string
   context_id?: string | null
   task_id?: string | null
   state?: string | null
+  status?: 'pending' | 'completed' | 'error' | string
+  error?: string | null
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
@@ -66,6 +69,19 @@ export async function executeAgent(
       context_id: contextId || undefined,
       task_id: taskId || undefined,
     }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  const data: ExecuteAgentResponse = await res.json()
+  return { ...data, output: data.output ?? '' }
+}
+
+export async function fetchAgentExecution(requestId: string): Promise<ExecuteAgentResponse> {
+  const res = await fetch(`${API_BASE}/agents/execute/${encodeURIComponent(requestId)}`, {
+    headers: { Accept: 'application/json' },
   })
 
   if (!res.ok) {

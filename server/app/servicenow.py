@@ -6,7 +6,6 @@ logic that used to live in the frontend `serviceNow.ts` plus the Vite proxy.
 """
 
 import logging
-import json
 import time
 from dataclasses import dataclass
 from typing import Any, NoReturn
@@ -42,10 +41,12 @@ class ServiceNowError(RuntimeError):
 
 @dataclass
 class AgentExecutionResult:
+    request_id: str
     output: str
     context_id: str | None = None
     task_id: str | None = None
     state: str | None = None
+    status: str = "completed"
 
 
 def _display_val(field: Any) -> str:
@@ -195,8 +196,14 @@ async def execute_agent(
     task_id: str | None = None,
     http_client: httpx.AsyncClient | None = None,
 ) -> AgentExecutionResult:
-    """Run a Zurich ServiceNow AI agent through A2A and return user-visible text."""
+    """Submit a Zurich ServiceNow AI agent through asynchronous A2A."""
     logger.info("Executing ServiceNow A2A agent %s", agent_sys_id)
+    if not settings.a2a_callback_base_url or not settings.a2a_callback_token:
+        raise ServiceNowError(
+            "ServiceNow A2A callbacks are not configured. Set A2A_CALLBACK_BASE_URL "
+            "and A2A_CALLBACK_TOKEN in server/.env."
+        )
+
     request_id = str(uuid4())
     message_id = str(uuid4())
     message = {
@@ -217,10 +224,15 @@ async def execute_agent(
         "params": {
             "configuration": {
                 "acceptedOutputModes": ["application/json"],
-                "blocking": True,
-                "returnImmediately": False,
-                "return_immediately": False,
+                "blocking": False,
+                "returnImmediately": True,
+                "return_immediately": True,
                 "historyLength": 0,
+                "pushNotificationConfig": {
+                    "url": settings.a2a_callback_url(agent_sys_id),
+                    "token": settings.a2a_callback_token,
+                    "authentication": {"schemes": ["Bearer"]},
+                },
             },
             "message": message,
             "metadata": {},
@@ -279,17 +291,21 @@ async def execute_agent(
     state = _extract_a2a_state(body)
     if output:
         return AgentExecutionResult(
+            request_id=request_id,
             output=output,
             context_id=context_id,
             task_id=task_id,
             state=state,
+            status="completed",
         )
 
     return AgentExecutionResult(
-        output=json.dumps(body, separators=(",", ":"), default=str),
+        request_id=request_id,
+        output="",
         context_id=context_id,
         task_id=task_id,
-        state=state,
+        state=state or "submitted",
+        status="pending",
     )
 
 

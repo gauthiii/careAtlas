@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     snow_a2a_client_id: Optional[str] = None
     snow_a2a_client_secret: Optional[str] = None
     snow_a2a_token_skew_seconds: int = 60
+    # Public backend origin used by ServiceNow to send async A2A callbacks.
+    a2a_callback_base_url: Optional[str] = None
+    # Shared callback verification token expected from ServiceNow callbacks.
+    a2a_callback_token: Optional[str] = None
 
     # Comma-separated list of browser origins allowed to call this API.
     cors_origins: str = "http://localhost:5173"
@@ -46,6 +50,10 @@ class Settings(BaseSettings):
     @property
     def snow_base_url(self) -> str:
         return f"https://{self.snow_instance}"
+
+    def a2a_callback_url(self, agent_sys_id: str) -> str:
+        base_url = (self.a2a_callback_base_url or "").rstrip("/")
+        return f"{base_url}/api/a2a/callback/{agent_sys_id}"
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -26,11 +26,16 @@ class FakeSettings:
     snow_a2a_client_id: str = "client-id"
     snow_a2a_client_secret: str = "client-secret"
     snow_a2a_token_skew_seconds: int = 60
+    a2a_callback_base_url: str = "https://careatlas.onrender.com"
+    a2a_callback_token: str = "callback-token"
     request_timeout: float = 5.0
 
     @property
     def snow_base_url(self) -> str:
         return f"https://{self.snow_instance}"
+
+    def a2a_callback_url(self, agent_sys_id: str) -> str:
+        return f"{self.a2a_callback_base_url}/api/a2a/callback/{agent_sys_id}"
 
 
 def form_body(request: httpx.Request) -> dict[str, str]:
@@ -102,10 +107,21 @@ class ServiceNowA2ATest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(execute_body["jsonrpc"], "2.0")
         self.assertEqual(execute_body["method"], "message/send")
         self.assertEqual(execute_body["params"]["configuration"]["acceptedOutputModes"], ["application/json"])
-        self.assertIs(execute_body["params"]["configuration"]["blocking"], True)
-        self.assertIs(execute_body["params"]["configuration"]["returnImmediately"], False)
-        self.assertIs(execute_body["params"]["configuration"]["return_immediately"], False)
+        self.assertIs(execute_body["params"]["configuration"]["blocking"], False)
+        self.assertIs(execute_body["params"]["configuration"]["returnImmediately"], True)
+        self.assertIs(execute_body["params"]["configuration"]["return_immediately"], True)
         self.assertEqual(execute_body["params"]["configuration"]["historyLength"], 0)
+        self.assertEqual(
+            execute_body["params"]["configuration"]["pushNotificationConfig"],
+            {
+                "url": (
+                    "https://careatlas.onrender.com/api/a2a/callback/"
+                    "0123456789abcdef0123456789abcdef"
+                ),
+                "token": "callback-token",
+                "authentication": {"schemes": ["Bearer"]},
+            },
+        )
         self.assertEqual(execute_body["params"]["message"]["kind"], "message")
         self.assertEqual(execute_body["params"]["message"]["role"], "user")
         self.assertTrue(execute_body["params"]["message"]["messageId"])
