@@ -8,13 +8,13 @@ logic that used to live in the frontend `serviceNow.ts` plus the Vite proxy.
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, NoReturn
+from typing import Any, Literal, NoReturn
 from uuid import uuid4
 
 import httpx
 
 from .config import Settings
-from .models import AISystem
+from .models import AISystem, AclTestCheck, AclTestResponse
 
 logger = logging.getLogger("careatlas.servicenow")
 
@@ -33,6 +33,119 @@ AGENT_FIELDS = [
     "instructions",
     "condition",
 ]
+
+
+@dataclass(frozen=True)
+class AclProbe:
+    label: str
+    expected: Literal["allowed", "denied"]
+    table: str
+    fields: tuple[str, ...]
+    inspect_denied_fields: bool = False
+
+
+ACL_TEST_PROBES: dict[str, tuple[AclProbe, AclProbe]] = {
+    "svc-identity-verification-agent": (
+        AclProbe(
+            label="Allowed patient identity fields",
+            expected="allowed",
+            table="u_patient",
+            fields=("sys_id", "u_registration_status", "u_confidence_score"),
+        ),
+        AclProbe(
+            label="Denied appointment table",
+            expected="denied",
+            table="u_appointment",
+            fields=("sys_id",),
+        ),
+    ),
+    "svc-scheduling-agent": (
+        AclProbe(
+            label="Allowed patient scheduling fields",
+            expected="allowed",
+            table="u_patient",
+            fields=(
+                "sys_id",
+                "u_patient_id",
+                "u_health_condition",
+                "u_accessibility",
+                "u_time_preference",
+                "u_account_status",
+            ),
+        ),
+        AclProbe(
+            label="Denied patient PII fields",
+            expected="denied",
+            table="u_patient",
+            fields=(
+                "u_first_name",
+                "u_last_name",
+                "u_email",
+                "u_phone",
+                "u_date_of_birth",
+                "u_gender",
+                "u_ethnicity",
+            ),
+            inspect_denied_fields=True,
+        ),
+    ),
+    "svc-reminder-agent": (
+        AclProbe(
+            label="Allowed appointment table",
+            expected="allowed",
+            table="u_appointment",
+            fields=("sys_id",),
+        ),
+        AclProbe(
+            label="Denied patient table",
+            expected="denied",
+            table="u_patient",
+            fields=("sys_id",),
+        ),
+    ),
+    "svc-notes-agent": (
+        AclProbe(
+            label="Allowed appointment notes fields",
+            expected="allowed",
+            table="u_appointment",
+            fields=("sys_id", "u_notes"),
+        ),
+        AclProbe(
+            label="Denied patient PII fields",
+            expected="denied",
+            table="u_patient",
+            fields=(
+                "u_first_name",
+                "u_last_name",
+                "u_email",
+                "u_phone",
+                "u_date_of_birth",
+            ),
+            inspect_denied_fields=True,
+        ),
+    ),
+    "svc-triage-agent": (
+        AclProbe(
+            label="Allowed patient triage fields",
+            expected="allowed",
+            table="u_patient",
+            fields=("sys_id", "u_reason_text", "u_health_condition"),
+        ),
+        AclProbe(
+            label="Denied patient PII fields",
+            expected="denied",
+            table="u_patient",
+            fields=(
+                "u_first_name",
+                "u_last_name",
+                "u_email",
+                "u_phone",
+                "u_date_of_birth",
+            ),
+            inspect_denied_fields=True,
+        ),
+    ),
+}
 
 
 class ServiceNowError(RuntimeError):
@@ -186,6 +299,157 @@ async def fetch_agents(settings: Settings) -> list[AISystem]:
 
     result = response.json().get("result", [])
     return [_map_agent(record) for record in result]
+
+
+async def test_service_account_acl(
+    settings: Settings,
+    service_account: str,
+    http_client: httpx.AsyncClient | None = None,
+) -> AclTestResponse:
+    """Run read-only ServiceNow ACL probes as one known service account."""
+    username = service_account.strip()
+    probes = ACL_TEST_PROBES.get(username)
+    if probes is None:
+        raise ValueError(f"Unknown service account: {service_account}")
+
+    async def run(client: httpx.AsyncClient) -> list[AclTestCheck]:
+        checks = []
+        for probe in probes:
+            checks.append(await _run_acl_probe(settings, client, username, probe))
+        return checks
+
+    if http_client is not None:
+        checks = await run(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+            checks = await run(client)
+
+    return AclTestResponse(
+        service_account=username,
+        overall_status=_acl_overall_status(checks),
+        checks=checks,
+    )
+
+
+async def _run_acl_probe(
+    settings: Settings,
+    client: httpx.AsyncClient,
+    username: str,
+    probe: AclProbe,
+) -> AclTestCheck:
+    params = {
+        "sysparm_fields": ",".join(probe.fields),
+        "sysparm_display_value": "true",
+        "sysparm_limit": "1",
+    }
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/table/{probe.table}",
+        params=params,
+        headers={"Accept": "application/json"},
+        auth=(username, settings.snow_password),
+    )
+
+    if response.status_code in (401, 403):
+        return _acl_check(
+            probe,
+            actual="denied",
+            status_code=response.status_code,
+            detail=f"ServiceNow returned HTTP {response.status_code}.",
+        )
+
+    if not response.is_success:
+        return _acl_check(
+            probe,
+            actual="error",
+            status_code=response.status_code,
+            detail=_error_detail(response),
+        )
+
+    if probe.expected == "denied" and probe.inspect_denied_fields:
+        return _inspect_denied_field_response(probe, response)
+
+    return _acl_check(
+        probe,
+        actual="allowed",
+        status_code=response.status_code,
+        detail=f"ServiceNow returned HTTP {response.status_code}.",
+    )
+
+
+def _inspect_denied_field_response(probe: AclProbe, response: httpx.Response) -> AclTestCheck:
+    try:
+        body = response.json()
+    except ValueError:
+        return _acl_check(
+            probe,
+            actual="error",
+            status_code=response.status_code,
+            detail="ServiceNow returned invalid JSON.",
+        )
+
+    records = body.get("result") if isinstance(body, dict) else None
+    if not isinstance(records, list):
+        return _acl_check(
+            probe,
+            actual="error",
+            status_code=response.status_code,
+            detail="ServiceNow response did not include a result list.",
+        )
+    if not records:
+        return _acl_check(
+            probe,
+            actual="inconclusive",
+            status_code=response.status_code,
+            detail="No records returned to inspect field-level ACL behavior.",
+        )
+
+    record = records[0] if isinstance(records[0], dict) else {}
+    visible_fields = [field for field in probe.fields if field in record]
+    if visible_fields:
+        return _acl_check(
+            probe,
+            actual="allowed",
+            status_code=response.status_code,
+            detail=f"Visible denied fields: {', '.join(visible_fields)}.",
+        )
+
+    return _acl_check(
+        probe,
+        actual="denied",
+        status_code=response.status_code,
+        detail="Requested denied fields were not present in the returned record.",
+    )
+
+
+def _acl_check(
+    probe: AclProbe,
+    actual: Literal["allowed", "denied", "inconclusive", "error"],
+    status_code: int | None,
+    detail: str,
+) -> AclTestCheck:
+    return AclTestCheck(
+        label=probe.label,
+        expected=probe.expected,
+        actual=actual,
+        passed=actual == probe.expected,
+        table=probe.table,
+        fields=list(probe.fields),
+        status_code=status_code,
+        detail=detail,
+    )
+
+
+def _acl_overall_status(
+    checks: list[AclTestCheck],
+) -> Literal["passed", "failed", "inconclusive", "error"]:
+    actuals = {check.actual for check in checks}
+    if "error" in actuals:
+        return "error"
+    if "inconclusive" in actuals:
+        return "inconclusive"
+    if all(check.passed for check in checks):
+        return "passed"
+    return "failed"
 
 
 async def execute_agent(

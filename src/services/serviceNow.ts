@@ -28,6 +28,23 @@ export interface ExecuteAgentResponse {
   error?: string | null
 }
 
+export interface AclTestCheck {
+  label: string
+  expected: 'allowed' | 'denied'
+  actual: 'allowed' | 'denied' | 'inconclusive' | 'error'
+  passed: boolean
+  table: string
+  fields: string[]
+  status_code?: number | null
+  detail: string
+}
+
+export interface AclTestResponse {
+  service_account: string
+  overall_status: 'passed' | 'failed' | 'inconclusive' | 'error'
+  checks: AclTestCheck[]
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 async function readError(res: Response): Promise<string> {
@@ -111,4 +128,21 @@ export async function validateServiceNowUserCredentials(
 
   const data: { valid?: boolean } = await res.json()
   return Boolean(data.valid)
+}
+
+export async function testServiceAccountAcl(serviceAccount: string): Promise<AclTestResponse> {
+  const res = await fetch(`${API_BASE}/acl/test`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ service_account: serviceAccount }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as AclTestResponse
 }

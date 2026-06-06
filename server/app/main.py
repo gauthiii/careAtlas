@@ -25,13 +25,21 @@ from .a2a_callbacks import (
 )
 from .entra_native_auth import router as entra_auth_router
 from .models import (
+    AclTestRequest,
+    AclTestResponse,
     AISystem,
     ExecuteAgentRequest,
     ExecuteAgentResponse,
     ValidateRequest,
     ValidateResponse,
 )
-from .servicenow import ServiceNowError, execute_agent, fetch_agents, validate_user
+from .servicenow import (
+    ServiceNowError,
+    execute_agent,
+    fetch_agents,
+    test_service_account_acl,
+    validate_user,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -128,6 +136,19 @@ async def post_validate(
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return ValidateResponse(valid=valid)
+
+
+@api.post("/acl/test", response_model=AclTestResponse)
+async def post_acl_test(
+    body: AclTestRequest,
+    settings: Settings = Depends(get_settings),
+) -> AclTestResponse:
+    try:
+        return await test_service_account_acl(settings, body.service_account)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 async def _read_json_body(request: Request) -> Any:

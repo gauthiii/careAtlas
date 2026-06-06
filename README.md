@@ -20,6 +20,7 @@ touches a backend lives in [`server/`](server/):
 - `POST /api/agents/execute` — submits a Zurich ServiceNow AI Agent over asynchronous A2A.
 - `GET  /api/agents/execute/{request_id}` — polls for an async A2A callback result.
 - `POST /api/a2a/callback/{agent_sys_id}` — receives ServiceNow async A2A callbacks.
+- `POST /api/acl/test` — tests read-only ServiceNow ACL access for a known non-human identity.
 - `POST /api/auth/validate` — validates a username/password against ServiceNow `sys_user`.
 - `POST /api/auth/entra/*` — Microsoft Entra External ID Native Auth signup,
   login, MFA challenge/verification, strong-auth registration, and token refresh.

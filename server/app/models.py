@@ -4,6 +4,8 @@
 React client can consume responses without any remapping.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, field_validator
 
 
@@ -27,6 +29,27 @@ class ValidateRequest(BaseModel):
 
 class ValidateResponse(BaseModel):
     valid: bool
+
+
+class AclTestRequest(BaseModel):
+    service_account: str
+
+
+class AclTestCheck(BaseModel):
+    label: str
+    expected: Literal["allowed", "denied"]
+    actual: Literal["allowed", "denied", "inconclusive", "error"]
+    passed: bool
+    table: str
+    fields: list[str]
+    status_code: int | None = None
+    detail: str = ""
+
+
+class AclTestResponse(BaseModel):
+    service_account: str
+    overall_status: Literal["passed", "failed", "inconclusive", "error"]
+    checks: list[AclTestCheck]
 
 
 class ExecuteAgentRequest(BaseModel):
