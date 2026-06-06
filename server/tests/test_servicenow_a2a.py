@@ -9,7 +9,15 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.servicenow import ServiceNowError, _A2A_TOKEN_CACHE, _extract_a2a_text, execute_agent
+from app.servicenow import (
+    ServiceNowError,
+    _A2A_TOKEN_CACHE,
+    _extract_a2a_context_id,
+    _extract_a2a_state,
+    _extract_a2a_task_id,
+    _extract_a2a_text,
+    execute_agent,
+)
 
 
 @dataclass
@@ -81,7 +89,7 @@ class ServiceNowA2ATest(unittest.IsolatedAsyncioTestCase):
         token_body = form_body(token_request)
         execute_body = json.loads(execute_request.content.decode())
 
-        self.assertEqual(result, "Done")
+        self.assertEqual(result.output, "Done")
         self.assertEqual(token_request.url.path, "/oauth_token.do")
         self.assertEqual(token_body["grant_type"], "client_credentials")
         self.assertEqual(token_body["client_id"], "client-id")
@@ -142,6 +150,44 @@ class ServiceNowA2ATest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual([request.url.path for request in requests].count("/oauth_token.do"), 1)
 
+    async def test_execute_sends_follow_up_context_and_task_ids(self):
+        requests = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            if request.url.path == "/oauth_token.do":
+                return httpx.Response(200, json={"access_token": "token-1", "expires_in": 1800})
+            return httpx.Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "result": {
+                        "id": "task-2",
+                        "contextId": "context-2",
+                        "status": {"state": "completed", "message": {"parts": [{"kind": "text", "text": "ok"}]}},
+                    },
+                },
+            )
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            result = await execute_agent(
+                FakeSettings(),
+                "0123456789abcdef0123456789abcdef",
+                "proceed",
+                context_id="context-1",
+                task_id="task-1",
+                http_client=http_client,
+            )
+
+        execute_body = json.loads(requests[1].content.decode())
+        self.assertEqual(execute_body["params"]["message"]["contextId"], "context-1")
+        self.assertEqual(execute_body["params"]["message"]["taskId"], "task-1")
+        self.assertEqual(result.output, "ok")
+        self.assertEqual(result.context_id, "context-2")
+        self.assertEqual(result.task_id, "task-2")
+        self.assertEqual(result.state, "completed")
+
     async def test_execute_surfaces_json_rpc_errors(self):
         with self.assertRaisesRegex(ServiceNowError, "JSON-RPC error -32602: Invalid method parameters"):
             await self.call_execute(
@@ -178,6 +224,19 @@ class ServiceNowA2ATest(unittest.IsolatedAsyncioTestCase):
         }
 
         self.assertEqual(_extract_a2a_text(body), "Line one\n\nLine two")
+
+    def test_extract_a2a_metadata_reads_context_task_and_state(self):
+        body = {
+            "result": {
+                "id": "task-id",
+                "contextId": "context-id",
+                "status": {"state": "input-required"},
+            }
+        }
+
+        self.assertEqual(_extract_a2a_context_id(body), "context-id")
+        self.assertEqual(_extract_a2a_task_id(body), "task-id")
+        self.assertEqual(_extract_a2a_state(body), "input-required")
 
 
 if __name__ == "__main__":

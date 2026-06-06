@@ -33,6 +33,8 @@ class ExecuteAgentRequest(BaseModel):
     # sys_id of the agent in ServiceNow AI Agent Studio / sn_aia_agent.
     agent_sys_id: str
     user_input: str
+    context_id: str | None = None
+    task_id: str | None = None
 
     @field_validator("agent_sys_id")
     @classmethod
@@ -45,3 +47,6 @@ class ExecuteAgentRequest(BaseModel):
 
 class ExecuteAgentResponse(BaseModel):
     output: str
+    context_id: str | None = None
+    task_id: str | None = None
+    state: str | None = None

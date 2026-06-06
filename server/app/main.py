@@ -54,10 +54,21 @@ async def post_execute_agent(
     settings: Settings = Depends(get_settings),
 ) -> ExecuteAgentResponse:
     try:
-        output = await execute_agent(settings, body.agent_sys_id, body.user_input)
+        output = await execute_agent(
+            settings,
+            body.agent_sys_id,
+            body.user_input,
+            context_id=body.context_id,
+            task_id=body.task_id,
+        )
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    return ExecuteAgentResponse(output=output)
+    return ExecuteAgentResponse(
+        output=output.output,
+        context_id=output.context_id,
+        task_id=output.task_id,
+        state=output.state,
+    )
 
 
 @api.post("/auth/validate", response_model=ValidateResponse)

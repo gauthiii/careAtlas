@@ -18,6 +18,13 @@ export interface SnowAISystem {
   condition: string
 }
 
+export interface ExecuteAgentResponse {
+  output: string
+  context_id?: string | null
+  task_id?: string | null
+  state?: string | null
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 async function readError(res: Response): Promise<string> {
@@ -43,8 +50,10 @@ export async function fetchUnmanagedAIStewardSystems(): Promise<SnowAISystem[]> 
 
 export async function executeAgent(
   agentSysId: string,
-  userInput: string
-): Promise<string> {
+  userInput: string,
+  contextId?: string | null,
+  taskId?: string | null
+): Promise<ExecuteAgentResponse> {
   const res = await fetch(`${API_BASE}/agents/execute`, {
     method: 'POST',
     headers: {
@@ -54,6 +63,8 @@ export async function executeAgent(
     body: JSON.stringify({
       agent_sys_id: agentSysId,
       user_input: userInput,
+      context_id: contextId || undefined,
+      task_id: taskId || undefined,
     }),
   })
 
@@ -61,8 +72,8 @@ export async function executeAgent(
     throw new Error(`API ${res.status}: ${await readError(res)}`)
   }
 
-  const data: { output?: string } = await res.json()
-  return data.output ?? ''
+  const data: ExecuteAgentResponse = await res.json()
+  return { ...data, output: data.output ?? '' }
 }
 
 export async function validateServiceNowUserCredentials(

@@ -8,6 +8,7 @@ logic that used to live in the frontend `serviceNow.ts` plus the Vite proxy.
 import logging
 import json
 import time
+from dataclasses import dataclass
 from typing import Any, NoReturn
 from uuid import uuid4
 
@@ -37,6 +38,14 @@ AGENT_FIELDS = [
 
 class ServiceNowError(RuntimeError):
     """Raised when ServiceNow returns a non-OK response we can't recover from."""
+
+
+@dataclass
+class AgentExecutionResult:
+    output: str
+    context_id: str | None = None
+    task_id: str | None = None
+    state: str | None = None
 
 
 def _display_val(field: Any) -> str:
@@ -182,12 +191,25 @@ async def execute_agent(
     settings: Settings,
     agent_sys_id: str,
     user_input: str,
+    context_id: str | None = None,
+    task_id: str | None = None,
     http_client: httpx.AsyncClient | None = None,
-) -> str:
+) -> AgentExecutionResult:
     """Run a Zurich ServiceNow AI agent through A2A and return user-visible text."""
     logger.info("Executing ServiceNow A2A agent %s", agent_sys_id)
     request_id = str(uuid4())
     message_id = str(uuid4())
+    message = {
+        "kind": "message",
+        "role": "user",
+        "messageId": message_id,
+        "parts": [{"kind": "text", "text": user_input}],
+    }
+    if context_id:
+        message["contextId"] = context_id
+    if task_id:
+        message["taskId"] = task_id
+
     payload = {
         "jsonrpc": "2.0",
         "id": request_id,
@@ -198,12 +220,7 @@ async def execute_agent(
                 "blocking": True,
                 "historyLength": 0,
             },
-            "message": {
-                "kind": "message",
-                "role": "user",
-                "messageId": message_id,
-                "parts": [{"kind": "text", "text": user_input}],
-            },
+            "message": message,
             "metadata": {},
         },
     }
@@ -255,10 +272,23 @@ async def execute_agent(
         raise ServiceNowError(f"ServiceNow A2A JSON-RPC error{code_part}: {message}")
 
     output = _extract_a2a_text(body)
+    context_id = _extract_a2a_context_id(body) or context_id
+    task_id = _extract_a2a_task_id(body) or task_id
+    state = _extract_a2a_state(body)
     if output:
-        return output
+        return AgentExecutionResult(
+            output=output,
+            context_id=context_id,
+            task_id=task_id,
+            state=state,
+        )
 
-    return json.dumps(body, separators=(",", ":"), default=str)
+    return AgentExecutionResult(
+        output=json.dumps(body, separators=(",", ":"), default=str),
+        context_id=context_id,
+        task_id=task_id,
+        state=state,
+    )
 
 
 def _part_texts(node: Any) -> list[str]:
@@ -308,6 +338,42 @@ def _extract_a2a_text(body: Any) -> str:
                 texts.extend(_part_texts(artifact))
 
     return "\n\n".join(texts)
+
+
+def _a2a_results(body: Any) -> list[dict[str, Any]]:
+    roots = [body]
+    if isinstance(body, dict) and isinstance(body.get("content"), dict):
+        roots.append(body["content"])
+
+    results = []
+    for root in roots:
+        if isinstance(root, dict) and isinstance(root.get("result"), dict):
+            results.append(root["result"])
+    return results
+
+
+def _extract_a2a_context_id(body: Any) -> str | None:
+    for result in _a2a_results(body):
+        value = result.get("contextId")
+        if value:
+            return str(value)
+    return None
+
+
+def _extract_a2a_task_id(body: Any) -> str | None:
+    for result in _a2a_results(body):
+        value = result.get("taskId") or result.get("id")
+        if value:
+            return str(value)
+    return None
+
+
+def _extract_a2a_state(body: Any) -> str | None:
+    for result in _a2a_results(body):
+        status = result.get("status")
+        if isinstance(status, dict) and status.get("state"):
+            return str(status["state"])
+    return None
 
 
 async def validate_user(settings: Settings, username: str, password: str) -> bool:

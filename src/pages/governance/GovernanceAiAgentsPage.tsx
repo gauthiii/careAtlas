@@ -1,12 +1,13 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   ArrowRight,
   Bot,
   Check,
   ChevronDown,
+  MessageSquare,
+  X,
   Filter,
   Fingerprint,
-  FlaskConical,
   ListOrdered,
   Loader2,
   Plus,
@@ -39,6 +40,10 @@ export function GovernanceAiAgentsPage() {
 function AgentInventory() {
   const { systems, state, errorMsg } = useUnmanagedAISystems()
   const [open, setOpen] = useState<Set<string>>(new Set())
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
+  const [sessions, setSessions] = useState<Record<string, ChatSession>>({})
+
+  const selectedAgent = systems.find((agent) => agent.sys_id === selectedAgentId) ?? null
 
   const toggle = (id: string) =>
     setOpen((prev) => {
@@ -85,6 +90,7 @@ function AgentInventory() {
               agent={agent}
               open={open.has(agent.sys_id)}
               onToggle={() => toggle(agent.sys_id)}
+              onChat={() => setSelectedAgentId(agent.sys_id)}
             />
           ))}
         </div>
@@ -98,6 +104,15 @@ function AgentInventory() {
           <Plus size={16} /> Register new agent
         </button>
       </div>
+
+      <AgentChatDrawer
+        agent={selectedAgent}
+        session={selectedAgent ? sessions[selectedAgent.sys_id] : undefined}
+        onClose={() => setSelectedAgentId(null)}
+        onSessionChange={(agentId, session) =>
+          setSessions((prev) => ({ ...prev, [agentId]: session }))
+        }
+      />
     </PortalPanel>
   )
 }
@@ -106,10 +121,12 @@ function AgentCard({
   agent,
   open,
   onToggle,
+  onChat,
 }: {
   agent: SnowAISystem
   open: boolean
   onToggle: () => void
+  onChat: () => void
 }) {
   const proficiency = parseBullets(agent.proficiency)
   const steps = parseSteps(agent.instructions)
@@ -121,12 +138,13 @@ function AgentCard({
         open ? 'shadow-[0_8px_24px_rgba(25,64,93,0.08)]' : 'hover:shadow-[0_4px_14px_rgba(25,64,93,0.06)]',
       )}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex w-full items-center gap-4 px-4 py-3.5 text-left"
-      >
+      <div className="flex w-full items-center gap-4 px-4 py-3.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-4 text-left"
+        >
         <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-[9px] bg-[#143A57] text-white">
           <Bot size={18} />
         </span>
@@ -150,7 +168,16 @@ function AgentCard({
           size={18}
           className={cn('flex-shrink-0 text-[#8aa0b3] transition-transform', open && 'rotate-180')}
         />
-      </button>
+        </button>
+
+        <button
+          type="button"
+          onClick={onChat}
+          className="inline-flex flex-shrink-0 items-center gap-2 rounded-md border border-[#cfe0ea] bg-white px-3 py-2 text-xs font-bold text-[#0f5f8c] transition-colors hover:border-[#0f5f8c] hover:bg-[#f5f9fb]"
+        >
+          <MessageSquare size={14} /> Chat
+        </button>
+      </div>
 
       {open && (
         <div className="space-y-5 border-t border-[#eef3f7] px-4 py-4">
@@ -210,89 +237,248 @@ function AgentCard({
             <MetaItem icon={<Filter size={14} />} label="Condition" value={agent.condition} />
             <MetaItem icon={<Bot size={14} />} label="Agent type" value={agent.agent_type} />
           </div>
-
-          <AgentTester agent={agent} />
         </div>
       )}
     </div>
   )
 }
 
-type TestState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'done'; output: string }
-  | { status: 'error'; message: string }
+type ChatMessage = {
+  id: string
+  role: 'user' | 'agent' | 'error'
+  text: string
+  timestamp: string
+}
 
-// Sends free-form input to the agent via our backend (which holds the
-// ServiceNow credentials and calls Zurich A2A by sn_aia_agent sys_id).
-function AgentTester({ agent }: { agent: SnowAISystem }) {
+type ChatSession = {
+  messages: ChatMessage[]
+  contextId?: string | null
+  taskId?: string | null
+  state?: string | null
+  pending?: boolean
+}
+
+const newId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+function AgentChatDrawer({
+  agent,
+  session,
+  onClose,
+  onSessionChange,
+}: {
+  agent: SnowAISystem | null
+  session?: ChatSession
+  onClose: () => void
+  onSessionChange: (agentId: string, session: ChatSession) => void
+}) {
   const [input, setInput] = useState('')
-  const [result, setResult] = useState<TestState>({ status: 'idle' })
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const open = Boolean(agent)
+  const activeSession = session ?? { messages: [] }
+  const pending = Boolean(activeSession.pending)
 
-  const loading = result.status === 'loading'
-  const canRun = input.trim().length > 0 && !loading
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose, open])
 
-  const handleRun = async () => {
-    if (!canRun) return
-    setResult({ status: 'loading' })
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [activeSession.messages.length, pending])
+
+  if (!agent) return null
+
+  const updateSession = (next: ChatSession) => onSessionChange(agent.sys_id, next)
+  const canSend = input.trim().length > 0 && !pending
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!canSend) return
+
+    const text = input.trim()
+    const now = new Date().toISOString()
+    const userMessage: ChatMessage = {
+      id: newId(),
+      role: 'user',
+      text,
+      timestamp: now,
+    }
+    const optimisticSession: ChatSession = {
+      ...activeSession,
+      messages: [...activeSession.messages, userMessage],
+      pending: true,
+    }
+
+    setInput('')
+    updateSession(optimisticSession)
+
     try {
-      const output = await executeAgent(agent.sys_id, input.trim())
-      setResult({ status: 'done', output: output || 'Agent executed successfully.' })
+      const response = await executeAgent(agent.sys_id, text, activeSession.contextId, activeSession.taskId)
+      const agentMessage: ChatMessage = {
+        id: newId(),
+        role: 'agent',
+        text: response.output || 'Agent executed successfully.',
+        timestamp: new Date().toISOString(),
+      }
+      updateSession({
+        ...optimisticSession,
+        messages: [...optimisticSession.messages, agentMessage],
+        contextId: response.context_id ?? optimisticSession.contextId,
+        taskId: response.task_id ?? optimisticSession.taskId,
+        state: response.state ?? optimisticSession.state,
+        pending: false,
+      })
     } catch (e) {
-      setResult({ status: 'error', message: e instanceof Error ? e.message : 'Failed to run the agent.' })
+      const errorMessage: ChatMessage = {
+        id: newId(),
+        role: 'error',
+        text: e instanceof Error ? e.message : 'Failed to run the agent.',
+        timestamp: new Date().toISOString(),
+      }
+      updateSession({
+        ...optimisticSession,
+        messages: [...optimisticSession.messages, errorMessage],
+        pending: false,
+      })
     }
   }
 
   return (
-    <DetailSection icon={<FlaskConical size={14} />} title="Test Agent">
-      <div className="space-y-3">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={`Ask ${agent.name || 'this agent'} to do something…`}
-          rows={3}
-          className="w-full resize-y rounded-lg border border-[#dbe6ee] bg-white px-3.5 py-2.5 text-sm leading-[1.55] text-[#40566b] outline-none placeholder:text-[#9fb0c0] focus:border-[#0f5f8c] focus:ring-2 focus:ring-[#0f5f8c]/15"
-        />
-
-        <button
-          type="button"
-          onClick={handleRun}
-          disabled={!canRun}
-          className={cn(
-            'inline-flex items-center gap-2 rounded-md bg-[#143A57] px-4 py-2 text-sm font-semibold text-white transition-opacity',
-            !canRun ? 'cursor-not-allowed opacity-50' : 'hover:opacity-90',
-          )}
-        >
-          {loading ? (
-            <>
-              <Loader2 size={15} className="animate-spin" /> Agent is thinking…
-            </>
-          ) : (
-            <>
-              <Send size={15} /> Run Agent
-            </>
-          )}
-        </button>
-
-        {result.status === 'done' && (
-          <div className="rounded-lg border-l-[3px] border-[#12805c] bg-[#f5f9fb] px-3.5 py-3">
-            <div className="mb-1 text-[0.66rem] font-bold uppercase tracking-[0.05em] text-[#8aa0b3]">
-              Agent response
+    <div className="fixed inset-0 z-50">
+      <button
+        type="button"
+        aria-label="Close chat drawer"
+        onClick={onClose}
+        className="absolute inset-0 bg-[#102033]/35"
+      />
+      <aside className="absolute right-0 top-0 flex h-full w-full max-w-[520px] flex-col bg-white shadow-[-16px_0_42px_rgba(16,32,51,0.16)] max-[640px]:max-w-none">
+        <header className="border-b border-[#e5eef3] px-5 py-4">
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-[9px] bg-[#143A57] text-white">
+              <Bot size={19} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="truncate text-base font-bold text-[#102033]">{agent.name || 'AI Agent'}</h2>
+                <AgentTypeBadge type={agent.agent_type} />
+              </div>
+              <p className="mt-1 max-h-[42px] overflow-hidden text-sm leading-[1.45] text-[#53687b]">
+                {agent.description || agent.display_name || 'No description'}
+              </p>
             </div>
-            <p className="whitespace-pre-wrap break-words text-sm leading-[1.6] text-[#40566b]">
-              {result.output}
-            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-md border border-[#dbe6ee] text-[#53687b] hover:bg-[#f5f9fb]"
+              aria-label="Close"
+            >
+              <X size={17} />
+            </button>
           </div>
-        )}
 
-        {result.status === 'error' && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
-            Failed to run the agent. <span className="opacity-75">{result.message}</span>
+          <div className="mt-4 grid grid-cols-2 gap-2 text-xs max-[640px]:grid-cols-1">
+            <MetaPill label="Strategy" value={agent.strategy || '—'} />
+            <MetaPill label="State" value={activeSession.state || 'new'} />
+            <MetaPill label="Context" value={activeSession.contextId || 'not started'} mono />
+            <MetaPill label="Task" value={activeSession.taskId || 'not started'} mono />
           </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto bg-[#f8fbfc] px-5 py-5">
+          {activeSession.messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-center">
+              <div className="max-w-[320px]">
+                <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-[10px] bg-[#e7f3f8] text-[#0f5f8c]">
+                  <MessageSquare size={20} />
+                </div>
+                <p className="text-sm leading-[1.6] text-[#53687b]">
+                  Start a conversation with this ServiceNow AI agent.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activeSession.messages.map((message) => (
+                <ChatBubble key={message.id} message={message} />
+              ))}
+              {pending && (
+                <div className="flex justify-start">
+                  <div className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm text-[#53687b] shadow-sm">
+                    <Loader2 size={14} className="animate-spin" /> Agent is thinking…
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+
+        <form onSubmit={handleSubmit} className="border-t border-[#e5eef3] bg-white px-5 py-4">
+          <div className="flex items-end gap-2">
+            <textarea
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              placeholder={`Message ${agent.name || 'this agent'}…`}
+              rows={2}
+              className="min-h-[46px] flex-1 resize-none rounded-lg border border-[#dbe6ee] px-3.5 py-2.5 text-sm leading-[1.45] text-[#40566b] outline-none placeholder:text-[#9fb0c0] focus:border-[#0f5f8c] focus:ring-2 focus:ring-[#0f5f8c]/15"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault()
+                  event.currentTarget.form?.requestSubmit()
+                }
+              }}
+            />
+            <button
+              type="submit"
+              disabled={!canSend}
+              className={cn(
+                'grid h-[46px] w-[46px] flex-shrink-0 place-items-center rounded-lg bg-[#143A57] text-white transition-opacity',
+                !canSend ? 'cursor-not-allowed opacity-50' : 'hover:opacity-90',
+              )}
+              aria-label="Send message"
+            >
+              {pending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+            </button>
+          </div>
+        </form>
+      </aside>
+    </div>
+  )
+}
+
+function ChatBubble({ message }: { message: ChatMessage }) {
+  const isUser = message.role === 'user'
+  const isError = message.role === 'error'
+
+  return (
+    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
+      <div
+        className={cn(
+          'max-w-[82%] whitespace-pre-wrap break-words rounded-lg px-3.5 py-2.5 text-sm leading-[1.55] shadow-sm',
+          isUser && 'bg-[#143A57] text-white',
+          !isUser && !isError && 'bg-white text-[#40566b]',
+          isError && 'border border-red-200 bg-red-50 text-red-700',
         )}
+      >
+        {message.text}
       </div>
-    </DetailSection>
+    </div>
+  )
+}
+
+function MetaPill({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="min-w-0 rounded-md bg-[#f5f9fb] px-3 py-2">
+      <div className="text-[0.62rem] font-bold uppercase tracking-[0.05em] text-[#8aa0b3]">{label}</div>
+      <div className={cn('truncate text-xs text-[#40566b]', mono && 'font-mono')}>{value}</div>
+    </div>
   )
 }
 

@@ -98,7 +98,8 @@ ServiceNow setup:
 1. In **AI Agent Studio > Settings > External AI Agents > Discoverability**, turn on
    **Allow third party to access ServiceNow AI Agents**.
 2. Set the External AI Agents communication mode to **Synchronous**. CareAtlas does
-   not currently implement asynchronous callback registration.
+   not currently implement asynchronous callback registration, and its A2A
+   `message/send` payload uses `blocking: true`.
 3. In **System Properties > sys_properties.list**, confirm this property exists and
    is set to `true`:
 
@@ -135,6 +136,9 @@ ServiceNow setup:
 
 After a CareAtlas run, verify ServiceNow received it in the Execution Plan
 [`sn_aia_execution_plan`] table by finding an Objective that contains the prompt you submitted.
+The `/governance/ai-agents` page opens each agent in a local slide-out chat drawer.
+Each chat turn uses synchronous A2A (`blocking: true`) and sends returned
+`contextId` / `taskId` values on follow-up turns when ServiceNow provides them.
 
 Token test:
 
@@ -162,6 +166,39 @@ A working response contains an `access_token`. If ServiceNow returns
 not reached agent execution yet. Recheck the client secret, saved OAuth app, OAuth
 Application User, `glide.oauth.inbound.client.credential.grant_type.enabled`, and
 whether **Password needs reset** is still checked on the integration user.
+
+A manual synchronous A2A execution payload must include `blocking: true`:
+
+```bash
+curl -X POST "https://<your-instance>.service-now.com/api/sn_aia/a2a/v2/agent/id/<agent-sys-id>" \
+  -H "Authorization: Bearer <access-token>" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "careatlas-test-1",
+    "method": "message/send",
+    "params": {
+      "configuration": {
+        "acceptedOutputModes": ["application/json"],
+        "blocking": true,
+        "historyLength": 0
+      },
+      "message": {
+        "kind": "message",
+        "role": "user",
+        "messageId": "careatlas-message-1",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "Test from CareAtlas. Please respond with a short confirmation."
+          }
+        ]
+      },
+      "metadata": {}
+    }
+  }'
+```
 
 ### Entra External ID test endpoints
 
