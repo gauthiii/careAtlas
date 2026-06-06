@@ -99,7 +99,7 @@ ServiceNow setup:
    **Allow third party to access ServiceNow AI Agents**.
 2. Set the External AI Agents communication mode to **Synchronous**. CareAtlas does
    not currently implement asynchronous callback registration, and its A2A
-   `message/send` payload uses `blocking: true`.
+   `message/send` payload uses `blocking: true` and `returnImmediately: false`.
 3. In **System Properties > sys_properties.list**, confirm this property exists and
    is set to `true`:
 
@@ -137,8 +137,9 @@ ServiceNow setup:
 After a CareAtlas run, verify ServiceNow received it in the Execution Plan
 [`sn_aia_execution_plan`] table by finding an Objective that contains the prompt you submitted.
 The `/governance/ai-agents` page opens each agent in a local slide-out chat drawer.
-Each chat turn uses synchronous A2A (`blocking: true`) and sends returned
-`contextId` / `taskId` values on follow-up turns when ServiceNow provides them.
+Each chat turn uses synchronous A2A (`blocking: true`, `returnImmediately: false`)
+and sends returned `contextId` / `taskId` values on follow-up turns when
+ServiceNow provides them.
 
 Token test:
 
@@ -167,7 +168,8 @@ not reached agent execution yet. Recheck the client secret, saved OAuth app, OAu
 Application User, `glide.oauth.inbound.client.credential.grant_type.enabled`, and
 whether **Password needs reset** is still checked on the integration user.
 
-A manual synchronous A2A execution payload must include `blocking: true`:
+A manual synchronous A2A execution payload must include `blocking: true` and
+`returnImmediately: false`:
 
 ```bash
 curl -X POST "https://<your-instance>.service-now.com/api/sn_aia/a2a/v2/agent/id/<agent-sys-id>" \
@@ -182,6 +184,8 @@ curl -X POST "https://<your-instance>.service-now.com/api/sn_aia/a2a/v2/agent/id
       "configuration": {
         "acceptedOutputModes": ["application/json"],
         "blocking": true,
+        "returnImmediately": false,
+        "return_immediately": false,
         "historyLength": 0
       },
       "message": {

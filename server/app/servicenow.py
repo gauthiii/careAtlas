@@ -218,6 +218,8 @@ async def execute_agent(
             "configuration": {
                 "acceptedOutputModes": ["application/json"],
                 "blocking": True,
+                "returnImmediately": False,
+                "return_immediately": False,
                 "historyLength": 0,
             },
             "message": message,

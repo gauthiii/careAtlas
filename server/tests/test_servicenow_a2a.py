@@ -103,6 +103,8 @@ class ServiceNowA2ATest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(execute_body["method"], "message/send")
         self.assertEqual(execute_body["params"]["configuration"]["acceptedOutputModes"], ["application/json"])
         self.assertIs(execute_body["params"]["configuration"]["blocking"], True)
+        self.assertIs(execute_body["params"]["configuration"]["returnImmediately"], False)
+        self.assertIs(execute_body["params"]["configuration"]["return_immediately"], False)
         self.assertEqual(execute_body["params"]["configuration"]["historyLength"], 0)
         self.assertEqual(execute_body["params"]["message"]["kind"], "message")
         self.assertEqual(execute_body["params"]["message"]["role"], "user")
