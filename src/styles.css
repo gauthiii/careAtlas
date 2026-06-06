@@ -37,3 +37,10 @@ textarea {
 button {
   cursor: pointer;
 }
+
+/* Marching-ants animation for the active edge in workflow flow diagrams. */
+@keyframes dash {
+  to {
+    stroke-dashoffset: -12;
+  }
+}

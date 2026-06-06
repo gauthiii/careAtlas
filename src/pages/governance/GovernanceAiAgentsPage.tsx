@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 
 import { PortalPage, PortalPanel } from '../../components/portal/PortalShell'
+import { ShadowAiWorkflowModal } from '../../components/governance/ShadowAiWorkflowModal'
 import { cn } from '../../lib/cn'
 import { useUnmanagedAISystems } from '../../hooks/useUnmanagedAISystems'
 import {
@@ -47,6 +48,7 @@ function AgentInventory() {
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<Record<string, ChatSession>>({})
+  const [workflowOpen, setWorkflowOpen] = useState(false)
 
   const selectedAgent = systems.find((agent) => agent.sys_id === selectedAgentId) ?? null
 
@@ -61,8 +63,18 @@ function AgentInventory() {
     state === 'ok' ? `AI Agent Inventory — ${systems.length} agents` : 'AI Agent Inventory'
 
   return (
-    <PortalPanel title={title} icon={<ShieldAlert size={18} />}>
-      <p className="mb-4 text-xs text-[#53687b]">
+    <PortalPanel title={title} icon={<ShieldAlert size={18} />} className="relative">
+      <button
+        type="button"
+        onClick={() => setWorkflowOpen(true)}
+        title="View the shadow-AI discovery end-to-end governance workflow"
+        className="absolute right-5 top-5 inline-flex items-center gap-2 rounded-lg border border-[#cfe0ea] bg-[#e7f3f8] px-3 py-2 text-xs font-bold text-[#0f5f8c] transition-colors hover:border-[#0f5f8c] hover:bg-[#d8edf5]"
+      >
+        <Workflow size={16} />
+        <span className="max-[640px]:hidden">End-to-End Workflow</span>
+      </button>
+
+      <p className="mb-4 pr-40 text-xs text-[#53687b]">
         Agents created in ServiceNow AI Control Tower table{' '}
         <span className="font-semibold text-[#143A57]">sn_aia_agent</span> since June 2, 2026.
       </p>
@@ -118,6 +130,8 @@ function AgentInventory() {
           setSessions((prev) => ({ ...prev, [agentId]: session }))
         }
       />
+
+      <ShadowAiWorkflowModal open={workflowOpen} onClose={() => setWorkflowOpen(false)} />
     </PortalPanel>
   )
 }
