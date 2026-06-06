@@ -1,9 +1,13 @@
 import json
+import sys
 import unittest
 from dataclasses import dataclass
+from pathlib import Path
 from urllib.parse import parse_qs
 
 import httpx
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.entra_native_auth import (
     EntraNativeAuthClient,

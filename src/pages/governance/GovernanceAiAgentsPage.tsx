@@ -6,9 +6,11 @@ import {
   ChevronDown,
   Filter,
   Fingerprint,
+  FlaskConical,
   ListOrdered,
   Loader2,
   Plus,
+  Send,
   ShieldAlert,
   Sparkles,
   UserRound,
@@ -18,7 +20,7 @@ import {
 import { PortalPage, PortalPanel } from '../../components/portal/PortalShell'
 import { cn } from '../../lib/cn'
 import { useUnmanagedAISystems } from '../../hooks/useUnmanagedAISystems'
-import type { SnowAISystem } from '../../services/serviceNow'
+import { executeAgent, type SnowAISystem } from '../../services/serviceNow'
 
 export function GovernanceAiAgentsPage() {
   return (
@@ -208,9 +210,89 @@ function AgentCard({
             <MetaItem icon={<Filter size={14} />} label="Condition" value={agent.condition} />
             <MetaItem icon={<Bot size={14} />} label="Agent type" value={agent.agent_type} />
           </div>
+
+          <AgentTester agent={agent} />
         </div>
       )}
     </div>
+  )
+}
+
+type TestState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'done'; output: string }
+  | { status: 'error'; message: string }
+
+// Sends free-form input to the agent via our backend (which holds the
+// ServiceNow credentials and calls Zurich A2A by sn_aia_agent sys_id).
+function AgentTester({ agent }: { agent: SnowAISystem }) {
+  const [input, setInput] = useState('')
+  const [result, setResult] = useState<TestState>({ status: 'idle' })
+
+  const loading = result.status === 'loading'
+  const canRun = input.trim().length > 0 && !loading
+
+  const handleRun = async () => {
+    if (!canRun) return
+    setResult({ status: 'loading' })
+    try {
+      const output = await executeAgent(agent.sys_id, input.trim())
+      setResult({ status: 'done', output: output || 'Agent executed successfully.' })
+    } catch (e) {
+      setResult({ status: 'error', message: e instanceof Error ? e.message : 'Failed to run the agent.' })
+    }
+  }
+
+  return (
+    <DetailSection icon={<FlaskConical size={14} />} title="Test Agent">
+      <div className="space-y-3">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={`Ask ${agent.name || 'this agent'} to do something…`}
+          rows={3}
+          className="w-full resize-y rounded-lg border border-[#dbe6ee] bg-white px-3.5 py-2.5 text-sm leading-[1.55] text-[#40566b] outline-none placeholder:text-[#9fb0c0] focus:border-[#0f5f8c] focus:ring-2 focus:ring-[#0f5f8c]/15"
+        />
+
+        <button
+          type="button"
+          onClick={handleRun}
+          disabled={!canRun}
+          className={cn(
+            'inline-flex items-center gap-2 rounded-md bg-[#143A57] px-4 py-2 text-sm font-semibold text-white transition-opacity',
+            !canRun ? 'cursor-not-allowed opacity-50' : 'hover:opacity-90',
+          )}
+        >
+          {loading ? (
+            <>
+              <Loader2 size={15} className="animate-spin" /> Agent is thinking…
+            </>
+          ) : (
+            <>
+              <Send size={15} /> Run Agent
+            </>
+          )}
+        </button>
+
+        {result.status === 'done' && (
+          <div className="rounded-lg border-l-[3px] border-[#12805c] bg-[#f5f9fb] px-3.5 py-3">
+            <div className="mb-1 text-[0.66rem] font-bold uppercase tracking-[0.05em] text-[#8aa0b3]">
+              Agent response
+            </div>
+            <p className="whitespace-pre-wrap break-words text-sm leading-[1.6] text-[#40566b]">
+              {result.output}
+            </p>
+          </div>
+        )}
+
+        {result.status === 'error' && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700">
+            Failed to run the agent. <span className="opacity-75">{result.message}</span>
+          </div>
+        )}
+      </div>
+    </DetailSection>
   )
 }
 

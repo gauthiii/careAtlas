@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, Optional
 
 import httpx
@@ -10,6 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from .config import Settings, get_settings
+
+logger = logging.getLogger("careatlas.entra")
 
 router = APIRouter(prefix="/auth/entra", tags=["auth"])
 
@@ -361,6 +364,7 @@ async def _call(client: EntraNativeAuthClient, action: str, *args: Any) -> dict[
     try:
         result = await getattr(client, action)(*args)
     except EntraNativeAuthError as exc:
+        logger.warning("Entra %s failed (%s): %s", action, exc.status_code, exc.detail)
         raise HTTPException(status_code=exc.status_code, detail=_to_camel(exc.detail)) from exc
     return normalize_native_auth_response(result)
 

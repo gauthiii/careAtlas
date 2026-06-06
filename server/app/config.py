@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # Service account with read access to the AI Control Tower tables.
     snow_username: str
     snow_password: str
+    # OAuth client credentials used to invoke ServiceNow AI Agents over A2A.
+    snow_a2a_client_id: Optional[str] = None
+    snow_a2a_client_secret: Optional[str] = None
+    snow_a2a_token_skew_seconds: int = 60
 
     # Comma-separated list of browser origins allowed to call this API.
     cors_origins: str = "http://localhost:5173"

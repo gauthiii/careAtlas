@@ -41,6 +41,30 @@ export async function fetchUnmanagedAIStewardSystems(): Promise<SnowAISystem[]> 
   return (await res.json()) as SnowAISystem[]
 }
 
+export async function executeAgent(
+  agentSysId: string,
+  userInput: string
+): Promise<string> {
+  const res = await fetch(`${API_BASE}/agents/execute`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      agent_sys_id: agentSysId,
+      user_input: userInput,
+    }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  const data: { output?: string } = await res.json()
+  return data.output ?? ''
+}
+
 export async function validateServiceNowUserCredentials(
   username: string,
   password: string
