@@ -34,7 +34,25 @@ const demoLinks: DemoLink[] = [
   {
     label: 'System Users',
     description: 'sys_user list — service & human accounts',
-    href: `${SNOW_BASE}/sys_user_list.do`,
+    href: `${SNOW_BASE}/now/nav/ui/classic/params/target/sys_user_list.do`,
+    icon: Users,
+  },
+    {
+    label: 'Roles',
+    description: 'sys_user_role list — roles and permissions',
+    href: `${SNOW_BASE}/now/nav/ui/classic/params/target/sys_user_role_list.do`,
+    icon: Users,
+  },
+    {
+    label: 'Groups',
+    description: 'sys_user_group list — user groups and memberships',
+    href: `${SNOW_BASE}/now/nav/ui/classic/params/target/sys_user_group_list.do`,
+    icon: Users,
+  },
+      {
+    label: 'Access Control (ACL) Rules',
+    description: 'sys_security_acl list — access control rules',
+    href: `${SNOW_BASE}/now/nav/ui/classic/params/target/sys_security_acl_list.do`,
     icon: Users,
   },
 ]
