@@ -14,7 +14,13 @@ from uuid import uuid4
 import httpx
 
 from .config import Settings
-from .models import AISystem, AclTestCheck, AclTestResponse
+from .models import (
+    AISystem,
+    AclTestCheck,
+    AclTestResponse,
+    PatientRegistrationRequest,
+    PatientRegistrationResponse,
+)
 
 logger = logging.getLogger("careatlas.servicenow")
 
@@ -162,6 +168,27 @@ class AgentExecutionResult:
     status: str = "completed"
 
 
+REQUIRED_PATIENT_FIELDS = (
+    "u_first_name",
+    "u_last_name",
+    "u_date_of_birth",
+    "u_gender",
+    "u_ethnicity",
+    "u_primary_language",
+    "u_phone",
+    "u_email",
+    "u_address_line1",
+    "u_city",
+    "u_postcode",
+    "u_health_condition",
+    "u_accessibility",
+    "u_emergency_name",
+    "u_emergency_phone",
+    "u_emergency_relationship",
+    "u_username",
+)
+
+
 def _display_val(field: Any) -> str:
     """ServiceNow returns reference fields as {value, display_value} when
     sysparm_display_value=true, and plain fields as strings. Normalize both."""
@@ -299,6 +326,143 @@ async def fetch_agents(settings: Settings) -> list[AISystem]:
 
     result = response.json().get("result", [])
     return [_map_agent(record) for record in result]
+
+
+async def create_patient_registration(
+    settings: Settings,
+    registration: PatientRegistrationRequest,
+    http_client: httpx.AsyncClient | None = None,
+) -> PatientRegistrationResponse:
+    """Create a patient record in ServiceNow's u_patient table."""
+    payload = _patient_registration_payload(registration)
+
+    async def run(client: httpx.AsyncClient) -> httpx.Response:
+        return await client.post(
+            f"{settings.snow_base_url}/api/now/table/u_patient",
+            json=payload,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            auth=(settings.snow_username, settings.snow_password),
+        )
+
+    if http_client is not None:
+        response = await run(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+            response = await run(client)
+
+    if not response.is_success:
+        _raise_snow_error(response)
+
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise ServiceNowError("ServiceNow patient registration failed: invalid JSON response") from exc
+
+    result = body.get("result") if isinstance(body, dict) else None
+    if not isinstance(result, dict):
+        raise ServiceNowError("ServiceNow patient registration response did not include a result object")
+
+    return PatientRegistrationResponse(
+        message="Patient registration created in ServiceNow.",
+        sys_id=_display_val(result.get("sys_id")),
+        patient_id=_display_val(result.get("u_patient_id")),
+        first_name=_display_val(result.get("u_first_name")),
+        last_name=_display_val(result.get("u_last_name")),
+        email=_display_val(result.get("u_email")),
+        registration_status=_display_val(result.get("u_registration_status")),
+    )
+
+
+def _patient_registration_payload(registration: PatientRegistrationRequest) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "u_first_name": registration.first_name,
+        "u_last_name": registration.last_name,
+        "u_date_of_birth": registration.date_of_birth,
+        "u_gender": _normalize_simple_choice(registration.gender),
+        "u_ethnicity": _normalize_ethnicity(registration.ethnicity),
+        "u_primary_language": registration.primary_language,
+        "u_phone": registration.phone,
+        "u_email": registration.email,
+        "u_address_line1": registration.address_line1,
+        "u_city": registration.city,
+        "u_postcode": registration.postcode,
+        "u_health_condition": _normalize_health_condition(registration.health_condition),
+        "u_accessibility": _normalize_yes_no(registration.accessibility),
+        "u_emergency_name": registration.emergency_name,
+        "u_emergency_phone": registration.emergency_phone,
+        "u_emergency_relationship": registration.emergency_relationship,
+        "u_username": registration.username,
+        "u_registration_status": "pending",
+        "u_account_status": "active",
+        "u_email_verified": "false",
+        "u_profile_complete": str(_has_complete_patient_profile(registration)).lower(),
+        "u_consent_accepted": str(registration.consent_accepted).lower(),
+        "u_privacy_notice_version": "v1",
+        "u_confidence_score": "100",
+    }
+    if registration.address_line2:
+        payload["u_address_line2"] = registration.address_line2
+    if registration.insurance_id:
+        payload["u_insurance_id"] = registration.insurance_id
+    return payload
+
+
+def _normalize_simple_choice(value: str) -> str:
+    return value.strip().lower()
+
+
+def _normalize_ethnicity(value: str) -> str:
+    normalized = _normalize_simple_choice(value)
+    if normalized == "black or black british":
+        return "black"
+    if normalized == "prefer not to say":
+        return "prefer_not_to_say"
+    return normalized
+
+
+def _normalize_health_condition(value: str) -> str:
+    normalized = _normalize_simple_choice(value)
+    aliases = {
+        "chronic condition": "chronic",
+        "mental health": "mental_health",
+        "preventative care": "preventative",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def _normalize_yes_no(value: str) -> str:
+    normalized = _normalize_simple_choice(value)
+    if normalized in {"yes", "true", "1"}:
+        return "true"
+    if normalized in {"no", "false", "0"}:
+        return "false"
+    return normalized
+
+
+def _has_complete_patient_profile(registration: PatientRegistrationRequest) -> bool:
+    patient_payload = {
+        "u_first_name": registration.first_name,
+        "u_last_name": registration.last_name,
+        "u_date_of_birth": registration.date_of_birth,
+        "u_gender": registration.gender,
+        "u_ethnicity": registration.ethnicity,
+        "u_primary_language": registration.primary_language,
+        "u_phone": registration.phone,
+        "u_email": registration.email,
+        "u_address_line1": registration.address_line1,
+        "u_city": registration.city,
+        "u_postcode": registration.postcode,
+        "u_health_condition": registration.health_condition,
+        "u_accessibility": registration.accessibility,
+        "u_emergency_name": registration.emergency_name,
+        "u_emergency_phone": registration.emergency_phone,
+        "u_emergency_relationship": registration.emergency_relationship,
+        "u_username": registration.username,
+    }
+    return all(str(patient_payload.get(field) or "").strip() for field in REQUIRED_PATIENT_FIELDS)
 
 
 async def test_service_account_acl(

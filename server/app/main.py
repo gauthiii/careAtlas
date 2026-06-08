@@ -30,11 +30,17 @@ from .models import (
     AISystem,
     ExecuteAgentRequest,
     ExecuteAgentResponse,
+    PatientRegistrationRequest,
+    PatientRegistrationResponse,
+    PasswordPwnedCheckRequest,
+    PasswordPwnedCheckResponse,
     ValidateRequest,
     ValidateResponse,
 )
+from .pwned_passwords import PwnedPasswordsError, check_pwned_password
 from .servicenow import (
     ServiceNowError,
+    create_patient_registration,
     execute_agent,
     fetch_agents,
     test_service_account_acl,
@@ -136,6 +142,28 @@ async def post_validate(
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return ValidateResponse(valid=valid)
+
+
+@api.post("/passwords/pwned-check", response_model=PasswordPwnedCheckResponse)
+async def post_password_pwned_check(
+    body: PasswordPwnedCheckRequest,
+    settings: Settings = Depends(get_settings),
+) -> PasswordPwnedCheckResponse:
+    try:
+        return await check_pwned_password(settings, body.password)
+    except PwnedPasswordsError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.post("/patients/register", response_model=PatientRegistrationResponse)
+async def post_patient_registration(
+    body: PatientRegistrationRequest,
+    settings: Settings = Depends(get_settings),
+) -> PatientRegistrationResponse:
+    try:
+        return await create_patient_registration(settings, body)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @api.post("/acl/test", response_model=AclTestResponse)

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { PatientField, RegistrationSection } from '../../data/patientPortalData'
 import { Asterisk } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -6,10 +7,14 @@ export function PatientFormSection({
   section,
   values,
   onFieldChange,
+  fieldAccessory,
+  fieldFeedback,
 }: {
   section: RegistrationSection
   values?: Record<string, string>
   onFieldChange?: (label: string, value: string) => void
+  fieldAccessory?: (field: PatientField) => ReactNode
+  fieldFeedback?: (field: PatientField) => ReactNode
 }) {
   return (
     <section className="grid gap-4 border-b border-[#e5eef3] pb-[22px] last:border-b-0 last:pb-0">
@@ -24,6 +29,8 @@ export function PatientFormSection({
             key={field.label}
             value={values?.[field.label]}
             onChange={onFieldChange ? (next) => onFieldChange(field.label, next) : undefined}
+            accessory={fieldAccessory?.(field)}
+            feedback={fieldFeedback?.(field)}
           />
         ))}
       </div>
@@ -36,11 +43,15 @@ export function PatientFieldControl({
   readOnly = false,
   value,
   onChange,
+  accessory,
+  feedback,
 }: {
   field: PatientField
   readOnly?: boolean
   value?: string
   onChange?: (value: string) => void
+  accessory?: ReactNode
+  feedback?: ReactNode
 }) {
   const fieldId = field.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')
   const marker = field.required ? <Asterisk size={16} className="text-red-500" /> :  ''
@@ -56,8 +67,13 @@ export function PatientFieldControl({
   }
 
   return (
-    <label className="grid gap-[7px] text-[0.84rem] font-bold" htmlFor={fieldId}>
-      <span className="flex items-center gap-1 text-sm font-bold">{field.label} <em className="text-sm font-semibold">{marker}</em></span>
+    <div className="grid gap-[7px] text-[0.84rem] font-bold">
+      <div className="flex items-center justify-between gap-2">
+        <label className="flex items-center gap-1 text-sm font-bold" htmlFor={fieldId}>
+          {field.label} <em className="text-sm font-semibold">{marker}</em>
+        </label>
+        {accessory}
+      </div>
       {field.type === 'select' ? (
         <select
           id={fieldId}
@@ -80,6 +96,7 @@ export function PatientFieldControl({
             : {})}
         />
       )}
-    </label>
+      {feedback}
+    </div>
   )
 }

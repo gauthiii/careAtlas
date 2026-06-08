@@ -45,6 +45,44 @@ export interface AclTestResponse {
   checks: AclTestCheck[]
 }
 
+export interface PatientRegistrationRequest {
+  first_name: string
+  last_name: string
+  date_of_birth: string
+  gender: string
+  ethnicity: string
+  primary_language: string
+  phone: string
+  email: string
+  address_line1: string
+  address_line2?: string | null
+  city: string
+  postcode: string
+  health_condition: string
+  accessibility: string
+  insurance_id?: string | null
+  emergency_name: string
+  emergency_phone: string
+  emergency_relationship: string
+  username: string
+  consent_accepted: boolean
+}
+
+export interface PatientRegistrationResponse {
+  message: string
+  sys_id: string
+  patient_id: string
+  first_name: string
+  last_name: string
+  email: string
+  registration_status: string
+}
+
+export interface PasswordPwnedCheckResponse {
+  pwned: boolean
+  count: number
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 async function readError(res: Response): Promise<string> {
@@ -128,6 +166,42 @@ export async function validateServiceNowUserCredentials(
 
   const data: { valid?: boolean } = await res.json()
   return Boolean(data.valid)
+}
+
+export async function registerPatient(
+  registration: PatientRegistrationRequest
+): Promise<PatientRegistrationResponse> {
+  const res = await fetch(`${API_BASE}/patients/register`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(registration),
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as PatientRegistrationResponse
+}
+
+export async function checkPwnedPassword(password: string): Promise<PasswordPwnedCheckResponse> {
+  const res = await fetch(`${API_BASE}/passwords/pwned-check`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ password }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as PasswordPwnedCheckResponse
 }
 
 export async function testServiceAccountAcl(serviceAccount: string): Promise<AclTestResponse> {
