@@ -238,13 +238,17 @@ async def _fetch_a2a_access_token(settings: Settings, client: httpx.AsyncClient)
             "SNOW_A2A_CLIENT_SECRET in server/.env."
         )
 
+    form = {
+        "grant_type": "client_credentials",
+        "client_id": settings.snow_a2a_client_id,
+        "client_secret": settings.snow_a2a_client_secret,
+    }
+    if settings.snow_a2a_scope:
+        form["scope"] = settings.snow_a2a_scope
+
     response = await client.post(
         f"{settings.snow_base_url}/oauth_token.do",
-        data={
-            "grant_type": "client_credentials",
-            "client_id": settings.snow_a2a_client_id,
-            "client_secret": settings.snow_a2a_client_secret,
-        },
+        data=form,
         headers={"Accept": "application/json"},
     )
 
@@ -624,13 +628,12 @@ async def execute_agent(
     task_id: str | None = None,
     http_client: httpx.AsyncClient | None = None,
 ) -> AgentExecutionResult:
-    """Submit a Zurich ServiceNow AI agent through asynchronous A2A."""
+    """Submit a ServiceNow AI agent through synchronous (blocking) A2A.
+
+    Sends ``message/send`` with ``configuration: {"blocking": true}`` and reads the agent
+    reply out of the same HTTP response. This needs no publicly reachable callback URL.
+    """
     logger.info("Executing ServiceNow A2A agent %s", agent_sys_id)
-    if not settings.a2a_callback_base_url or not settings.a2a_callback_token:
-        raise ServiceNowError(
-            "ServiceNow A2A callbacks are not configured. Set A2A_CALLBACK_BASE_URL "
-            "and A2A_CALLBACK_TOKEN in server/.env."
-        )
 
     request_id = str(uuid4())
     message_id = str(uuid4())
@@ -650,18 +653,7 @@ async def execute_agent(
         "id": request_id,
         "method": "message/send",
         "params": {
-            "configuration": {
-                "acceptedOutputModes": ["application/json"],
-                "blocking": False,
-                "returnImmediately": True,
-                "return_immediately": True,
-                "historyLength": 0,
-                "pushNotificationConfig": {
-                    "url": settings.a2a_callback_url(agent_sys_id),
-                    "token": settings.a2a_callback_token,
-                    "authentication": {"schemes": ["Bearer"]},
-                },
-            },
+            "configuration": {"blocking": True},
             "message": message,
             "metadata": {},
         },
@@ -682,7 +674,7 @@ async def execute_agent(
     if http_client is not None:
         response = await run(http_client)
     else:
-        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        async with httpx.AsyncClient(timeout=settings.agent_execute_timeout) as client:
             response = await run(client)
 
     if not response.is_success:

@@ -19,9 +19,11 @@ class Settings(BaseSettings):
     snow_a2a_client_id: Optional[str] = None
     snow_a2a_client_secret: Optional[str] = None
     snow_a2a_token_skew_seconds: int = 60
-    # Public backend origin used by ServiceNow to send async A2A callbacks.
+    # OAuth scope required to invoke agents (from the agent card; usually "a2aauthscope").
+    snow_a2a_scope: Optional[str] = "a2aauthscope"
+    # Optional, no longer required for chat: kept so existing .env files still load. The
+    # blocking A2A call returns the reply inline, so async push-notification callbacks are unused.
     a2a_callback_base_url: Optional[str] = None
-    # Shared callback verification token expected from ServiceNow callbacks.
     a2a_callback_token: Optional[str] = None
 
     # AWS Cognito user pool used for email/password + TOTP MFA authentication.
@@ -38,6 +40,10 @@ class Settings(BaseSettings):
 
     # Outbound request timeout to ServiceNow, in seconds.
     request_timeout: float = 20.0
+
+    # Timeout for a blocking A2A agent execution, in seconds. Agents can take tens of
+    # seconds to respond, so this is generous relative to request_timeout.
+    agent_execute_timeout: float = 90.0
 
     model_config = SettingsConfigDict(
         env_file=SERVER_DIR / ".env",
