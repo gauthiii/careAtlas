@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     # Shared callback verification token expected from ServiceNow callbacks.
     a2a_callback_token: Optional[str] = None
 
+    # AWS Cognito user pool used for email/password + TOTP MFA authentication.
+    cognito_region: str = "us-east-1"
+    cognito_user_pool_id: Optional[str] = None
+    cognito_client_id: Optional[str] = None
+    cognito_client_secret: Optional[str] = None
+
     # Comma-separated list of browser origins allowed to call this API.
     cors_origins: str = "http://localhost:5173"
 

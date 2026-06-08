@@ -10,20 +10,27 @@ import {
   portalSwitcherLink,
 } from '../../lib/portalNav'
 import { hospital } from '../../data/patientPortalData'
+import { usePatientAuth } from '../../contexts/PatientAuthContext'
 
 
-const patientNav = [
+const loggedOutPatientNav = [
   { label: 'Home', to: '/patient/home', icon: Home },
   { label: 'Register', to: '/patient/register', icon: UserPlus },
   { label: 'Sign in', to: '/patient/sign-in', icon: LockKeyhole },
+] as const
+
+const loggedInPatientNav = [
   { label: 'Dashboard', to: '/patient/dashboard', icon: LayoutDashboard },
   { label: 'Book', to: '/patient/book', icon: CalendarCheck },
   { label: 'Profile', to: '/patient/profile', icon: User },
   { label: 'Contact', to: '/patient/contact', icon: MessageCircle },
-]
+] as const
 
 export function PatientShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
+  const { isAuthenticated } = usePatientAuth()
+  const patientNav = isAuthenticated ? loggedInPatientNav : loggedOutPatientNav
+  const patientPortalHome = isAuthenticated ? '/patient/dashboard' : '/patient/home'
 
   return (
     <div className="flex w-full min-h-0 flex-1 flex-col">
@@ -40,7 +47,7 @@ export function PatientShell({ children }: { children: React.ReactNode }) {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === '/'}
+              end
               className={({ isActive }) =>
                 cn(
                   'inline-flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
@@ -54,7 +61,7 @@ export function PatientShell({ children }: { children: React.ReactNode }) {
         </nav>
         <nav className="min-w-0 justify-self-end flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto" aria-label="Switch portal view">
           <NavLink
-            to="/patient/home"
+            to={patientPortalHome}
             className={cn(portalSwitcherLink, isPatientPortalPath(location.pathname) && portalSwitcherActive)}
           >
             <HeartPulse size={15} /> Patient Portal

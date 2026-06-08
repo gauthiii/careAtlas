@@ -242,14 +242,6 @@ curl -X POST "https://<your-instance>.service-now.com/api/sn_aia/a2a/v2/agent/id
   }'
 ```
 
-### Entra External ID test endpoints
-
-The Entra Native Auth backend endpoints are available in the FastAPI docs at
-<http://localhost:8000/docs> under `/api/auth/entra/*`. The email + password
-flow starts with `/signin/start`, continues with `/signin/password`, and returns
-either JSON tokens or an MFA/registration next step. If MFA is required, use the
-`/signin/mfa/*` endpoints for existing methods or `/mfa/register/*` to register a
-strong authentication method, then finish with `/token/continue`.
 
 ### Frontend — `.env` (repo root)
 

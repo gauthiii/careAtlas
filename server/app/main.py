@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import Settings, get_settings
+from .aws_auth import router as aws_auth_router
 from .a2a_callbacks import (
     AgentExecutionRecord,
     create_pending_execution,
@@ -272,6 +273,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
     app.include_router(api)
+    app.include_router(aws_auth_router)
     return app
 
 

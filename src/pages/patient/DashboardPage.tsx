@@ -2,17 +2,19 @@ import {
   Bell,
   CalendarCheck,
   ClipboardList,
+  LogOut,
   UserRound,
   Pill,
   Activity,
   FileText,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   PatientPanel,
   StatusBadge,
 } from '../../components/patient/PatientPanel'
 import { PatientPage } from '../../components/patient/PatientShell'
+import { patientDisplayName, usePatientAuth } from '../../contexts/PatientAuthContext'
 import {
   appointmentHistory,
   dashboardActions,
@@ -40,11 +42,31 @@ const medications = [
 ]
 
 export function DashboardPage() {
+  const navigate = useNavigate()
+  const { user, logout } = usePatientAuth()
+  const displayName = patientDisplayName(user)
+
+  async function handleLogout() {
+    await logout()
+    navigate('/patient/sign-in', { replace: true })
+  }
+
   return (
     <PatientPage
-      title={`Welcome back, ${patient.firstName}`}
+      title={`Welcome back, ${displayName}`}
       intro="Your central place for appointments, health records, medications, and clinic messages."
     >
+      <div className="-mt-3 mb-5 flex justify-end">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
+        >
+          <LogOut size={17} />
+          Logout
+        </button>
+      </div>
+
       {/* KPI SECTION */}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

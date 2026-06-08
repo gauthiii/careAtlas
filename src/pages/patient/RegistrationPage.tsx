@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { AlertTriangle, CheckCircle, LoaderCircle, SearchCheck, Sparkles } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { PatientPage } from '../../components/patient/PatientShell'
 import { PatientFormSection } from '../../components/patient/PatientFormSection'
 import { registrationSections } from '../../data/patientPortalData'
 import { generatePatient } from '../../lib/patientDataGenerator'
+import { usePatientAuth } from '../../contexts/PatientAuthContext'
+import { registerAwsPatient } from '../../services/awsAuth'
 import {
   checkPwnedPassword,
   registerPatient,
@@ -95,6 +97,8 @@ function validateRegistration(values: Record<string, string>, consentAccepted: b
 }
 
 export function RegistrationPage() {
+  const navigate = useNavigate()
+  const { login } = usePatientAuth()
   const [values, setValues] = useState<Record<string, string>>({})
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -148,8 +152,51 @@ export function RegistrationPage() {
 
     setIsSubmitting(true)
     try {
-      const response = await registerPatient(registrationPayload(values, consentAccepted))
+      const payload = registrationPayload(values, consentAccepted)
+      const password = values['Create a password'] ?? ''
+      const fullName = `${payload.first_name} ${payload.last_name}`.trim()
+      const response = await registerPatient(payload)
+      await registerAwsPatient(fullName, payload.email, password)
+      const loginResponse = await login(payload.email, password)
       setConfirmation(response)
+      if (loginResponse.status === 'MFA_SETUP_REQUIRED') {
+        navigate('/patient/verify-email', {
+          state: {
+            username: payload.email,
+            session: loginResponse.session,
+            name: fullName,
+          },
+        })
+        return
+      }
+      if (loginResponse.status === 'AUTH_SUCCESS') {
+        navigate('/patient/dashboard')
+        return
+      }
+      if (loginResponse.status === 'MFA_REQUIRED') {
+        navigate('/patient/sign-in', {
+          state: {
+            username: payload.email,
+            session: loginResponse.session,
+            mode: 'mfa',
+          },
+        })
+        return
+      }
+      if (loginResponse.status === 'CHALLENGE') {
+        if (loginResponse.challenge_name === 'NEW_PASSWORD_REQUIRED') {
+          navigate('/patient/sign-in', {
+            state: {
+              username: payload.email,
+              session: loginResponse.session,
+              mode: 'new-password',
+            },
+          })
+          return
+        }
+        setErrorMessage(`Cognito returned an unsupported challenge: ${loginResponse.challenge_name}.`)
+        return
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to submit registration.')
     } finally {
