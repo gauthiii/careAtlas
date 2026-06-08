@@ -2,7 +2,15 @@ import type { PatientField, RegistrationSection } from '../../data/patientPortal
 import { Asterisk } from 'lucide-react'
 import { cn } from '../../lib/cn'
 
-export function PatientFormSection({ section }: { section: RegistrationSection }) {
+export function PatientFormSection({
+  section,
+  values,
+  onFieldChange,
+}: {
+  section: RegistrationSection
+  values?: Record<string, string>
+  onFieldChange?: (label: string, value: string) => void
+}) {
   return (
     <section className="grid gap-4 border-b border-[#e5eef3] pb-[22px] last:border-b-0 last:pb-0">
       <div>
@@ -10,13 +18,30 @@ export function PatientFormSection({ section }: { section: RegistrationSection }
         <p className="mt-1.5 mb-0 leading-normal text-[#607487]">{section.description}</p>
       </div>
       <div className="grid grid-cols-2 gap-3.5 max-[720px]:grid-cols-1">
-        {section.fields.map((field) => <PatientFieldControl field={field} key={field.label} />)}
+        {section.fields.map((field) => (
+          <PatientFieldControl
+            field={field}
+            key={field.label}
+            value={values?.[field.label]}
+            onChange={onFieldChange ? (next) => onFieldChange(field.label, next) : undefined}
+          />
+        ))}
       </div>
     </section>
   )
 }
 
-export function PatientFieldControl({ field, readOnly = false }: { field: PatientField; readOnly?: boolean }) {
+export function PatientFieldControl({
+  field,
+  readOnly = false,
+  value,
+  onChange,
+}: {
+  field: PatientField
+  readOnly?: boolean
+  value?: string
+  onChange?: (value: string) => void
+}) {
   const fieldId = field.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')
   const marker = field.required ? <Asterisk size={16} className="text-red-500" /> :  ''
 
@@ -34,7 +59,13 @@ export function PatientFieldControl({ field, readOnly = false }: { field: Patien
     <label className="grid gap-[7px] text-[0.84rem] font-bold" htmlFor={fieldId}>
       <span className="flex items-center gap-1 text-sm font-bold">{field.label} <em className="text-sm font-semibold">{marker}</em></span>
       {field.type === 'select' ? (
-        <select id={fieldId} className="w-full rounded-[9px] border border-[#cbdde6] bg-white px-3 py-[11px] text-inherit" defaultValue="">
+        <select
+          id={fieldId}
+          className="w-full rounded-[9px] border border-[#cbdde6] bg-white px-3 py-[11px] text-inherit"
+          {...(onChange
+            ? { value: value ?? '', onChange: (event) => onChange(event.target.value) }
+            : { defaultValue: '' })}
+        >
           <option value="" disabled>Select option</option>
           {field.options?.map((option) => <option key={option}>{option}</option>)}
         </select>
@@ -44,6 +75,9 @@ export function PatientFieldControl({ field, readOnly = false }: { field: Patien
           className="w-full rounded-[9px] border border-[#cbdde6] bg-white px-3 py-[11px] text-inherit"
           type={field.type ?? 'text'}
           placeholder={field.label}
+          {...(onChange
+            ? { value: value ?? '', onChange: (event) => onChange(event.target.value) }
+            : {})}
         />
       )}
     </label>
