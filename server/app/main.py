@@ -23,7 +23,7 @@ from .a2a_callbacks import (
     get_execution,
     store_callback,
 )
-from .entra_native_auth import router as entra_auth_router
+
 from .models import (
     AclTestRequest,
     AclTestResponse,
@@ -48,7 +48,7 @@ logging.basicConfig(
 logger = logging.getLogger("careatlas")
 
 api = APIRouter(prefix="/api")
-api.include_router(entra_auth_router)
+
 
 
 @api.get("/health")

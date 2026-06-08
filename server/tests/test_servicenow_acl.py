@@ -13,9 +13,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.setdefault("SNOW_INSTANCE", "ven04690.service-now.com")
 os.environ.setdefault("SNOW_USERNAME", "snow-user")
 os.environ.setdefault("SNOW_PASSWORD", "snow-password")
-os.environ.setdefault("ENTRA_APP_ID", "entra-app-id")
-os.environ.setdefault("ENTRA_TENANT_ID", "entra-tenant-id")
-os.environ.setdefault("ENTRA_TENANT_SUBDOMAIN", "entra-subdomain")
 
 from app.config import get_settings
 from app.main import create_app
