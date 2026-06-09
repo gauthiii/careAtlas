@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Bot, HeartPulse, Home, Hospital, Presentation, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
+import { Bot, HeartPulse, Home, Hospital, LockKeyhole, Presentation, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import {
@@ -11,6 +11,9 @@ import {
 } from '../../lib/portalNav'
 import type { PanelTone } from '../patient/PatientPanel'
 import { hospital } from '../../data/patientPortalData'
+import { useClinicianAuth } from '../../contexts/ClinicianAuthContext'
+import { useGovernanceAuth } from '../../contexts/GovernanceAuthContext'
+import { usePatientAuth } from '../../contexts/PatientAuthContext'
 
 export type PortalTone = 'patient' | 'staff' | 'admin' | 'governance' | 'risk' | 'neutral'
 
@@ -29,9 +32,20 @@ const governanceNav = [
   { label: 'Demo', to: '/governance/demo', icon: Presentation, end: true },
 ] as const
 
+const signedOutGovernanceNav = [
+  { label: 'Sign in', to: '/governance/sign-in', icon: LockKeyhole, end: true },
+] as const
+
 export function PortalHeader({ label }: { label: string }) {
   const location = useLocation()
+  const { isAuthenticated: isClinicianAuthenticated } = useClinicianAuth()
+  const { isAuthenticated: isGovernanceAuthenticated } = useGovernanceAuth()
+  const { isAuthenticated: isPatientAuthenticated } = usePatientAuth()
   const showGovernanceNav = isGovernancePortalPath(location.pathname)
+  const visibleGovernanceNav = isGovernanceAuthenticated ? governanceNav : signedOutGovernanceNav
+  const patientPortalHome = isPatientAuthenticated ? '/patient/dashboard' : '/patient/home'
+  const clinicianPortalHome = isClinicianAuthenticated ? '/staff/doctor' : '/staff/sign-in'
+  const governancePortalHome = isGovernanceAuthenticated ? '/governance' : '/governance/sign-in'
 
   return (
     <header className="sticky top-0 z-[18] grid grid-cols-[auto_1fr_auto] items-center gap-3 border border-[#d7e5ec] rounded-[14px] bg-white/96 px-[clamp(14px,3vw,28px)] py-3.5 shadow-[0_10px_26px_rgba(25,64,93,0.08)] backdrop-blur-[14px] max-[1100px]:grid-cols-1 max-[720px]:static max-[720px]:p-2.5">
@@ -48,7 +62,7 @@ export function PortalHeader({ label }: { label: string }) {
           className="min-w-0 justify-self-center flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-[#f7fbfd] p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto"
           aria-label="AI governance navigation"
         >
-          {governanceNav.map((item) => {
+          {visibleGovernanceNav.map((item) => {
             const Icon = item.icon
 
             return (
@@ -73,19 +87,19 @@ export function PortalHeader({ label }: { label: string }) {
 
       <nav className="min-w-0 justify-self-end flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto" aria-label="Switch portal view">
         <NavLink
-          to="/patient/home"
+          to={patientPortalHome}
           className={cn(portalSwitcherLink, isPatientPortalPath(location.pathname) && portalSwitcherActive)}
         >
           <HeartPulse size={15} /> Patient Portal
         </NavLink>
         <NavLink
-          to="/staff/doctor"
+          to={clinicianPortalHome}
           className={cn(portalSwitcherLink, isClinicianPortalPath(location.pathname) && portalSwitcherActive)}
         >
           <Stethoscope size={15} /> Clinician Portal
         </NavLink>
         <NavLink
-          to="/governance"
+          to={governancePortalHome}
           className={cn(portalSwitcherLink, isGovernancePortalPath(location.pathname) && portalSwitcherActive)}
         >
           <ShieldCheck size={15} /> AI Governance

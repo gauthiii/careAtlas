@@ -9,14 +9,26 @@ import {
   ArrowRight,
   Plus,
   ChartBar,
+  LogOut,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 import {
   PortalPage,
   PortalPanel,
 } from '../../components/portal/PortalShell'
+import { governanceDisplayName, useGovernanceAuth } from '../../contexts/GovernanceAuthContext'
 
 export function GovernanceDashboardPage() {
+  const navigate = useNavigate()
+  const { logout, user } = useGovernanceAuth()
+  const displayName = governanceDisplayName(user)
+
+  async function handleLogout() {
+    await logout()
+    navigate('/governance/sign-in', { replace: true })
+  }
+
   const fairnessData = [
     { group: 'Asian', value: 32, expected: '+22%' },
     { group: 'Black', value: 20, expected: '+2%' },
@@ -29,8 +41,19 @@ export function GovernanceDashboardPage() {
     <PortalPage
       label="AI Governance Officer"
       title="Control Tower evidence board"
-      intro="Consolidated governance view for agent inventory, shadow AI detection, fairness monitoring, prompt injection, access violations and Action Fabric audit evidence."
+      intro={`Signed in as ${displayName}. Consolidated governance view for agent inventory, shadow AI detection, fairness monitoring, prompt injection, access violations and Action Fabric audit evidence.`}
     >
+      <div className="-mt-3 flex justify-end px-6">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
+        >
+          <LogOut size={17} />
+          Logout
+        </button>
+      </div>
+
       {/* KPI STRIP */}
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5 p-6">
         <div className="rounded-xl border border-[#d7e5ec] bg-white p-5">

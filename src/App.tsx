@@ -5,6 +5,7 @@ import { GovernanceAclPage } from './pages/governance/GovernanceAclPage'
 import { GovernanceAiAgentsPage } from './pages/governance/GovernanceAiAgentsPage'
 import { GovernanceDashboardPage } from './pages/governance/GovernanceDashboardPage'
 import { GovernanceDemoPage } from './pages/governance/GovernanceDemoPage'
+import { GovernanceSignInPage } from './pages/governance/GovernanceSignInPage'
 import { ViewChooserPage } from './pages/home/ViewChooserPage'
 import { BookAppointmentPage } from './pages/patient/BookAppointmentPage'
 import { ContactPage } from './pages/patient/ContactPage'
@@ -20,6 +21,7 @@ import { DoctorDashboardPage } from './pages/staff/DoctorDashboardPage'
 import { PatientRecordPage } from './pages/staff/PatientRecordPage'
 import { StaffSignInPage } from './pages/staff/StaffSignInPage'
 import { useClinicianAuth } from './contexts/ClinicianAuthContext'
+import { useGovernanceAuth } from './contexts/GovernanceAuthContext'
 import { usePatientAuth } from './contexts/PatientAuthContext'
 
 function App() {
@@ -31,120 +33,158 @@ function App() {
         <Route
           path="/patient/home"
           element={
-            <ClinicianRoleBlocker>
-              <LandingPage />
-            </ClinicianRoleBlocker>
+            <GovernanceRoleBlocker>
+              <ClinicianRoleBlocker>
+                <LandingPage />
+              </ClinicianRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/patient/register"
           element={
-            <ClinicianRoleBlocker>
-              <RegistrationPage />
-            </ClinicianRoleBlocker>
+            <GovernanceRoleBlocker>
+              <ClinicianRoleBlocker>
+                <RegistrationPage />
+              </ClinicianRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/patient/verify-email"
           element={
-            <ClinicianRoleBlocker>
-              <EmailVerificationPage />
-            </ClinicianRoleBlocker>
+            <GovernanceRoleBlocker>
+              <ClinicianRoleBlocker>
+                <EmailVerificationPage />
+              </ClinicianRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/patient/sign-in"
           element={
-            <ClinicianRoleBlocker>
-              <PatientSignInPage />
-            </ClinicianRoleBlocker>
+            <GovernanceRoleBlocker>
+              <ClinicianRoleBlocker>
+                <PatientSignInPage />
+              </ClinicianRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/patient/dashboard"
           element={
-            <ClinicianRoleBlocker>
-              <PatientProtectedRoute>
-                <DashboardPage />
-              </PatientProtectedRoute>
-            </ClinicianRoleBlocker>
+            <GovernanceRoleBlocker>
+              <ClinicianRoleBlocker>
+                <PatientProtectedRoute>
+                  <DashboardPage />
+                </PatientProtectedRoute>
+              </ClinicianRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/patient/book"
           element={
-            <ClinicianRoleBlocker>
-              <PatientProtectedRoute>
-                <BookAppointmentPage />
-              </PatientProtectedRoute>
-            </ClinicianRoleBlocker>
+            <GovernanceRoleBlocker>
+              <ClinicianRoleBlocker>
+                <PatientProtectedRoute>
+                  <BookAppointmentPage />
+                </PatientProtectedRoute>
+              </ClinicianRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/patient/profile"
           element={
-            <ClinicianRoleBlocker>
-              <PatientProtectedRoute>
-                <ProfilePage />
-              </PatientProtectedRoute>
-            </ClinicianRoleBlocker>
+            <GovernanceRoleBlocker>
+              <ClinicianRoleBlocker>
+                <PatientProtectedRoute>
+                  <ProfilePage />
+                </PatientProtectedRoute>
+              </ClinicianRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/patient/contact"
           element={
-            <ClinicianRoleBlocker>
-              <ContactPage />
-            </ClinicianRoleBlocker>
+            <GovernanceRoleBlocker>
+              <ClinicianRoleBlocker>
+                <ContactPage />
+              </ClinicianRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/staff/sign-in"
           element={
-            <PatientRoleBlocker>
-              <ClinicianSignInRoute>
-                <StaffSignInPage />
-              </ClinicianSignInRoute>
-            </PatientRoleBlocker>
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianSignInRoute>
+                  <StaffSignInPage />
+                </ClinicianSignInRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/staff/doctor"
           element={
-            <PatientRoleBlocker>
-              <ClinicianProtectedRoute>
-                <DoctorDashboardPage />
-              </ClinicianProtectedRoute>
-            </PatientRoleBlocker>
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianProtectedRoute>
+                  <DoctorDashboardPage />
+                </ClinicianProtectedRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/staff/admin"
           element={
-            <PatientRoleBlocker>
-              <ClinicianProtectedRoute>
-                <AdminDashboardPage />
-              </ClinicianProtectedRoute>
-            </PatientRoleBlocker>
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianProtectedRoute>
+                  <AdminDashboardPage />
+                </ClinicianProtectedRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/staff/patient/:id"
           element={
-            <PatientRoleBlocker>
-              <ClinicianProtectedRoute>
-                <PatientRecordPage />
-              </ClinicianProtectedRoute>
-            </PatientRoleBlocker>
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianProtectedRoute>
+                  <PatientRecordPage />
+                </ClinicianProtectedRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
           }
         />
         <Route
           path="/staff/availability"
           element={
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianProtectedRoute>
+                  <AvailabilityPage />
+                </ClinicianProtectedRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
+          }
+        />
+        <Route
+          path="/governance/sign-in"
+          element={
             <PatientRoleBlocker>
-              <ClinicianProtectedRoute>
-                <AvailabilityPage />
-              </ClinicianProtectedRoute>
+              <ClinicianRoleBlocker>
+                <GovernanceSignInRoute>
+                  <GovernanceSignInPage />
+                </GovernanceSignInRoute>
+              </ClinicianRoleBlocker>
             </PatientRoleBlocker>
           }
         />
@@ -153,7 +193,9 @@ function App() {
           element={
             <PatientRoleBlocker>
               <ClinicianRoleBlocker>
-                <GovernanceDashboardPage />
+                <GovernanceProtectedRoute>
+                  <GovernanceDashboardPage />
+                </GovernanceProtectedRoute>
               </ClinicianRoleBlocker>
             </PatientRoleBlocker>
           }
@@ -163,7 +205,9 @@ function App() {
           element={
             <PatientRoleBlocker>
               <ClinicianRoleBlocker>
-                <GovernanceAiAgentsPage />
+                <GovernanceProtectedRoute>
+                  <GovernanceAiAgentsPage />
+                </GovernanceProtectedRoute>
               </ClinicianRoleBlocker>
             </PatientRoleBlocker>
           }
@@ -173,7 +217,9 @@ function App() {
           element={
             <PatientRoleBlocker>
               <ClinicianRoleBlocker>
-                <GovernanceAclPage />
+                <GovernanceProtectedRoute>
+                  <GovernanceAclPage />
+                </GovernanceProtectedRoute>
               </ClinicianRoleBlocker>
             </PatientRoleBlocker>
           }
@@ -183,7 +229,9 @@ function App() {
           element={
             <PatientRoleBlocker>
               <ClinicianRoleBlocker>
-                <GovernanceDemoPage />
+                <GovernanceProtectedRoute>
+                  <GovernanceDemoPage />
+                </GovernanceProtectedRoute>
               </ClinicianRoleBlocker>
             </PatientRoleBlocker>
           }
@@ -260,6 +308,37 @@ function ClinicianRoleBlocker({ children }: { children: ReactNode }) {
   return children
 }
 
+function GovernanceProtectedRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isHydrating } = useGovernanceAuth()
+  const location = useLocation()
+
+  if (isHydrating) return <SessionLoading />
+
+  if (!isAuthenticated) {
+    return <Navigate to="/governance/sign-in" replace state={{ from: location.pathname }} />
+  }
+
+  return children
+}
+
+function GovernanceSignInRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isHydrating } = useGovernanceAuth()
+
+  if (isHydrating) return <SessionLoading />
+  if (isAuthenticated) return <Navigate to="/governance" replace />
+
+  return children
+}
+
+function GovernanceRoleBlocker({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isHydrating } = useGovernanceAuth()
+
+  if (isHydrating) return <SessionLoading />
+  if (isAuthenticated) return <GovernanceAccessDeniedPage />
+
+  return children
+}
+
 function PatientAccessDeniedPage() {
   const { logout } = usePatientAuth()
   const location = useLocation()
@@ -297,6 +376,47 @@ function PatientAccessDeniedPage() {
           >
             Return to patient dashboard
           </Link>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function GovernanceAccessDeniedPage() {
+  const { logout } = useGovernanceAuth()
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    await logout()
+    navigate('/governance/sign-in', { replace: true })
+  }
+
+  return (
+    <main className="flex min-h-[calc(100vh-120px)] items-center justify-center px-4 py-10">
+      <section className="grid w-full max-w-[620px] gap-5 rounded-[14px] border border-[#d7e5ec] bg-white p-7 text-center shadow-[0_12px_30px_rgba(25,64,93,0.07)]">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#feeceb] text-[#a22828]">
+          <span className="text-xl font-black">!</span>
+        </div>
+        <div className="grid gap-2">
+          <h1 className="m-0 text-2xl font-bold text-[#102033]">AI Governance access only</h1>
+          <p className="m-0 text-[1rem] font-semibold leading-[1.55] text-[#53687b]">
+            You are signed in to AI Governance. You do not have access to this page.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link
+            to="/governance"
+            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
+          >
+            Return to AI Governance
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center rounded-[9px] border border-transparent bg-[#143A57] px-[15px] font-bold !text-white max-[720px]:w-full"
+          >
+            Log out of AI Governance
+          </button>
         </div>
       </section>
     </main>
