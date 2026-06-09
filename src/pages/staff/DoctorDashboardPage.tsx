@@ -10,11 +10,13 @@ import {
   ClipboardList,
   ListTodo,
   ArrowUpRight,
+  LogOut,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { DoctorPage } from '../../components/staff/DoctorShell'
 import { staffAppointments } from '../../data/staffGovernanceData'
 import { PortalPanel } from '../../components/portal/PortalShell'
+import { clinicianDisplayName, useClinicianAuth } from '../../contexts/ClinicianAuthContext'
 
 type StatCardProps = {
   label: string
@@ -138,11 +140,31 @@ const weekDays = [
 ]
 
 export function DoctorDashboardPage() {
+  const navigate = useNavigate()
+  const { logout, user } = useClinicianAuth()
+  const displayName = clinicianDisplayName(user)
+
+  async function handleLogout() {
+    await logout()
+    navigate('/staff/sign-in', { replace: true })
+  }
+
   return (
     <DoctorPage
       title="Today's clinical run sheet"
-      intro="Friday, 5 June 2026 · Dr. Ananya Krishnan · General Medicine"
+      intro={`Friday, 5 June 2026 · ${displayName} · General Medicine`}
     >
+      <div className="-mt-3 mb-5 flex justify-end">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
+        >
+          <LogOut size={17} />
+          Logout
+        </button>
+      </div>
+
       {/* KPI CARDS */}
       <div className="mb-6 grid grid-cols-4 gap-4 max-[1200px]:grid-cols-2 max-[640px]:grid-cols-1">
         <StatCard

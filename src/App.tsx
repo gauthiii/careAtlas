@@ -19,6 +19,7 @@ import { AvailabilityPage } from './pages/staff/AvailabilityPage'
 import { DoctorDashboardPage } from './pages/staff/DoctorDashboardPage'
 import { PatientRecordPage } from './pages/staff/PatientRecordPage'
 import { StaffSignInPage } from './pages/staff/StaffSignInPage'
+import { useClinicianAuth } from './contexts/ClinicianAuthContext'
 import { usePatientAuth } from './contexts/PatientAuthContext'
 
 function App() {
@@ -27,40 +28,83 @@ function App() {
       <Route element={<Shell />}>
         <Route index element={<ViewChooserPage />} />
         <Route path="/role-picker" element={<ViewChooserPage />} />
-        <Route path="/patient/home" element={<LandingPage />} />
-        <Route path="/patient/register" element={<RegistrationPage />} />
-        <Route path="/patient/verify-email" element={<EmailVerificationPage />} />
-        <Route path="/patient/sign-in" element={<PatientSignInPage />} />
+        <Route
+          path="/patient/home"
+          element={
+            <ClinicianRoleBlocker>
+              <LandingPage />
+            </ClinicianRoleBlocker>
+          }
+        />
+        <Route
+          path="/patient/register"
+          element={
+            <ClinicianRoleBlocker>
+              <RegistrationPage />
+            </ClinicianRoleBlocker>
+          }
+        />
+        <Route
+          path="/patient/verify-email"
+          element={
+            <ClinicianRoleBlocker>
+              <EmailVerificationPage />
+            </ClinicianRoleBlocker>
+          }
+        />
+        <Route
+          path="/patient/sign-in"
+          element={
+            <ClinicianRoleBlocker>
+              <PatientSignInPage />
+            </ClinicianRoleBlocker>
+          }
+        />
         <Route
           path="/patient/dashboard"
           element={
-            <PatientProtectedRoute>
-              <DashboardPage />
-            </PatientProtectedRoute>
+            <ClinicianRoleBlocker>
+              <PatientProtectedRoute>
+                <DashboardPage />
+              </PatientProtectedRoute>
+            </ClinicianRoleBlocker>
           }
         />
         <Route
           path="/patient/book"
           element={
-            <PatientProtectedRoute>
-              <BookAppointmentPage />
-            </PatientProtectedRoute>
+            <ClinicianRoleBlocker>
+              <PatientProtectedRoute>
+                <BookAppointmentPage />
+              </PatientProtectedRoute>
+            </ClinicianRoleBlocker>
           }
         />
         <Route
           path="/patient/profile"
           element={
-            <PatientProtectedRoute>
-              <ProfilePage />
-            </PatientProtectedRoute>
+            <ClinicianRoleBlocker>
+              <PatientProtectedRoute>
+                <ProfilePage />
+              </PatientProtectedRoute>
+            </ClinicianRoleBlocker>
           }
         />
-        <Route path="/patient/contact" element={<ContactPage />} />
+        <Route
+          path="/patient/contact"
+          element={
+            <ClinicianRoleBlocker>
+              <ContactPage />
+            </ClinicianRoleBlocker>
+          }
+        />
         <Route
           path="/staff/sign-in"
           element={
             <PatientRoleBlocker>
-              <StaffSignInPage />
+              <ClinicianSignInRoute>
+                <StaffSignInPage />
+              </ClinicianSignInRoute>
             </PatientRoleBlocker>
           }
         />
@@ -68,7 +112,9 @@ function App() {
           path="/staff/doctor"
           element={
             <PatientRoleBlocker>
-              <DoctorDashboardPage />
+              <ClinicianProtectedRoute>
+                <DoctorDashboardPage />
+              </ClinicianProtectedRoute>
             </PatientRoleBlocker>
           }
         />
@@ -76,7 +122,9 @@ function App() {
           path="/staff/admin"
           element={
             <PatientRoleBlocker>
-              <AdminDashboardPage />
+              <ClinicianProtectedRoute>
+                <AdminDashboardPage />
+              </ClinicianProtectedRoute>
             </PatientRoleBlocker>
           }
         />
@@ -84,7 +132,9 @@ function App() {
           path="/staff/patient/:id"
           element={
             <PatientRoleBlocker>
-              <PatientRecordPage />
+              <ClinicianProtectedRoute>
+                <PatientRecordPage />
+              </ClinicianProtectedRoute>
             </PatientRoleBlocker>
           }
         />
@@ -92,7 +142,9 @@ function App() {
           path="/staff/availability"
           element={
             <PatientRoleBlocker>
-              <AvailabilityPage />
+              <ClinicianProtectedRoute>
+                <AvailabilityPage />
+              </ClinicianProtectedRoute>
             </PatientRoleBlocker>
           }
         />
@@ -100,7 +152,9 @@ function App() {
           path="/governance"
           element={
             <PatientRoleBlocker>
-              <GovernanceDashboardPage />
+              <ClinicianRoleBlocker>
+                <GovernanceDashboardPage />
+              </ClinicianRoleBlocker>
             </PatientRoleBlocker>
           }
         />
@@ -108,7 +162,9 @@ function App() {
           path="/governance/ai-agents"
           element={
             <PatientRoleBlocker>
-              <GovernanceAiAgentsPage />
+              <ClinicianRoleBlocker>
+                <GovernanceAiAgentsPage />
+              </ClinicianRoleBlocker>
             </PatientRoleBlocker>
           }
         />
@@ -116,7 +172,9 @@ function App() {
           path="/governance/acl"
           element={
             <PatientRoleBlocker>
-              <GovernanceAclPage />
+              <ClinicianRoleBlocker>
+                <GovernanceAclPage />
+              </ClinicianRoleBlocker>
             </PatientRoleBlocker>
           }
         />
@@ -124,7 +182,9 @@ function App() {
           path="/governance/demo"
           element={
             <PatientRoleBlocker>
-              <GovernanceDemoPage />
+              <ClinicianRoleBlocker>
+                <GovernanceDemoPage />
+              </ClinicianRoleBlocker>
             </PatientRoleBlocker>
           }
         />
@@ -169,6 +229,37 @@ function PatientRoleBlocker({ children }: { children: ReactNode }) {
   return children
 }
 
+function ClinicianProtectedRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isHydrating } = useClinicianAuth()
+  const location = useLocation()
+
+  if (isHydrating) return <SessionLoading />
+
+  if (!isAuthenticated) {
+    return <Navigate to="/staff/sign-in" replace state={{ from: location.pathname }} />
+  }
+
+  return children
+}
+
+function ClinicianSignInRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isHydrating } = useClinicianAuth()
+
+  if (isHydrating) return <SessionLoading />
+  if (isAuthenticated) return <Navigate to="/staff/doctor" replace />
+
+  return children
+}
+
+function ClinicianRoleBlocker({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isHydrating } = useClinicianAuth()
+
+  if (isHydrating) return <SessionLoading />
+  if (isAuthenticated) return <ClinicianAccessDeniedPage />
+
+  return children
+}
+
 function PatientAccessDeniedPage() {
   const { logout } = usePatientAuth()
   const location = useLocation()
@@ -209,6 +300,55 @@ function PatientAccessDeniedPage() {
         </div>
       </section>
     </main>
+  )
+}
+
+function ClinicianAccessDeniedPage() {
+  const { logout } = useClinicianAuth()
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    await logout()
+    navigate('/staff/sign-in', { replace: true })
+  }
+
+  return (
+    <main className="flex min-h-[calc(100vh-120px)] items-center justify-center px-4 py-10">
+      <section className="grid w-full max-w-[620px] gap-5 rounded-[14px] border border-[#d7e5ec] bg-white p-7 text-center shadow-[0_12px_30px_rgba(25,64,93,0.07)]">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#feeceb] text-[#a22828]">
+          <span className="text-xl font-black">!</span>
+        </div>
+        <div className="grid gap-2">
+          <h1 className="m-0 text-2xl font-bold text-[#102033]">Clinician access only</h1>
+          <p className="m-0 text-[1rem] font-semibold leading-[1.55] text-[#53687b]">
+            You are signed in as a clinician. You do not have access to this page.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link
+            to="/staff/doctor"
+            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
+          >
+            Return to clinician dashboard
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center rounded-[9px] border border-transparent bg-[#143A57] px-[15px] font-bold !text-white max-[720px]:w-full"
+          >
+            Log out as clinician
+          </button>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function SessionLoading() {
+  return (
+    <div className="grid min-h-[55vh] place-items-center text-sm font-bold text-[#53687b]">
+      Checking session...
+    </div>
   )
 }
 

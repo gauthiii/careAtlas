@@ -20,9 +20,14 @@ import {
   portalSwitcherLink,
 } from '../../lib/portalNav'
 import { hospital } from '../../data/patientPortalData'
+import { useClinicianAuth } from '../../contexts/ClinicianAuthContext'
+import { usePatientAuth } from '../../contexts/PatientAuthContext'
 
-const clinicianNav = [
+const signedOutClinicianNav = [
   { label: 'Sign in', to: '/staff/sign-in', icon: LockKeyhole, end: true },
+] as const
+
+const signedInClinicianNav = [
   { label: 'Dashboard', to: '/staff/doctor', icon: LayoutDashboard, end: true },
   { label: 'Admin', to: '/staff/admin', icon: CalendarCheck },
   { label: 'Availability', to: '/staff/availability', icon: Clock3 },
@@ -31,6 +36,11 @@ const clinicianNav = [
 
 export function DoctorShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
+  const { isAuthenticated: isClinicianAuthenticated } = useClinicianAuth()
+  const { isAuthenticated: isPatientAuthenticated } = usePatientAuth()
+  const clinicianNav = isClinicianAuthenticated ? signedInClinicianNav : signedOutClinicianNav
+  const patientPortalHome = isPatientAuthenticated ? '/patient/dashboard' : '/patient/home'
+  const clinicianPortalHome = isClinicianAuthenticated ? '/staff/doctor' : '/staff/sign-in'
 
   return (
     <div className="flex w-full min-h-0 flex-1 flex-col">
@@ -82,13 +92,13 @@ export function DoctorShell({ children }: { children: React.ReactNode }) {
           aria-label="Switch portal view"
         >
           <NavLink
-            to="/patient/home"
+            to={patientPortalHome}
             className={cn(portalSwitcherLink, isPatientPortalPath(location.pathname) && portalSwitcherActive)}
           >
             <HeartPulse size={15} /> Patient Portal
           </NavLink>
           <NavLink
-            to="/staff/doctor"
+            to={clinicianPortalHome}
             className={cn(portalSwitcherLink, isClinicianPortalPath(location.pathname) && portalSwitcherActive)}
           >
             <Stethoscope size={15} /> Clinician Portal
