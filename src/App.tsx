@@ -20,6 +20,7 @@ import { AvailabilityPage } from './pages/staff/AvailabilityPage'
 import { DoctorDashboardPage } from './pages/staff/DoctorDashboardPage'
 import { PatientRecordPage } from './pages/staff/PatientRecordPage'
 import { StaffSignInPage } from './pages/staff/StaffSignInPage'
+import { AiAssistantWidget } from './components/AiAssistantWidget'
 import { useClinicianAuth } from './contexts/ClinicianAuthContext'
 import { useGovernanceAuth } from './contexts/GovernanceAuthContext'
 import { usePatientAuth } from './contexts/PatientAuthContext'
@@ -484,6 +485,7 @@ function Shell() {
       <div className="mx-auto flex min-h-screen w-[min(1760px,calc(100%-28px))] flex-col pt-3.5 max-[720px]:w-[min(calc(100%-18px),1760px)] max-[720px]:pt-3.5">
         <Outlet />
       </div>
+      <AiAssistantWidget />
     </div>
   )
 }

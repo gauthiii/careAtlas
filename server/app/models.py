@@ -114,6 +114,63 @@ class PatientRegistrationResponse(BaseModel):
     registration_status: str
 
 
+class BookingDoctor(BaseModel):
+    doctor_id: str
+    doctor_record_id: str
+    name: str
+    first_name: str = ""
+    last_name: str = ""
+    department: str = ""
+    speciality: str = ""
+    email: str = ""
+    active: bool = True
+
+
+class BookingAppointmentOverlay(BaseModel):
+    appointment_id: str
+    appointment_record_id: str
+    status: str
+    reason_category: str = ""
+    reason_text: str = ""
+    patient_id: str = ""
+    patient_display: str = ""
+
+
+class BookingSlot(BaseModel):
+    slot_id: str
+    slot_record_id: str
+    doctor_id: str
+    doctor_record_id: str
+    doctor_name: str
+    department: str = ""
+    speciality: str = ""
+    date: str
+    start_time: str
+    end_time: str
+    status: str
+    status_label: str
+    appointment_type: str
+    appointment_type_label: str
+    location: str = ""
+    floor: str = ""
+    selectable: bool
+    appointment: BookingAppointmentOverlay | None = None
+
+
+class BookingCalendarDay(BaseModel):
+    date: str
+    label: str
+    slots: list[BookingSlot]
+
+
+class BookingAvailabilityResponse(BaseModel):
+    start_date: str
+    end_date: str
+    days: list[BookingCalendarDay]
+    doctors: list[BookingDoctor]
+    slots: list[BookingSlot]
+
+
 class AclTestRequest(BaseModel):
     service_account: str
 

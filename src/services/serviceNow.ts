@@ -78,6 +78,63 @@ export interface PatientRegistrationResponse {
   registration_status: string
 }
 
+export interface BookingDoctor {
+  doctor_id: string
+  doctor_record_id: string
+  name: string
+  first_name: string
+  last_name: string
+  department: string
+  speciality: string
+  email: string
+  active: boolean
+}
+
+export interface BookingAppointmentOverlay {
+  appointment_id: string
+  appointment_record_id: string
+  status: string
+  reason_category: string
+  reason_text: string
+  patient_id: string
+  patient_display: string
+}
+
+export interface BookingSlot {
+  slot_id: string
+  slot_record_id: string
+  doctor_id: string
+  doctor_record_id: string
+  doctor_name: string
+  department: string
+  speciality: string
+  date: string
+  start_time: string
+  end_time: string
+  status: string
+  status_label: string
+  appointment_type: string
+  appointment_type_label: string
+  location: string
+  floor: string
+  selectable: boolean
+  appointment?: BookingAppointmentOverlay | null
+}
+
+export interface BookingCalendarDay {
+  date: string
+  label: string
+  slots: BookingSlot[]
+}
+
+export interface BookingCalendarResponse {
+  start_date: string
+  end_date: string
+  days: BookingCalendarDay[]
+  doctors: BookingDoctor[]
+  slots: BookingSlot[]
+}
+
 export interface PasswordPwnedCheckResponse {
   pwned: boolean
   count: number
@@ -202,6 +259,22 @@ export async function checkPwnedPassword(password: string): Promise<PasswordPwne
   }
 
   return (await res.json()) as PasswordPwnedCheckResponse
+}
+
+export async function fetchPatientBookingAvailability(
+  startDate: string,
+  days = 14,
+): Promise<BookingCalendarResponse> {
+  const params = new URLSearchParams({ start_date: startDate, days: String(days) })
+  const res = await fetch(`${API_BASE}/patients/booking/availability?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as BookingCalendarResponse
 }
 
 export async function testServiceAccountAcl(serviceAccount: string): Promise<AclTestResponse> {

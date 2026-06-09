@@ -7,8 +7,9 @@ calls `/api/*` here. Run locally with:
 """
 
 import logging
-from typing import Any
+from datetime import date
 from secrets import compare_digest
+from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.exception_handlers import http_exception_handler
@@ -29,6 +30,7 @@ from .models import (
     AclTestRequest,
     AclTestResponse,
     AISystem,
+    BookingAvailabilityResponse,
     ExecuteAgentRequest,
     ExecuteAgentResponse,
     PatientRegistrationRequest,
@@ -44,6 +46,7 @@ from .servicenow import (
     create_patient_registration,
     execute_agent,
     fetch_agents,
+    fetch_patient_booking_availability,
     test_service_account_acl,
     validate_user,
 )
@@ -163,6 +166,18 @@ async def post_patient_registration(
 ) -> PatientRegistrationResponse:
     try:
         return await create_patient_registration(settings, body)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/patients/booking/availability", response_model=BookingAvailabilityResponse)
+async def get_patient_booking_availability(
+    start_date: date | None = None,
+    days: int = 14,
+    settings: Settings = Depends(get_settings),
+) -> BookingAvailabilityResponse:
+    try:
+        return await fetch_patient_booking_availability(settings, start_date=start_date, days=days)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

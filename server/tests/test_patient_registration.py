@@ -4,6 +4,7 @@ import os
 import sys
 import unittest
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -18,8 +19,12 @@ os.environ.setdefault("SNOW_PASSWORD", "snow-password")
 
 from app.config import get_settings
 from app.main import create_app
-from app.models import PatientRegistrationRequest, PatientRegistrationResponse
-from app.servicenow import ServiceNowError, create_patient_registration
+from app.models import BookingAvailabilityResponse, PatientRegistrationRequest, PatientRegistrationResponse
+from app.servicenow import (
+    ServiceNowError,
+    create_patient_registration,
+    fetch_patient_booking_availability,
+)
 
 
 @dataclass
@@ -126,6 +131,153 @@ class PatientRegistrationServiceNowTest(unittest.IsolatedAsyncioTestCase):
                 )
 
 
+class PatientBookingAvailabilityServiceNowTest(unittest.IsolatedAsyncioTestCase):
+    async def test_resolves_doctor_name_when_reference_display_is_sys_id(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/u_doctor"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "doctor-sys-id",
+                                "u_doctor_id": "DOC-100",
+                                "u_first_name": "Sarah",
+                                "u_last_name": "Patel",
+                                "u_department": "General Practice",
+                                "u_speciality": "Family Medicine",
+                                "u_email": "sarah@example.com",
+                                "u_active": "true",
+                            }
+                        ]
+                    },
+                )
+            if request.url.path.endswith("/u_doctor_availability"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "slot-sys-id",
+                                "u_slot_id": "SLOT-100",
+                                "u_doctor": {
+                                    "value": "doctor-sys-id",
+                                    "display_value": "doctor-sys-id",
+                                },
+                                "u_date": "2026-06-09",
+                                "u_start_time": {
+                                    "value": "1970-01-01 13:00:00",
+                                    "display_value": "13:00:00",
+                                },
+                                "u_end_time": {
+                                    "value": "1970-01-01 13:30:00",
+                                    "display_value": "13:30:00",
+                                },
+                                "u_status": {"value": "available", "display_value": "Available"},
+                                "u_location": "Clinic A",
+                                "u_floor": "2",
+                                "u_appointment_type": {
+                                    "value": "in_person",
+                                    "display_value": "In person",
+                                },
+                            }
+                        ]
+                    },
+                )
+            if request.url.path.endswith("/u_appointment"):
+                return httpx.Response(200, json={"result": []})
+            return httpx.Response(404)
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            response = await fetch_patient_booking_availability(
+                FakeSettings(),
+                start_date=date(2026, 6, 9),
+                days=1,
+                http_client=http_client,
+            )
+
+        self.assertEqual(response.slots[0].doctor_name, "Sarah Patel")
+        self.assertEqual(response.slots[0].doctor_id, "DOC-100")
+        self.assertTrue(response.slots[0].selectable)
+
+    async def test_appointment_overlay_by_slot_reference_marks_slot_booked(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/u_doctor"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "doctor-sys-id",
+                                "u_doctor_id": "DOC-100",
+                                "u_first_name": "Sarah",
+                                "u_last_name": "Patel",
+                                "u_department": "General Practice",
+                                "u_speciality": "Family Medicine",
+                                "u_email": "sarah@example.com",
+                                "u_active": "true",
+                            }
+                        ]
+                    },
+                )
+            if request.url.path.endswith("/u_doctor_availability"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "slot-sys-id",
+                                "u_slot_id": "SLOT-100",
+                                "u_doctor": {"value": "doctor-sys-id", "display_value": "doctor-sys-id"},
+                                "u_date": "2026-06-09",
+                                "u_start_time": {"value": "1970-01-01 13:00:00", "display_value": "13:00:00"},
+                                "u_end_time": {"value": "1970-01-01 13:30:00", "display_value": "13:30:00"},
+                                "u_status": {"value": "available", "display_value": "Available"},
+                                "u_location": "Clinic A",
+                                "u_floor": "2",
+                                "u_appointment_type": {"value": "in_person", "display_value": "In person"},
+                            }
+                        ]
+                    },
+                )
+            if request.url.path.endswith("/u_appointment"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "appointment-sys-id",
+                                "u_appointment_id": "APT-100",
+                                "u_doctor": {"value": "doctor-sys-id", "display_value": "doctor-sys-id"},
+                                "u_slot": {"value": "slot-sys-id", "display_value": "slot-sys-id"},
+                                "u_patient": {"value": "patient-sys-id", "display_value": "Maya Chen"},
+                                "u_appointment_date": "2026-06-09",
+                                "u_appointment_time": {"value": "1970-01-01 13:00:00", "display_value": "13:00:00"},
+                                "u_status": {"value": "booked", "display_value": "Booked"},
+                                "u_reason_category": "Follow-up",
+                                "u_reason_text": "Review",
+                            }
+                        ]
+                    },
+                )
+            return httpx.Response(404)
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            response = await fetch_patient_booking_availability(
+                FakeSettings(),
+                start_date=date(2026, 6, 9),
+                days=1,
+                http_client=http_client,
+            )
+
+        slot = response.slots[0]
+        self.assertFalse(slot.selectable)
+        self.assertEqual(slot.status, "booked")
+        self.assertEqual(slot.appointment.appointment_id if slot.appointment else None, "APT-100")
+
+
 class PatientRegistrationEndpointTest(unittest.TestCase):
     def setUp(self):
         get_settings.cache_clear()
@@ -170,6 +322,21 @@ class PatientRegistrationEndpointTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 502)
         self.assertIn("ServiceNow 403", response.json()["detail"])
+
+    def test_booking_availability_endpoint_returns_normalized_response(self):
+        expected = BookingAvailabilityResponse(
+            start_date="2026-06-09",
+            end_date="2026-06-09",
+            days=[{"date": "2026-06-09", "label": "Jun 9", "slots": []}],
+            doctors=[],
+            slots=[],
+        )
+
+        with patch("app.main.fetch_patient_booking_availability", new=AsyncMock(return_value=expected)):
+            response = self.client.get("/api/patients/booking/availability?start_date=2026-06-09&days=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["start_date"], "2026-06-09")
 
 
 if __name__ == "__main__":
