@@ -20,10 +20,12 @@ import { AvailabilityPage } from './pages/staff/AvailabilityPage'
 import { DoctorDashboardPage } from './pages/staff/DoctorDashboardPage'
 import { PatientRecordPage } from './pages/staff/PatientRecordPage'
 import { StaffSignInPage } from './pages/staff/StaffSignInPage'
-import { AiAssistantWidget } from './components/AiAssistantWidget'
+import { AiAssistantWidget, type AiAssistantAgentConfig } from './components/AiAssistantWidget'
 import { useClinicianAuth } from './contexts/ClinicianAuthContext'
 import { useGovernanceAuth } from './contexts/GovernanceAuthContext'
-import { usePatientAuth } from './contexts/PatientAuthContext'
+import { patientDisplayName, usePatientAuth, type PatientAuthUser } from './contexts/PatientAuthContext'
+
+const BOOK_APPOINTMENT_AGENT_ID = 'b2cdf70e1bd50f54d7eaea45604bcb0c'
 
 function App() {
   return (
@@ -475,19 +477,35 @@ function SessionLoading() {
 
 function Shell() {
   const { pathname } = useLocation()
+  const { user } = usePatientAuth()
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0 })
   }, [pathname])
+
+  const assistantAgentConfig = getAssistantAgentConfig(pathname, user)
 
   return (
     <div className="min-h-screen">
       <div className="mx-auto flex min-h-screen w-[min(1760px,calc(100%-28px))] flex-col pt-3.5 max-[720px]:w-[min(calc(100%-18px),1760px)] max-[720px]:pt-3.5">
         <Outlet />
       </div>
-      <AiAssistantWidget />
+      <AiAssistantWidget agentConfig={assistantAgentConfig} />
     </div>
   )
+}
+
+function getAssistantAgentConfig(pathname: string, user: PatientAuthUser | null): AiAssistantAgentConfig | null {
+  if (pathname !== '/patient/book') return null
+
+  const fullName = patientDisplayName(user)
+  const email = user?.attributes.email?.trim() || user?.username || 'unknown email'
+
+  return {
+    agentSysId: BOOK_APPOINTMENT_AGENT_ID,
+    pageName: 'Book Appointment',
+    systemContext: `System context: The logged-in CareAtlas patient is ${fullName}. Email: ${email}. Current page: Book Appointment. Use this context when helping with appointment booking.`,
+  }
 }
 
 export default App

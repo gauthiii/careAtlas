@@ -840,6 +840,7 @@ async def execute_agent(
     user_input: str,
     context_id: str | None = None,
     task_id: str | None = None,
+    system_context: str | None = None,
     http_client: httpx.AsyncClient | None = None,
 ) -> AgentExecutionResult:
     """Submit a ServiceNow AI agent through synchronous (blocking) A2A.
@@ -851,11 +852,12 @@ async def execute_agent(
 
     request_id = str(uuid4())
     message_id = str(uuid4())
+    message_text = _agent_message_text(user_input, system_context)
     message = {
         "kind": "message",
         "role": "user",
         "messageId": message_id,
-        "parts": [{"kind": "text", "text": user_input}],
+        "parts": [{"kind": "text", "text": message_text}],
     }
     if context_id:
         message["contextId"] = context_id
@@ -941,6 +943,13 @@ async def execute_agent(
         state=state or "submitted",
         status="pending",
     )
+
+
+def _agent_message_text(user_input: str, system_context: str | None = None) -> str:
+    context = (system_context or "").strip()
+    if not context:
+        return user_input
+    return f"{context}\n\nUser message: {user_input}"
 
 
 def _part_texts(node: Any) -> list[str]:

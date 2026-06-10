@@ -187,7 +187,8 @@ export async function executeAgent(
   agentSysId: string,
   userInput: string,
   contextId?: string | null,
-  taskId?: string | null
+  taskId?: string | null,
+  systemContext?: string | null
 ): Promise<ExecuteAgentResponse> {
   const res = await fetch(`${API_BASE}/agents/execute`, {
     method: 'POST',
@@ -200,6 +201,7 @@ export async function executeAgent(
       user_input: userInput,
       context_id: contextId || undefined,
       task_id: taskId || undefined,
+      system_context: systemContext || undefined,
     }),
   })
 

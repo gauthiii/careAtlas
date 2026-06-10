@@ -218,6 +218,7 @@ class ExecuteAgentRequest(BaseModel):
     user_input: str
     context_id: str | None = None
     task_id: str | None = None
+    system_context: str | None = None
 
     @field_validator("agent_sys_id")
     @classmethod
@@ -226,6 +227,14 @@ class ExecuteAgentRequest(BaseModel):
         if len(value) != 32 or not all(char in "0123456789abcdefABCDEF" for char in value):
             raise ValueError("agent_sys_id must be a 32-character ServiceNow sys_id")
         return value
+
+    @field_validator("system_context")
+    @classmethod
+    def trim_system_context(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
 
 
 class ExecuteAgentResponse(BaseModel):

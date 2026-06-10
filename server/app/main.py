@@ -86,6 +86,7 @@ async def post_execute_agent(
             body.user_input,
             context_id=body.context_id,
             task_id=body.task_id,
+            system_context=body.system_context,
         )
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

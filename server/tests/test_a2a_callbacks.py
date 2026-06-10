@@ -3,6 +3,7 @@ import sys
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -17,6 +18,7 @@ os.environ.setdefault("A2A_CALLBACK_TOKEN", "callback-secret")
 from app.a2a_callbacks import create_pending_execution, reset_callback_store
 from app.config import get_settings
 from app.main import create_app
+from app.servicenow import AgentExecutionResult
 
 
 @dataclass
@@ -91,6 +93,30 @@ class A2ACallbackEndpointTest(unittest.TestCase):
         self.assertEqual(body["context_id"], "context-1")
         self.assertEqual(body["task_id"], "task-1")
         self.assertEqual(body["state"], "completed")
+
+    def test_execute_endpoint_accepts_system_context(self):
+        expected = AgentExecutionResult(
+            request_id="request-2",
+            output="Accepted",
+            context_id="context-2",
+            task_id="task-2",
+            state="completed",
+            status="completed",
+        )
+
+        with patch("app.main.execute_agent", new=AsyncMock(return_value=expected)) as mock_execute:
+            response = self.client.post(
+                "/api/agents/execute",
+                json={
+                    "agent_sys_id": "0123456789abcdef0123456789abcdef",
+                    "user_input": "Book an appointment",
+                    "system_context": "System context: Patient is Maya Patel. Email: maya@example.com.",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["output"], "Accepted")
+        self.assertEqual(mock_execute.await_args.kwargs["system_context"], "System context: Patient is Maya Patel. Email: maya@example.com.")
 
 
 if __name__ == "__main__":

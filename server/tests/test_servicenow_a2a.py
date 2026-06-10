@@ -192,6 +192,42 @@ class ServiceNowA2ATest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.task_id, "task-2")
         self.assertEqual(result.state, "completed")
 
+    async def test_execute_prepends_system_context_to_user_message(self):
+        requests = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            if request.url.path == "/oauth_token.do":
+                return httpx.Response(200, json={"access_token": "token-1", "expires_in": 1800})
+            return httpx.Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "result": {
+                        "status": {
+                            "message": {
+                                "parts": [{"kind": "text", "text": "ok"}],
+                            }
+                        }
+                    },
+                },
+            )
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            await execute_agent(
+                FakeSettings(),
+                "0123456789abcdef0123456789abcdef",
+                "Find me a cardiology slot",
+                system_context="System context: Patient is Maya Patel. Email: maya@example.com.",
+                http_client=http_client,
+            )
+
+        execute_body = json.loads(requests[1].content.decode())
+        text = execute_body["params"]["message"]["parts"][0]["text"]
+        self.assertIn("System context: Patient is Maya Patel. Email: maya@example.com.", text)
+        self.assertIn("User message: Find me a cardiology slot", text)
+
     async def test_execute_surfaces_json_rpc_errors(self):
         with self.assertRaisesRegex(ServiceNowError, "JSON-RPC error -32602: Invalid method parameters"):
             await self.call_execute(
