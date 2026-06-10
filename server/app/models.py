@@ -6,7 +6,7 @@ React client can consume responses without any remapping.
 
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class AISystem(BaseModel):
@@ -136,6 +136,24 @@ class BookingAppointmentOverlay(BaseModel):
     patient_display: str = ""
 
 
+class BookingAppointment(BaseModel):
+    appointment_id: str
+    appointment_record_id: str
+    doctor_id: str
+    doctor_record_id: str
+    doctor_name: str
+    department: str = ""
+    speciality: str = ""
+    date: str
+    start_time: str
+    status: str
+    status_label: str
+    reason_category: str = ""
+    reason_text: str = ""
+    patient_id: str = ""
+    patient_display: str = ""
+
+
 class BookingSlot(BaseModel):
     slot_id: str
     slot_record_id: str
@@ -160,7 +178,8 @@ class BookingSlot(BaseModel):
 class BookingCalendarDay(BaseModel):
     date: str
     label: str
-    slots: list[BookingSlot]
+    appointments: list[BookingAppointment] = Field(default_factory=list)
+    slots: list[BookingSlot] = Field(default_factory=list)
 
 
 class BookingAvailabilityResponse(BaseModel):
@@ -168,7 +187,8 @@ class BookingAvailabilityResponse(BaseModel):
     end_date: str
     days: list[BookingCalendarDay]
     doctors: list[BookingDoctor]
-    slots: list[BookingSlot]
+    appointments: list[BookingAppointment] = Field(default_factory=list)
+    slots: list[BookingSlot] = Field(default_factory=list)
 
 
 class AclTestRequest(BaseModel):

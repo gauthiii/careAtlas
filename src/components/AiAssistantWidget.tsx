@@ -93,7 +93,8 @@ export function AiAssistantWidget() {
             <div className="flex-1 overflow-y-auto px-5 py-5">
               {messages.length === 0 ? (
                 <div className="rounded-[8px] border border-[#d7e5ec] bg-[#f8fbfc] p-4 text-sm font-semibold leading-6 text-[#53687b]">
-                  Start a chat and I will route it to the assistant once the backend is connected.
+                  {/* Start a chat and I will route it to the assistant once the backend is connected. */}
+                  How can I help you today? Ask me anything about CareAtlas, and I'll do my best to assist you!
                 </div>
               ) : (
                 <div className="grid gap-3">

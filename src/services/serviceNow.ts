@@ -100,6 +100,24 @@ export interface BookingAppointmentOverlay {
   patient_display: string
 }
 
+export interface BookingAppointment {
+  appointment_id: string
+  appointment_record_id: string
+  doctor_id: string
+  doctor_record_id: string
+  doctor_name: string
+  department: string
+  speciality: string
+  date: string
+  start_time: string
+  status: string
+  status_label: string
+  reason_category: string
+  reason_text: string
+  patient_id: string
+  patient_display: string
+}
+
 export interface BookingSlot {
   slot_id: string
   slot_record_id: string
@@ -124,6 +142,7 @@ export interface BookingSlot {
 export interface BookingCalendarDay {
   date: string
   label: string
+  appointments: BookingAppointment[]
   slots: BookingSlot[]
 }
 
@@ -132,6 +151,7 @@ export interface BookingCalendarResponse {
   end_date: string
   days: BookingCalendarDay[]
   doctors: BookingDoctor[]
+  appointments: BookingAppointment[]
   slots: BookingSlot[]
 }
 

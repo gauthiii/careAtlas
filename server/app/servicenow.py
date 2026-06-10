@@ -19,11 +19,10 @@ from .models import (
     AISystem,
     AclTestCheck,
     AclTestResponse,
-    BookingAppointmentOverlay,
+    BookingAppointment,
     BookingAvailabilityResponse,
     BookingCalendarDay,
     BookingDoctor,
-    BookingSlot,
     PatientRegistrationRequest,
     PatientRegistrationResponse,
 )
@@ -57,24 +56,10 @@ DOCTOR_FIELDS = [
     "u_active",
 ]
 
-DOCTOR_AVAILABILITY_FIELDS = [
-    "sys_id",
-    "u_slot_id",
-    "u_doctor",
-    "u_date",
-    "u_start_time",
-    "u_end_time",
-    "u_status",
-    "u_location",
-    "u_floor",
-    "u_appointment_type",
-]
-
 APPOINTMENT_FIELDS = [
     "sys_id",
     "u_appointment_id",
     "u_doctor",
-    "u_slot",
     "u_patient",
     "u_appointment_date",
     "u_appointment_time",
@@ -597,20 +582,13 @@ async def fetch_patient_booking_availability(
             raise ServiceNowError(f"ServiceNow {table} response did not include a result list")
         return [record for record in records if isinstance(record, dict)]
 
-    async def run(client: httpx.AsyncClient) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    async def run(client: httpx.AsyncClient) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         doctors = await get_table(
             client,
             "u_doctor",
             DOCTOR_FIELDS,
             "u_active=true^ORDERBYu_last_name^ORDERBYu_first_name",
             200,
-        )
-        slots = await get_table(
-            client,
-            "u_doctor_availability",
-            DOCTOR_AVAILABILITY_FIELDS,
-            f"u_date>={first_day.isoformat()}^u_date<={last_day.isoformat()}^ORDERBYu_date^ORDERBYu_start_time",
-            500,
         )
         appointments = await get_table(
             client,
@@ -623,39 +601,27 @@ async def fetch_patient_booking_availability(
             ),
             500,
         )
-        return doctors, slots, appointments
+        return doctors, appointments
 
     if http_client is not None:
-        doctor_records, slot_records, appointment_records = await run(http_client)
+        doctor_records, appointment_records = await run(http_client)
     else:
         async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
-            doctor_records, slot_records, appointment_records = await run(client)
+            doctor_records, appointment_records = await run(client)
 
     doctors = [_map_booking_doctor(record) for record in doctor_records]
     doctor_by_record_id = {doctor.doctor_record_id: doctor for doctor in doctors}
-    appointment_by_slot, appointment_by_fallback = _map_booking_appointments(appointment_records)
-
-    normalized_slots: list[BookingSlot] = []
-    for record in slot_records:
-        normalized_slots.append(
-            _map_booking_slot(
-                record,
-                doctor_by_record_id,
-                appointment_by_slot,
-                appointment_by_fallback,
-            )
-        )
-
-    normalized_slots.sort(key=lambda slot: (slot.date, slot.start_time, slot.doctor_name))
-    slots_by_date: dict[str, list[BookingSlot]] = {}
-    for slot in normalized_slots:
-        slots_by_date.setdefault(slot.date, []).append(slot)
+    appointments = [_map_booking_appointment(record, doctor_by_record_id) for record in appointment_records]
+    appointments.sort(key=lambda appointment: (appointment.date, appointment.start_time, appointment.doctor_name))
+    appointments_by_date: dict[str, list[BookingAppointment]] = {}
+    for appointment in appointments:
+        appointments_by_date.setdefault(appointment.date, []).append(appointment)
 
     calendar_days = [
         BookingCalendarDay(
             date=(first_day + timedelta(days=offset)).isoformat(),
             label=_calendar_label(first_day + timedelta(days=offset)),
-            slots=slots_by_date.get((first_day + timedelta(days=offset)).isoformat(), []),
+            appointments=appointments_by_date.get((first_day + timedelta(days=offset)).isoformat(), []),
         )
         for offset in range(day_count)
     ]
@@ -665,7 +631,8 @@ async def fetch_patient_booking_availability(
         end_date=last_day.isoformat(),
         days=calendar_days,
         doctors=doctors,
-        slots=normalized_slots,
+        appointments=appointments,
+        slots=[],
     )
 
 
@@ -686,63 +653,20 @@ def _map_booking_doctor(record: dict[str, Any]) -> BookingDoctor:
     )
 
 
-def _map_booking_appointments(
-    records: list[dict[str, Any]],
-) -> tuple[dict[str, BookingAppointmentOverlay], dict[tuple[str, str, str], BookingAppointmentOverlay]]:
-    appointment_by_slot: dict[str, BookingAppointmentOverlay] = {}
-    appointment_by_fallback: dict[tuple[str, str, str], BookingAppointmentOverlay] = {}
-    for record in records:
-        overlay = BookingAppointmentOverlay(
-            appointment_id=_field_best(record.get("u_appointment_id")) or _field_best(record.get("sys_id")),
-            appointment_record_id=_field_best(record.get("sys_id")),
-            status=(_field_value(record.get("u_status")) or _field_display(record.get("u_status"))).lower(),
-            reason_category=_field_best(record.get("u_reason_category")),
-            reason_text=_field_best(record.get("u_reason_text")),
-            patient_id=_field_value(record.get("u_patient")),
-            patient_display=_field_display(record.get("u_patient")),
-        )
-        slot_ref = _field_value(record.get("u_slot")) or _field_display(record.get("u_slot"))
-        if slot_ref:
-            appointment_by_slot[slot_ref] = overlay
-        fallback_key = (
-            _field_value(record.get("u_doctor")) or _field_display(record.get("u_doctor")),
-            _date_value(record.get("u_appointment_date")),
-            _time_key(_time_value(record.get("u_appointment_time"))),
-        )
-        if all(fallback_key):
-            appointment_by_fallback[fallback_key] = overlay
-    return appointment_by_slot, appointment_by_fallback
-
-
-def _map_booking_slot(
+def _map_booking_appointment(
     record: dict[str, Any],
     doctor_by_record_id: dict[str, BookingDoctor],
-    appointment_by_slot: dict[str, BookingAppointmentOverlay],
-    appointment_by_fallback: dict[tuple[str, str, str], BookingAppointmentOverlay],
-) -> BookingSlot:
-    slot_record_id = _field_best(record.get("sys_id"))
-    slot_id = _field_best(record.get("u_slot_id")) or slot_record_id
+) -> BookingAppointment:
     doctor_record_id = _field_value(record.get("u_doctor")) or _field_display(record.get("u_doctor"))
     doctor = doctor_by_record_id.get(doctor_record_id)
-    date_value = _date_value(record.get("u_date"))
-    start_time = _time_value(record.get("u_start_time"))
-    end_time = _time_value(record.get("u_end_time"))
+    date_value = _date_value(record.get("u_appointment_date"))
+    start_time = _time_value(record.get("u_appointment_time"))
     status = (_field_value(record.get("u_status")) or _field_display(record.get("u_status"))).lower()
     status_label = _field_display(record.get("u_status")) or status.title() or "Unknown"
-    appointment = (
-        appointment_by_slot.get(slot_record_id)
-        or appointment_by_slot.get(slot_id)
-        or appointment_by_fallback.get((doctor_record_id, date_value, _time_key(start_time)))
-    )
-    active_appointment = appointment is not None and appointment.status not in {"cancelled", "canceled"}
-    selectable = status == "available" and not active_appointment
-    if active_appointment and status == "available":
-        status = appointment.status or "booked"
-        status_label = status.replace("_", " ").title()
 
-    return BookingSlot(
-        slot_id=slot_id,
-        slot_record_id=slot_record_id,
+    return BookingAppointment(
+        appointment_id=_field_best(record.get("u_appointment_id")) or _field_best(record.get("sys_id")),
+        appointment_record_id=_field_best(record.get("sys_id")),
         doctor_id=doctor.doctor_id if doctor else doctor_record_id,
         doctor_record_id=doctor.doctor_record_id if doctor else doctor_record_id,
         doctor_name=doctor.name if doctor else _field_display(record.get("u_doctor")) or "Unknown doctor",
@@ -750,15 +674,12 @@ def _map_booking_slot(
         speciality=doctor.speciality if doctor else "",
         date=date_value,
         start_time=start_time,
-        end_time=end_time,
         status=status,
         status_label=status_label,
-        appointment_type=_field_value(record.get("u_appointment_type")) or _field_display(record.get("u_appointment_type")),
-        appointment_type_label=_field_display(record.get("u_appointment_type")) or _field_value(record.get("u_appointment_type")),
-        location=_field_best(record.get("u_location")),
-        floor=_field_best(record.get("u_floor")),
-        selectable=selectable,
-        appointment=appointment,
+        reason_category=_field_best(record.get("u_reason_category")),
+        reason_text=_field_best(record.get("u_reason_text")),
+        patient_id=_field_value(record.get("u_patient")),
+        patient_display=_field_display(record.get("u_patient")),
     )
 
 
