@@ -1,9 +1,12 @@
 import {
   AlertTriangle,
+  CalendarCheck2,
   CalendarDays,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
+  Clock3,
   FileText,
   LoaderCircle,
 } from 'lucide-react'
@@ -11,7 +14,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PatientPanel } from '../../components/patient/PatientPanel'
 import { PatientPage } from '../../components/patient/PatientShell'
-import { type Appointment } from '../../data/patientPortalData'
+import { patient, type Appointment } from '../../data/patientPortalData'
+import { patientDisplayName, usePatientAuth } from '../../contexts/PatientAuthContext'
 import { cn } from '../../lib/cn'
 import {
   fetchPatientBookingAvailability,
@@ -35,6 +39,8 @@ const CALENDAR_END_HOUR = 18
 const APPOINTMENT_DURATION_MINUTES = 60
 const WEEK_LENGTH = 7
 const BOOKING_RANGE_DAYS = 31
+const APPOINTMENT_LOOKBACK_DAYS = 180
+const APPOINTMENT_HISTORY_RANGE_DAYS = APPOINTMENT_LOOKBACK_DAYS + BOOKING_RANGE_DAYS
 const MAX_WEEK_START_OFFSET = BOOKING_RANGE_DAYS - WEEK_LENGTH
 const CALENDAR_HOURS = Array.from(
   { length: CALENDAR_END_HOUR - CALENDAR_START_HOUR },
@@ -118,6 +124,10 @@ function formatTime(time: string) {
   }).format(new Date(2026, 0, 1, hours, minutes))
 }
 
+function formatAppointmentDateTime(date: string, time: string) {
+  return `${formatDate(date)} at ${formatTime(time)}`
+}
+
 function hourTime(hour: number) {
   return `${String(hour).padStart(2, '0')}:00`
 }
@@ -176,6 +186,18 @@ function isCancelledAppointment(appointment: BookingAppointment) {
   return appointment.status === 'cancelled' || appointment.status === 'canceled'
 }
 
+function normalizeSearchValue(value: string | null | undefined) {
+  return (value ?? '').trim().toLowerCase()
+}
+
+function appointmentSortValue(appointment: BookingAppointment) {
+  return dateFromIso(appointment.date).getTime() + minutesFromTime(appointment.start_time) * 60_000
+}
+
+function appointmentReason(appointment: BookingAppointment) {
+  return appointment.reason_category || appointment.reason_text || 'Appointment'
+}
+
 function selectedAppointmentFromSlot(doctor: BookingDoctor, date: string, hour: number): Appointment {
   return {
     id: `${doctor.doctor_record_id}-${date}-${hour}`,
@@ -190,6 +212,7 @@ function selectedAppointmentFromSlot(doctor: BookingDoctor, date: string, hour: 
 }
 
 export function BookAppointmentPage() {
+  const { user } = usePatientAuth()
   const [step, setStep] = useState(1)
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<Appointment | null>(null)
@@ -211,6 +234,8 @@ export function BookAppointmentPage() {
   const [interpreter, setInterpreter] = useState('No interpreter')
 
   const today = useMemo(todayIso, [])
+  const bookingEnd = useMemo(() => addDays(today, BOOKING_RANGE_DAYS - 1), [today])
+  const availabilityStart = useMemo(() => addDays(today, -APPOINTMENT_LOOKBACK_DAYS), [today])
   const maxWeekStart = useMemo(() => addDays(today, MAX_WEEK_START_OFFSET), [today])
   const weekDays = useMemo(
     () => Array.from({ length: WEEK_LENGTH }, (_, index) => addDays(weekStart, index)),
@@ -224,7 +249,7 @@ export function BookAppointmentPage() {
       setIsLoadingAvailability(true)
       setAvailabilityError(null)
       try {
-        const response = await fetchPatientBookingAvailability(today, BOOKING_RANGE_DAYS)
+        const response = await fetchPatientBookingAvailability(availabilityStart, APPOINTMENT_HISTORY_RANGE_DAYS)
         if (!active) return
         setAvailability(response)
         if (response.doctors.length === 0) {
@@ -244,10 +269,39 @@ export function BookAppointmentPage() {
     return () => {
       active = false
     }
-  }, [today])
+  }, [availabilityStart])
 
   const doctors = useMemo(() => availability?.doctors.filter((doctor) => doctor.active) ?? [], [availability])
   const appointments = useMemo(() => availability?.appointments ?? [], [availability])
+  const currentPatientAppointments = useMemo(() => {
+    const userTerms = user
+      ? [
+          patientDisplayName(user),
+          user.attributes.email,
+          user.username,
+        ]
+          .map(normalizeSearchValue)
+          .filter(Boolean)
+      : []
+    const fallbackTerms = [
+      `${patient.firstName} ${patient.lastName}`,
+      patient.email,
+      patient.username,
+      patient.id,
+    ]
+      .map(normalizeSearchValue)
+      .filter(Boolean)
+    const terms = userTerms.length > 0 ? userTerms : fallbackTerms
+
+    if (terms.length === 0) return []
+
+    return appointments.filter((appointment) => {
+      if (isCancelledAppointment(appointment)) return false
+
+      const patientText = normalizeSearchValue(`${appointment.patient_display} ${appointment.patient_id}`)
+      return terms.some((term) => patientText.includes(term))
+    })
+  }, [appointments, user])
   const specialityOptions = useMemo(() => {
     const names = new Set(doctors.map(doctorSpeciality).filter(Boolean))
     return [ANY_SPECIALITY, ...Array.from(names).sort((a, b) => a.localeCompare(b))]
@@ -330,7 +384,7 @@ export function BookAppointmentPage() {
             </p>
             {availability && (
               <p className="m-0 mt-1 text-[0.78rem] font-bold text-[#6b7f91]">
-                Booking window: {formatDate(availability.start_date)} through {formatDate(availability.end_date)}
+                Booking window: {formatDate(today)} through {formatDate(bookingEnd)}
               </p>
             )}
           </div>
@@ -712,7 +766,235 @@ export function BookAppointmentPage() {
           )
         )}
       </div>
+
+      {currentPatientAppointments.length > 0 && (
+        <ScheduledAppointmentsPanel appointments={currentPatientAppointments} today={today} />
+      )}
+      {!isLoadingAvailability && !availabilityError && currentPatientAppointments.length === 0 && (
+        <p className="m-0 mt-6 rounded-[10px] border border-dashed border-[#cbdde6] bg-[#f7fbfd] p-3 text-center text-[0.84rem] font-bold text-[#6b7f91]">
+          You have not scheduled any appointments before.
+        </p>
+      )}
     </PatientPage>
+  )
+}
+
+type AppointmentTab = 'upcoming' | 'past' | 'plan'
+
+function ScheduledAppointmentsPanel({
+  appointments,
+  today,
+}: {
+  appointments: BookingAppointment[]
+  today: string
+}) {
+  const upcomingAppointments = useMemo(
+    () =>
+      appointments
+        .filter((appointment) => appointment.date >= today && !isCancelledAppointment(appointment))
+        .sort((a, b) => appointmentSortValue(a) - appointmentSortValue(b)),
+    [appointments, today],
+  )
+  const pastAppointments = useMemo(
+    () =>
+      appointments
+        .filter((appointment) => appointment.date < today)
+        .sort((a, b) => appointmentSortValue(b) - appointmentSortValue(a)),
+    [appointments, today],
+  )
+  const [activeTab, setActiveTab] = useState<AppointmentTab>(() =>
+    upcomingAppointments.length > 0 ? 'upcoming' : 'past',
+  )
+
+  const tabs: { id: AppointmentTab; label: string; count?: number }[] = [
+    { id: 'upcoming', label: 'Upcoming appointments', count: upcomingAppointments.length },
+    { id: 'past', label: 'Past appointments', count: pastAppointments.length },
+    { id: 'plan', label: 'Plan' },
+  ]
+
+  return (
+    <PatientPanel
+      title="Appointments already scheduled for you"
+      icon={<CalendarCheck2 size={21} />}
+      tone="secure"
+      className="mt-6"
+    >
+      <div className="grid gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <p className="m-0 max-w-[720px] text-[0.9rem] font-semibold leading-relaxed text-[#53687b]">
+            There are already appointments scheduled for you. Review them before booking another visit so the
+            new request fits your existing care plan.
+          </p>
+          {upcomingAppointments[0] && (
+            <div className="rounded-[9px] border border-[#b7ceda] bg-[#f7fbfd] px-3 py-2 text-[0.78rem] font-black text-[#143A57]">
+              Next: {formatAppointmentDateTime(upcomingAppointments[0].date, upcomingAppointments[0].start_time)}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2 border-b border-[#d7e5ec] pb-3" role="tablist" aria-label="Scheduled appointments">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[9px] border px-3 text-[0.82rem] font-black transition',
+                  isActive
+                    ? 'border-[#143A57] bg-[#143A57] text-white'
+                    : 'border-[#cbdde6] bg-white text-[#143A57] hover:bg-[#f7fbfd]',
+                )}
+              >
+                {tab.label}
+                {typeof tab.count === 'number' && (
+                  <span
+                    className={cn(
+                      'rounded-full px-2 py-0.5 text-[0.7rem]',
+                      isActive ? 'bg-white/20 text-white' : 'bg-[#e7f3f8] text-[#143A57]',
+                    )}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {activeTab === 'upcoming' && (
+          <AppointmentList
+            appointments={upcomingAppointments}
+            emptyText="No upcoming appointments were found in the current scheduling window."
+          />
+        )}
+        {activeTab === 'past' && (
+          <AppointmentList
+            appointments={pastAppointments}
+            emptyText="No past appointments were found in the recent history window."
+          />
+        )}
+        {activeTab === 'plan' && (
+          <AppointmentPlan appointments={appointments} pastAppointments={pastAppointments} upcomingAppointments={upcomingAppointments} />
+        )}
+      </div>
+    </PatientPanel>
+  )
+}
+
+function AppointmentList({ appointments, emptyText }: { appointments: BookingAppointment[]; emptyText: string }) {
+  if (appointments.length === 0) {
+    return (
+      <div className="rounded-[10px] border border-dashed border-[#cbdde6] bg-[#f7fbfd] p-4 text-center text-[0.86rem] font-bold text-[#53687b]">
+        {emptyText}
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid gap-3">
+      {appointments.map((appointment) => (
+        <div
+          key={appointment.appointment_record_id || appointment.appointment_id}
+          className="grid grid-cols-[1fr_auto] gap-3 rounded-[10px] border border-[#d7e5ec] bg-white p-4 max-[720px]:grid-cols-1"
+        >
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <strong className="text-[0.98rem] text-[#102033]">
+                {formatAppointmentDateTime(appointment.date, appointment.start_time)}
+              </strong>
+              <span className="rounded-full border border-[#cbdde6] bg-[#f7fbfd] px-2 py-0.5 text-[0.7rem] font-black text-[#53687b]">
+                {appointment.status_label || appointment.status || 'Scheduled'}
+              </span>
+            </div>
+            <div className="mt-2 text-[0.9rem] font-bold text-[#143A57]">{appointment.doctor_name}</div>
+            <div className="mt-1 text-[0.82rem] font-semibold text-[#53687b]">
+              {[appointment.speciality, appointment.department].filter(Boolean).join(' - ') || 'Clinic appointment'}
+            </div>
+            {(appointment.reason_category || appointment.reason_text) && (
+              <div className="mt-2 text-[0.84rem] font-semibold text-[#102033]">
+                {appointmentReason(appointment)}
+                {appointment.reason_category && appointment.reason_text ? `: ${appointment.reason_text}` : ''}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col items-end justify-between gap-2 text-right max-[720px]:items-start max-[720px]:text-left">
+            <span className="rounded-[8px] bg-[#e7f3f8] px-2.5 py-1 text-[0.72rem] font-black text-[#143A57]">
+              {appointment.appointment_id || 'Appointment'}
+            </span>
+            <span className="text-[0.74rem] font-bold text-[#6b7f91]">
+              Patient: {appointment.patient_display || 'Matched patient'}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function AppointmentPlan({
+  appointments,
+  pastAppointments,
+  upcomingAppointments,
+}: {
+  appointments: BookingAppointment[]
+  pastAppointments: BookingAppointment[]
+  upcomingAppointments: BookingAppointment[]
+}) {
+  const nextAppointment = upcomingAppointments[0]
+  const latestPastAppointment = pastAppointments[0]
+  const focusCounts = appointments.reduce<Record<string, number>>((counts, appointment) => {
+    const focus = appointmentReason(appointment)
+    counts[focus] = (counts[focus] ?? 0) + 1
+    return counts
+  }, {})
+  const careFocus =
+    Object.entries(focusCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'General care coordination'
+
+  const planItems = [
+    {
+      icon: <Clock3 size={18} />,
+      label: 'Next scheduled visit',
+      value: nextAppointment
+        ? `${formatAppointmentDateTime(nextAppointment.date, nextAppointment.start_time)} with ${nextAppointment.doctor_name}`
+        : 'No upcoming visit in this window',
+    },
+    {
+      icon: <CalendarDays size={18} />,
+      label: 'Recent visit reference',
+      value: latestPastAppointment
+        ? `${formatAppointmentDateTime(latestPastAppointment.date, latestPastAppointment.start_time)} with ${latestPastAppointment.doctor_name}`
+        : 'No recent visit in this window',
+    },
+    {
+      icon: <ClipboardList size={18} />,
+      label: 'Care focus',
+      value: careFocus,
+    },
+  ]
+
+  return (
+    <div className="grid gap-3">
+      <div className="grid grid-cols-3 gap-3 max-[900px]:grid-cols-1">
+        {planItems.map((item) => (
+          <div key={item.label} className="rounded-[10px] border border-[#d7e5ec] bg-[#f7fbfd] p-4">
+            <div className="mb-2 flex items-center gap-2 text-[#143A57]">
+              {item.icon}
+              <span className="text-[0.74rem] font-black uppercase text-[#53687b]">{item.label}</span>
+            </div>
+            <p className="m-0 text-[0.9rem] font-bold leading-relaxed text-[#102033]">{item.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-[10px] border border-[#b7ceda] bg-white p-4 text-[0.86rem] font-semibold leading-relaxed text-[#53687b]">
+        Use this plan view to compare the appointment you are about to book against your existing schedule. If
+        the next visit covers the same care focus, keep the current visit and bring new concerns to that
+        appointment.
+      </div>
+    </div>
   )
 }
 

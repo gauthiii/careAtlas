@@ -69,6 +69,8 @@ APPOINTMENT_FIELDS = [
     "u_reason_text",
 ]
 
+BOOKING_AVAILABILITY_MAX_DAYS = 211
+
 PATIENT_PROFILE_FIELDS = [
     "sys_id",
     "sys_created_on",
@@ -714,7 +716,7 @@ async def fetch_patient_booking_availability(
 ) -> BookingAvailabilityResponse:
     """Return normalized booking availability for the patient booking page."""
     first_day = start_date or date.today()
-    day_count = max(1, min(days, 31))
+    day_count = max(1, min(days, BOOKING_AVAILABILITY_MAX_DAYS))
     last_day = first_day + timedelta(days=day_count - 1)
 
     async def get_table(

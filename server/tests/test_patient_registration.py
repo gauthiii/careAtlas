@@ -383,7 +383,7 @@ class PatientBookingAvailabilityServiceNowTest(unittest.IsolatedAsyncioTestCase)
         self.assertEqual(appointment.patient_display, "Maya Chen")
         self.assertEqual(response.days[0].appointments[0].appointment_id, "APT-100")
 
-    async def test_booking_range_is_capped_at_31_days(self):
+    async def test_booking_range_is_capped_at_history_window(self):
         def handler(request: httpx.Request) -> httpx.Response:
             if request.url.path.endswith("/u_doctor") or request.url.path.endswith("/u_appointment"):
                 return httpx.Response(200, json={"result": []})
@@ -394,13 +394,13 @@ class PatientBookingAvailabilityServiceNowTest(unittest.IsolatedAsyncioTestCase)
             response = await fetch_patient_booking_availability(
                 FakeSettings(),
                 start_date=date(2026, 6, 9),
-                days=45,
+                days=400,
                 http_client=http_client,
             )
 
         self.assertEqual(response.start_date, "2026-06-09")
-        self.assertEqual(response.end_date, "2026-07-09")
-        self.assertEqual(len(response.days), 31)
+        self.assertEqual(response.end_date, "2027-01-05")
+        self.assertEqual(len(response.days), 211)
 
 
 class PatientRegistrationEndpointTest(unittest.TestCase):
