@@ -78,6 +78,50 @@ export interface PatientRegistrationResponse {
   registration_status: string
 }
 
+export interface PatientProfile {
+  sys_id: string
+  patient_id: string
+  first_name: string
+  last_name: string
+  date_of_birth: string
+  gender: string
+  ethnicity: string
+  primary_language: string
+  phone: string
+  email: string
+  address_line1: string
+  address_line2: string
+  city: string
+  postcode: string
+  state_region: string
+  health_condition: string
+  accessibility: string
+  insurance_id: string
+  insurance_provider: string
+  emergency_name: string
+  emergency_phone: string
+  emergency_relationship: string
+  username: string
+  registration_status: string
+  account_status: string
+  email_verified: boolean
+  profile_complete: boolean
+  blood_type: string
+  known_allergies: string
+  active_since: string
+  confidence_score: string
+  consent_accepted: boolean
+  privacy_notice_version: string
+  time_preference: string
+  last_updated: string
+}
+
+export interface PatientProfileLookup {
+  email?: string
+  username?: string
+  name?: string
+}
+
 export interface BookingDoctor {
   doctor_id: string
   doctor_record_id: string
@@ -264,6 +308,27 @@ export async function registerPatient(
   }
 
   return (await res.json()) as PatientRegistrationResponse
+}
+
+export async function fetchPatientProfile(lookup: PatientProfileLookup): Promise<PatientProfile | null> {
+  const params = new URLSearchParams()
+  if (lookup.email?.trim()) params.set('email', lookup.email.trim())
+  if (lookup.username?.trim()) params.set('username', lookup.username.trim())
+  if (lookup.name?.trim()) params.set('name', lookup.name.trim())
+
+  if (!params.toString()) return null
+
+  const res = await fetch(`${API_BASE}/patients/profile?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (res.status === 404) return null
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as PatientProfile
 }
 
 export async function checkPwnedPassword(password: string): Promise<PasswordPwnedCheckResponse> {

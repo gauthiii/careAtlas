@@ -33,6 +33,7 @@ from .models import (
     BookingAvailabilityResponse,
     ExecuteAgentRequest,
     ExecuteAgentResponse,
+    PatientProfileResponse,
     PatientRegistrationRequest,
     PatientRegistrationResponse,
     PasswordPwnedCheckRequest,
@@ -47,6 +48,7 @@ from .servicenow import (
     execute_agent,
     fetch_agents,
     fetch_patient_booking_availability,
+    fetch_patient_profile,
     test_service_account_acl,
     validate_user,
 )
@@ -169,6 +171,23 @@ async def post_patient_registration(
         return await create_patient_registration(settings, body)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/patients/profile", response_model=PatientProfileResponse)
+async def get_patient_profile(
+    email: str | None = None,
+    username: str | None = None,
+    name: str | None = None,
+    settings: Settings = Depends(get_settings),
+) -> PatientProfileResponse:
+    try:
+        profile = await fetch_patient_profile(settings, email=email, username=username, name=name)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Patient profile not found")
+    return profile
 
 
 @api.get("/patients/booking/availability", response_model=BookingAvailabilityResponse)

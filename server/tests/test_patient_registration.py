@@ -19,11 +19,17 @@ os.environ.setdefault("SNOW_PASSWORD", "snow-password")
 
 from app.config import get_settings
 from app.main import create_app
-from app.models import BookingAvailabilityResponse, PatientRegistrationRequest, PatientRegistrationResponse
+from app.models import (
+    BookingAvailabilityResponse,
+    PatientProfileResponse,
+    PatientRegistrationRequest,
+    PatientRegistrationResponse,
+)
 from app.servicenow import (
     ServiceNowError,
     create_patient_registration,
     fetch_patient_booking_availability,
+    fetch_patient_profile,
 )
 
 
@@ -129,6 +135,147 @@ class PatientRegistrationServiceNowTest(unittest.IsolatedAsyncioTestCase):
                     PatientRegistrationRequest(**registration_data()),
                     http_client=http_client,
                 )
+
+
+class PatientProfileServiceNowTest(unittest.IsolatedAsyncioTestCase):
+    async def test_fetches_profile_by_email_first(self):
+        requests: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            return httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": "patient-sys-id",
+                            "sys_created_on": "2024-01-12",
+                            "sys_updated_on": "2026-06-04 18:08:29",
+                            "u_patient_id": "NGH-200",
+                            "u_first_name": "Aisha",
+                            "u_last_name": "Evans",
+                            "u_date_of_birth": "1981-09-30",
+                            "u_gender": {"value": "female", "display_value": "Female"},
+                            "u_ethnicity": "White",
+                            "u_primary_language": "English",
+                            "u_phone": "07721130263",
+                            "u_email": "aisha.evans77@example.com",
+                            "u_address_line1": "1 Demo Street",
+                            "u_address_line2": "Flat 2",
+                            "u_city": "London",
+                            "u_postcode": "E1 6AA",
+                            "u_state": "England",
+                            "u_country": "United Kingdom",
+                            "u_health_condition": {"value": "preventative", "display_value": "Preventative care"},
+                            "u_accessibility": "true",
+                            "u_insurance_id": "INS-1",
+                            "u_insurance_provider": "NHS",
+                            "u_emergency_name": "Emergency Contact",
+                            "u_emergency_phone": "07700000000",
+                            "u_emergency_relationship": "Partner",
+                            "u_username": "aisha.evans77",
+                            "u_registration_status": "approved",
+                            "u_account_status": "active",
+                            "u_email_verified": "true",
+                            "u_profile_complete": "true",
+                            "u_confidence_score": "100",
+                            "u_consent_accepted": "true",
+                            "u_privacy_notice_version": "v1",
+                            "u_time_preference": "Morning",
+                            "u_blood_type": "A+",
+                            "u_known_allergies": "None",
+                        }
+                    ]
+                },
+            )
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            response = await fetch_patient_profile(
+                FakeSettings(),
+                email="aisha.evans77@example.com",
+                username="aisha.evans77",
+                name="Aisha Evans",
+                http_client=http_client,
+            )
+
+        self.assertIsNotNone(response)
+        assert response is not None
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(requests[0].url.params["sysparm_query"], "u_email=aisha.evans77@example.com")
+        requested_fields = requests[0].url.params["sysparm_fields"]
+        for field in (
+            "sys_updated_on",
+            "u_confidence_score",
+            "u_consent_accepted",
+            "u_privacy_notice_version",
+            "u_time_preference",
+        ):
+            self.assertIn(field, requested_fields)
+        self.assertEqual(response.patient_id, "NGH-200")
+        self.assertEqual(response.first_name, "Aisha")
+        self.assertEqual(response.gender, "Female")
+        self.assertEqual(response.health_condition, "Preventative care")
+        self.assertTrue(response.email_verified)
+        self.assertTrue(response.profile_complete)
+        self.assertEqual(response.state_region, "England, United Kingdom")
+        self.assertEqual(response.confidence_score, "100")
+        self.assertTrue(response.consent_accepted)
+        self.assertEqual(response.privacy_notice_version, "v1")
+        self.assertEqual(response.time_preference, "Morning")
+        self.assertEqual(response.last_updated, "2026-06-04 18:08:29")
+
+    async def test_falls_back_to_username_then_name(self):
+        requests: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            if len(requests) < 3:
+                return httpx.Response(200, json={"result": []})
+            return httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {
+                            "sys_id": "patient-sys-id",
+                            "u_first_name": "Maya",
+                            "u_last_name": "Patel",
+                            "u_email": "maya@example.com",
+                            "u_username": "maya.patel",
+                        }
+                    ]
+                },
+            )
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            response = await fetch_patient_profile(
+                FakeSettings(),
+                email="missing@example.com",
+                username="missing-user",
+                name="Maya Patel",
+                http_client=http_client,
+            )
+
+        self.assertIsNotNone(response)
+        self.assertEqual(len(requests), 3)
+        self.assertEqual(requests[0].url.params["sysparm_query"], "u_email=missing@example.com")
+        self.assertEqual(requests[1].url.params["sysparm_query"], "u_username=missing-user")
+        self.assertEqual(requests[2].url.params["sysparm_query"], "u_first_name=Maya^u_last_name=Patel")
+
+    async def test_returns_none_when_no_match(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"result": []})
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            response = await fetch_patient_profile(
+                FakeSettings(),
+                email="missing@example.com",
+                http_client=http_client,
+            )
+
+        self.assertIsNone(response)
 
 
 class PatientBookingAvailabilityServiceNowTest(unittest.IsolatedAsyncioTestCase):
@@ -316,6 +463,52 @@ class PatientRegistrationEndpointTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["start_date"], "2026-06-09")
+
+    def test_patient_profile_endpoint_returns_profile(self):
+        expected = PatientProfileResponse(
+            sys_id="patient-sys-id",
+            patient_id="NGH-200",
+            first_name="Aisha",
+            last_name="Evans",
+            email="aisha.evans77@example.com",
+            profile_complete=True,
+            email_verified=True,
+            confidence_score="100",
+            consent_accepted=True,
+            privacy_notice_version="v1",
+            time_preference="Morning",
+            last_updated="2026-06-04 18:08:29",
+        )
+
+        with patch("app.main.fetch_patient_profile", new=AsyncMock(return_value=expected)):
+            response = self.client.get(
+                "/api/patients/profile?email=aisha.evans77%40example.com&username=aisha.evans77&name=Aisha%20Evans"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["patient_id"], "NGH-200")
+        self.assertTrue(response.json()["profile_complete"])
+        self.assertEqual(response.json()["confidence_score"], "100")
+        self.assertTrue(response.json()["consent_accepted"])
+        self.assertEqual(response.json()["privacy_notice_version"], "v1")
+        self.assertEqual(response.json()["time_preference"], "Morning")
+        self.assertEqual(response.json()["last_updated"], "2026-06-04 18:08:29")
+
+    def test_patient_profile_endpoint_returns_404_when_no_match(self):
+        with patch("app.main.fetch_patient_profile", new=AsyncMock(return_value=None)):
+            response = self.client.get("/api/patients/profile?email=missing%40example.com")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_patient_profile_endpoint_upstream_failure_returns_502(self):
+        with patch(
+            "app.main.fetch_patient_profile",
+            new=AsyncMock(side_effect=ServiceNowError("ServiceNow 403: Forbidden")),
+        ):
+            response = self.client.get("/api/patients/profile?email=aisha.evans77%40example.com")
+
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("ServiceNow 403", response.json()["detail"])
 
 
 if __name__ == "__main__":

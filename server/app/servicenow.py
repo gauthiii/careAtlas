@@ -23,6 +23,7 @@ from .models import (
     BookingAvailabilityResponse,
     BookingCalendarDay,
     BookingDoctor,
+    PatientProfileResponse,
     PatientRegistrationRequest,
     PatientRegistrationResponse,
 )
@@ -66,6 +67,46 @@ APPOINTMENT_FIELDS = [
     "u_status",
     "u_reason_category",
     "u_reason_text",
+]
+
+PATIENT_PROFILE_FIELDS = [
+    "sys_id",
+    "sys_created_on",
+    "sys_updated_on",
+    "u_patient_id",
+    "u_first_name",
+    "u_last_name",
+    "u_date_of_birth",
+    "u_gender",
+    "u_ethnicity",
+    "u_primary_language",
+    "u_phone",
+    "u_email",
+    "u_address_line1",
+    "u_address_line2",
+    "u_city",
+    "u_postcode",
+    "u_state",
+    "u_region",
+    "u_country",
+    "u_health_condition",
+    "u_accessibility",
+    "u_insurance_id",
+    "u_insurance_provider",
+    "u_emergency_name",
+    "u_emergency_phone",
+    "u_emergency_relationship",
+    "u_username",
+    "u_registration_status",
+    "u_account_status",
+    "u_email_verified",
+    "u_profile_complete",
+    "u_confidence_score",
+    "u_consent_accepted",
+    "u_privacy_notice_version",
+    "u_time_preference",
+    "u_blood_type",
+    "u_known_allergies",
 ]
 
 
@@ -517,6 +558,129 @@ def _normalize_yes_no(value: str) -> str:
     if normalized in {"no", "false", "0"}:
         return "false"
     return normalized
+
+
+def _service_now_query_value(value: str) -> str:
+    return value.strip().replace("^", " ").replace("=", " ")
+
+
+def _first_last_from_name(name: str | None) -> tuple[str, str]:
+    parts = [part for part in (name or "").strip().split() if part]
+    if not parts:
+        return "", ""
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], " ".join(parts[1:])
+
+
+def _patient_profile_queries(email: str | None, username: str | None, name: str | None) -> list[str]:
+    queries: list[str] = []
+    normalized_email = _service_now_query_value(email or "")
+    normalized_username = _service_now_query_value(username or "")
+    first_name, last_name = (_service_now_query_value(part) for part in _first_last_from_name(name))
+
+    if normalized_email:
+        queries.append(f"u_email={normalized_email}")
+    if normalized_username and normalized_username != normalized_email:
+        queries.append(f"u_username={normalized_username}")
+    if first_name and last_name:
+        queries.append(f"u_first_name={first_name}^u_last_name={last_name}")
+    elif first_name:
+        queries.append(f"u_first_name={first_name}")
+
+    return queries
+
+
+async def fetch_patient_profile(
+    settings: Settings,
+    *,
+    email: str | None = None,
+    username: str | None = None,
+    name: str | None = None,
+    http_client: httpx.AsyncClient | None = None,
+) -> PatientProfileResponse | None:
+    """Return the first u_patient record matching auth email, username, then name."""
+    queries = _patient_profile_queries(email, username, name)
+    if not queries:
+        return None
+
+    async def run_query(client: httpx.AsyncClient, query: str) -> httpx.Response:
+        return await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_patient",
+            params={
+                "sysparm_query": query,
+                "sysparm_fields": ",".join(PATIENT_PROFILE_FIELDS),
+                "sysparm_display_value": "true",
+                "sysparm_limit": "1",
+            },
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+
+    async def run(client: httpx.AsyncClient) -> PatientProfileResponse | None:
+        for query in queries:
+            response = await run_query(client, query)
+            if not response.is_success:
+                _raise_snow_error(response)
+            records = response.json().get("result", [])
+            if records:
+                return _map_patient_profile(records[0])
+        return None
+
+    if http_client is not None:
+        return await run(http_client)
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+def _map_patient_profile(record: dict[str, Any]) -> PatientProfileResponse:
+    state_region = ", ".join(
+        part
+        for part in (
+            _field_best(record.get("u_state")) or _field_best(record.get("u_region")),
+            _field_best(record.get("u_country")),
+        )
+        if part
+    )
+
+    return PatientProfileResponse(
+        sys_id=_field_best(record.get("sys_id")),
+        patient_id=_field_best(record.get("u_patient_id")),
+        first_name=_field_best(record.get("u_first_name")),
+        last_name=_field_best(record.get("u_last_name")),
+        date_of_birth=_date_value(record.get("u_date_of_birth")),
+        gender=_field_best(record.get("u_gender")),
+        ethnicity=_field_best(record.get("u_ethnicity")),
+        primary_language=_field_best(record.get("u_primary_language")),
+        phone=_field_best(record.get("u_phone")),
+        email=_field_best(record.get("u_email")),
+        address_line1=_field_best(record.get("u_address_line1")),
+        address_line2=_field_best(record.get("u_address_line2")),
+        city=_field_best(record.get("u_city")),
+        postcode=_field_best(record.get("u_postcode")),
+        state_region=state_region,
+        health_condition=_field_best(record.get("u_health_condition")),
+        accessibility=_field_best(record.get("u_accessibility")),
+        insurance_id=_field_best(record.get("u_insurance_id")),
+        insurance_provider=_field_best(record.get("u_insurance_provider")),
+        emergency_name=_field_best(record.get("u_emergency_name")),
+        emergency_phone=_field_best(record.get("u_emergency_phone")),
+        emergency_relationship=_field_best(record.get("u_emergency_relationship")),
+        username=_field_best(record.get("u_username")),
+        registration_status=_field_best(record.get("u_registration_status")),
+        account_status=_field_best(record.get("u_account_status")),
+        email_verified=_truthy_snow(record.get("u_email_verified")),
+        profile_complete=_truthy_snow(record.get("u_profile_complete")),
+        blood_type=_field_best(record.get("u_blood_type")),
+        known_allergies=_field_best(record.get("u_known_allergies")),
+        active_since=_date_value(record.get("sys_created_on")),
+        confidence_score=_field_best(record.get("u_confidence_score")),
+        consent_accepted=_truthy_snow(record.get("u_consent_accepted")),
+        privacy_notice_version=_field_best(record.get("u_privacy_notice_version")),
+        time_preference=_field_best(record.get("u_time_preference")),
+        last_updated=_date_value(record.get("sys_updated_on")),
+    )
 
 
 def _has_complete_patient_profile(registration: PatientRegistrationRequest) -> bool:

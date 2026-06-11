@@ -114,6 +114,44 @@ class PatientRegistrationResponse(BaseModel):
     registration_status: str
 
 
+class PatientProfileResponse(BaseModel):
+    sys_id: str = ""
+    patient_id: str = ""
+    first_name: str = ""
+    last_name: str = ""
+    date_of_birth: str = ""
+    gender: str = ""
+    ethnicity: str = ""
+    primary_language: str = ""
+    phone: str = ""
+    email: str = ""
+    address_line1: str = ""
+    address_line2: str = ""
+    city: str = ""
+    postcode: str = ""
+    state_region: str = ""
+    health_condition: str = ""
+    accessibility: str = ""
+    insurance_id: str = ""
+    insurance_provider: str = ""
+    emergency_name: str = ""
+    emergency_phone: str = ""
+    emergency_relationship: str = ""
+    username: str = ""
+    registration_status: str = ""
+    account_status: str = ""
+    email_verified: bool = False
+    profile_complete: bool = False
+    blood_type: str = ""
+    known_allergies: str = ""
+    active_since: str = ""
+    confidence_score: str = ""
+    consent_accepted: bool = False
+    privacy_notice_version: str = ""
+    time_preference: str = ""
+    last_updated: str = ""
+
+
 class BookingDoctor(BaseModel):
     doctor_id: str
     doctor_record_id: str
