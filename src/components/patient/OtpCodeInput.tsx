@@ -1,4 +1,5 @@
-import { useRef } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
+import { useRef, useState } from 'react'
 
 const OTP_LENGTH = 6
 
@@ -14,6 +15,7 @@ export function OtpCodeInput({
   label?: string
 }) {
   const inputsRef = useRef<Array<HTMLInputElement | null>>([])
+  const [isVisible, setIsVisible] = useState(false)
   const digits = Array.from({ length: OTP_LENGTH }, (_, index) => value[index] ?? '')
 
   function focusInput(index: number) {
@@ -29,7 +31,20 @@ export function OtpCodeInput({
 
   return (
     <fieldset className="grid gap-[7px] text-md font-bold" disabled={disabled}>
-      <legend>{label}</legend>
+      <legend className="sr-only">{label}</legend>
+      <div className="flex items-center justify-between gap-3">
+        <span>{label}</span>
+        <button
+          type="button"
+          className="inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-[9px] border border-[#cbdde6] bg-white px-2.5 text-[0.78rem] font-black text-[#143A57] transition hover:bg-[#f7fbfd] disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => setIsVisible((current) => !current)}
+          disabled={disabled}
+          aria-label={isVisible ? 'Hide authenticator code' : 'Show authenticator code'}
+        >
+          {isVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+          {isVisible ? 'Hide' : 'Show'}
+        </button>
+      </div>
       <div className="flex gap-2 max-[420px]:gap-1.5" aria-label={label}>
         {digits.map((digit, index) => (
           <input
@@ -38,6 +53,7 @@ export function OtpCodeInput({
               inputsRef.current[index] = element
             }}
             className="h-12 w-12 rounded-[10px] border border-[#cbdde6] bg-white text-center text-xl font-black text-[#102033] outline-none transition focus:border-[#143A57] focus:ring-2 focus:ring-[#143A57]/20 disabled:cursor-not-allowed disabled:bg-[#f2f6f8] max-[420px]:h-11 max-[420px]:w-10"
+            type={isVisible ? 'text' : 'password'}
             inputMode="numeric"
             autoComplete={index === 0 ? 'one-time-code' : 'off'}
             maxLength={1}

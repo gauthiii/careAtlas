@@ -1,22 +1,34 @@
 import {
   AlertTriangle,
-  CalendarCheck,
-  Clock3,
-  UserCheck,
-  Activity,
-  ShieldAlert,
-  FileText,
-  Plus,
-  ClipboardList,
-  ListTodo,
   ArrowUpRight,
+  CalendarCheck,
+  ClipboardList,
+  Clock3,
+  FileText,
+  LoaderCircle,
   LogOut,
+  UserCheck,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { DoctorPage } from '../../components/staff/DoctorShell'
-import { staffAppointments } from '../../data/staffGovernanceData'
-import { PortalPanel } from '../../components/portal/PortalShell'
 import { clinicianDisplayName, useClinicianAuth } from '../../contexts/ClinicianAuthContext'
+import { useClinicianSchedule } from '../../hooks/useClinicianSchedule'
+import {
+  WEEK_LENGTH,
+  addDays,
+  appointmentReason,
+  appointmentSortValue,
+  findNextAvailableSlot,
+  formatAppointmentDateTime,
+  formatDate,
+  formatShortDate,
+  formatTime,
+  getScheduleForDoctor,
+  hourTime,
+  isCancelledAppointment,
+  timeRangeForHour,
+} from '../../lib/scheduling'
+import type { BookingAppointment } from '../../services/serviceNow'
 
 type StatCardProps = {
   label: string
@@ -26,123 +38,59 @@ type StatCardProps = {
   subtitle?: string
 }
 
-function StatCard({
-  label,
-  value,
-  badge,
-  badgeColor,
-  subtitle,
-}: StatCardProps) {
+function StatCard({ label, value, badge, badgeColor, subtitle }: StatCardProps) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-        {label}
-      </div>
-
-      <div className="mt-2 text-3xl font-bold text-slate-900">
-        {value}
-      </div>
-
+      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="mt-2 text-3xl font-bold text-slate-900">{value}</div>
       {badge && (
         <div
-          className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${badgeColor === 'warning'
-              ? 'bg-amber-100 text-amber-700'
-              : 'bg-emerald-100 text-emerald-700'
-            }`}
+          className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+            badgeColor === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+          }`}
         >
           {badge}
         </div>
       )}
-
-      {subtitle && (
-        <div className="mt-2 text-sm text-slate-500">
-          {subtitle}
-        </div>
-      )}
+      {subtitle && <div className="mt-2 text-sm text-slate-500">{subtitle}</div>}
     </div>
   )
 }
 
-type AvailabilityRowProps = {
-  title: string
-  subtitle: string
-  enabled?: boolean
+function patientInitials(name: string) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join('')
+  return initials || 'PT'
 }
 
-function AvailabilityRow({
-  title,
-  subtitle,
-  enabled = true,
-}: AvailabilityRowProps) {
-  return (
-    <div className="flex items-center justify-between">
-      <div>
-        <div className="font-medium text-slate-900">
-          {title}
-        </div>
-
-        <div className="text-sm text-slate-500">
-          {subtitle}
-        </div>
-      </div>
-
-      <div
-        className={`relative h-6 w-11 rounded-full transition ${enabled ? 'bg-emerald-500' : 'bg-slate-300'
-          }`}
-      >
-        <div
-          className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${enabled ? 'right-1' : 'left-1'
-            }`}
-        />
-      </div>
-    </div>
-  )
+function statusCount(appointments: BookingAppointment[], status: string) {
+  return appointments.filter((appointment) => appointment.status.toLowerCase() === status).length
 }
-
-type VitalCardProps = {
-  title: string
-  value: string
-  trend?: string
-}
-
-function VitalCard({
-  title,
-  value,
-  trend,
-}: VitalCardProps) {
-  return (
-    <div className="rounded-xl bg-slate-100 p-3 text-center">
-      <div className="text-xl font-bold text-slate-900">
-        {value}
-      </div>
-
-      <div className="mt-1 text-xs text-slate-500">
-        {title}
-      </div>
-
-      {trend && (
-        <div className="mt-1 text-[10px] text-emerald-600">
-          {trend}
-        </div>
-      )}
-    </div>
-  )
-}
-
-const weekDays = [
-  { day: 'Fri', date: 5, visits: 4, active: true },
-  { day: 'Sat', date: 6, visits: 7 },
-  { day: 'Sun', date: 7, visits: 8 },
-  { day: 'Mon', date: 8, visits: 2 },
-  { day: 'Tue', date: 9, visits: 3 },
-  { day: 'Wed', date: 10, visits: 4 },
-  { day: 'Thu', date: 11, visits: 5 },
-]
 
 export function DoctorDashboardPage() {
   const navigate = useNavigate()
   const { logout, user } = useClinicianAuth()
-  const displayName = clinicianDisplayName(user)
+  const { doctor, doctorAppointments, error, isLoading, today } = useClinicianSchedule()
+  const displayName = doctor?.name || clinicianDisplayName(user)
+  const todayAppointments = doctorAppointments
+    .filter((appointment) => appointment.date === today && !isCancelledAppointment(appointment))
+    .sort((a, b) => appointmentSortValue(a) - appointmentSortValue(b))
+  const upcomingAppointments = doctorAppointments
+    .filter((appointment) => appointment.date >= today && !isCancelledAppointment(appointment))
+    .sort((a, b) => appointmentSortValue(a) - appointmentSortValue(b))
+  const nextAvailableSlot = doctor ? findNextAvailableSlot(doctor, doctorAppointments, today, WEEK_LENGTH) : null
+  const schedule = doctor ? getScheduleForDoctor(doctor) : null
+  const weekDays = Array.from({ length: WEEK_LENGTH }, (_, index) => {
+    const date = addDays(today, index)
+    return {
+      date,
+      visits: doctorAppointments.filter((appointment) => appointment.date === date && !isCancelledAppointment(appointment)).length,
+    }
+  })
 
   async function handleLogout() {
     await logout()
@@ -152,9 +100,23 @@ export function DoctorDashboardPage() {
   return (
     <DoctorPage
       title="Today's clinical run sheet"
-      intro={`Friday, 5 June 2026 · ${displayName} · General Medicine`}
+      intro={`${formatDate(today)} · ${displayName} · ${doctor?.speciality || doctor?.department || 'Clinician schedule'}`}
     >
-      <div className="-mt-3 mb-5 flex justify-end">
+      <div className="-mt-3 mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm font-bold text-[#53687b]">
+          {isLoading && (
+            <span className="inline-flex items-center gap-2">
+              <LoaderCircle size={16} className="animate-spin" />
+              Loading live doctor and appointment data
+            </span>
+          )}
+          {!isLoading && error && (
+            <span className="inline-flex items-center gap-2 text-[#a22828]">
+              <AlertTriangle size={16} />
+              {error}
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={handleLogout}
@@ -165,243 +127,129 @@ export function DoctorDashboardPage() {
         </button>
       </div>
 
-      {/* KPI CARDS */}
       <div className="mb-6 grid grid-cols-4 gap-4 max-[1200px]:grid-cols-2 max-[640px]:grid-cols-1">
         <StatCard
           label="Appointments Today"
-          value={`${staffAppointments.length}`}
-          badge="2 Completed"
+          value={`${todayAppointments.length}`}
+          badge={`${statusCount(todayAppointments, 'completed')} Completed`}
           badgeColor="success"
         />
-
+        <StatCard label="Upcoming Visits" value={`${upcomingAppointments.length}`} subtitle="In the loaded scheduling window" />
         <StatCard
-          label="Open Governance Alerts"
-          value="2"
-          badge="Needs Review"
-          badgeColor="warning"
+          label="Clinic Hours"
+          value={schedule ? timeRangeForHour(schedule.startHour) : 'Pending'}
+          subtitle={schedule ? `${schedule.breakLabel}: ${formatTime(hourTime(schedule.breakHour))}` : 'Waiting for doctor match'}
         />
-
-        <StatCard
-          label="Average Wait Time"
-          value="8 min"
-          badge="Down 3 min"
-          badgeColor="success"
-        />
-
         <StatCard
           label="Next Available Slot"
-          value="3:30 PM"
-          subtitle="Today · Room 4B"
+          value={nextAvailableSlot ? formatTime(hourTime(nextAvailableSlot.hour)) : 'None'}
+          subtitle={nextAvailableSlot ? formatShortDate(nextAvailableSlot.date) : 'No open slot in next 7 days'}
+          badge={doctor ? 'From appointment table conflicts' : undefined}
+          badgeColor="success"
         />
       </div>
 
-      {/* TOP SECTION */}
       <div className="mb-6 grid grid-cols-[1.5fr_1fr] gap-4 max-[1200px]:grid-cols-1">
-        {/* APPOINTMENTS */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between gap-3">
             <h3 className="flex items-center gap-2 text-lg font-semibold">
               <Clock3 size={18} />
               Today's Appointments
             </h3>
-
-            <button className="bg-[#143A57] p-2 rounded-lg">
-              <span className="inline-flex items-center gap-2 !text-sm font-semibold text-white"><Plus size={18} /> Add Slot</span>
-            </button>
+            <Link to="/staff/availability" className="rounded-lg bg-[#143A57] px-3 py-2 text-sm font-semibold !text-white">
+              View availability
+            </Link>
           </div>
 
-          <div className="space-y-3">
-            {staffAppointments.map((appointment) => (
-              <div
-                key={appointment.patient}
-                className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 hover:bg-slate-50"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e7f3f8] text-[#0397AE] font-bold text-md">
-                  {appointment.patient
-                    .split(' ')
-                    .map((word) => word[0])
-                    .join('')}
-                </div>
-
-                <div className="flex-1">
-                  <p className="font-semibold">
-                    {appointment.patient}
-                  </p>
-
-                  <p className="text-xs text-slate-500">
-                    Consultation · Room 2A
-                  </p>
-                </div>
-
-                <div className="text-right">
-                  <p className="font-semibold">
-                    {appointment.time}
-                  </p>
-
-                  <p className="text-xs text-emerald-700">
-                    {appointment.status}
-                  </p>
-                </div>
-              </div>
-            ))}
-            <div className="mt-4 border-t border-slate-200 pt-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e7f3f8] text-[#0397AE] font-bold text-md">
-                  SR
-                </div>
-
-                <div>
-                  <div className="font-semibold text-slate-900">
-                    Samira Raza
-                  </div>
-
-                  <div className="text-xs text-slate-500">
-                    Upcoming · Medication review · 3:30 PM
-                  </div>
-                </div>
-              </div>
+          {todayAppointments.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm font-bold text-slate-500">
+              No appointments are scheduled for this doctor today.
             </div>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              {todayAppointments.map((appointment) => (
+                <Link
+                  key={appointment.appointment_record_id || appointment.appointment_id}
+                  to={`/staff/patient/${encodeURIComponent(appointment.patient_display || 'search')}`}
+                  className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 !text-inherit hover:bg-slate-50"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e7f3f8] text-md font-bold text-[#0397AE]">
+                    {patientInitials(appointment.patient_display)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{appointment.patient_display || 'Patient unavailable'}</p>
+                    <p className="truncate text-xs text-slate-500">{appointmentReason(appointment)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{formatTime(appointment.start_time)}</p>
+                    <p className="text-xs text-emerald-700">{appointment.status_label || appointment.status}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* RIGHT SIDE */}
         <div className="flex flex-col gap-4">
-          {/* CALENDAR */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
               <CalendarCheck size={18} />
               Next 7 Days
             </h3>
-
             <div className="grid grid-cols-7 gap-2 max-[700px]:grid-cols-2">
-              {weekDays.map((item) => (
+              {weekDays.map((item, index) => (
                 <div
-                  key={item.day}
-                  className={`rounded-xl border p-2 text-center ${item.active
-                      ? 'border-[#0397AE] bg-[#e7f3f8] border-3'
-                      : 'border-slate-200'
-                    }`}
+                  key={item.date}
+                  className={`rounded-xl border p-2 text-center ${
+                    index === 0 ? 'border-[#0397AE] bg-[#e7f3f8] shadow-[inset_0_0_0_1px_#0397AE]' : 'border-slate-200'
+                  }`}
                 >
-                  <div className="text-xs text-slate-500">
-                    {item.day}
-                  </div>
-
-                  <div className="text-xl font-bold">
-                    {item.date}
-                  </div>
-
-                  <div className="text-[10px] text-slate-500">
-                    {item.visits} visits
-                  </div>
+                  <div className="text-xs text-slate-500">{formatDate(item.date).split(',')[0]}</div>
+                  <div className="text-xl font-bold">{formatShortDate(item.date).split(' ')[1]}</div>
+                  <div className="text-[10px] text-slate-500">{item.visits} visits</div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* AVAILABILITY */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="flex items-center gap-2 text-lg font-semibold">
                 <UserCheck size={18} />
-                My Availability
+                Doctor Profile
               </h3>
-
-              <Link
-                to="/staff/availability"
-                className="rounded-lg bg-[#143A57] px-3 py-2 text-sm font-semibold !text-white"
-              >
-                Manage
+              <Link to="/staff/profile" className="rounded-lg bg-[#143A57] px-3 py-2 text-sm font-semibold !text-white">
+                Open
               </Link>
             </div>
-
-            <div className="space-y-4">
-              <AvailabilityRow
-                title="Morning Slots"
-                subtitle="8:00 AM – 12:00 PM"
-              />
-
-              <AvailabilityRow
-                title="Afternoon Slots"
-                subtitle="1:00 PM – 5:00 PM"
-              />
-
-              <AvailabilityRow
-                title="Telemedicine"
-                subtitle="Video consults enabled"
-                enabled={false}
-              />
+            <div className="space-y-3 text-sm">
+              <ProfileLine label="Doctor" value={doctor?.name || 'No matched doctor'} />
+              <ProfileLine label="Department" value={doctor?.department || 'Not provided'} />
+              <ProfileLine label="Speciality" value={doctor?.speciality || 'General'} />
+              <ProfileLine label="Email" value={doctor?.email || user?.attributes.email || 'Not provided'} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* BOTTOM SECTION */}
       <div className="grid grid-cols-[1.4fr_1fr_1fr] gap-4 max-[1200px]:grid-cols-1">
-        {/* GOVERNANCE ALERTS */}
         <div className="space-y-3">
-          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-            <div className="flex gap-3">
-              <AlertTriangle size={20} className="text-amber-700" />
-              <div>
-                <h4 className="font-semibold text-amber-800">
-                  Flagged Scheduling — Jordan Brooks
-                </h4>
-
-                <p className="mt-1 text-sm text-slate-600">
-                  AI suggested an earlier slot that conflicts with
-                  an existing lab request.
-                </p>
-
-                <p className="mt-2 text-xs text-slate-500">
-                  Flagged 40 minutes ago
-                </p>
-
-                <div className="mt-3 flex gap-2">
-                  <Link
-                    to="/staff/patient/P-2193"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold"
-                  >
-                    Open Record
-                  </Link>
-
-                  <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm !font-semibold">
-                    Dismiss
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-red-300 bg-red-50 p-4">
-            <div className="flex gap-3">
-              <AlertTriangle size={20} className="text-red-700" />
-
-              <div>
-                <h4 className="font-semibold text-red-800">
-                  Medication Interaction — Priya Singh
-                </h4>
-
-                <p className="mt-1 text-sm text-slate-600">
-                  Newly prescribed medication may interact with
-                  existing potassium supplement.
-                </p>
-
-                <p className="mt-2 text-xs text-slate-500">
-                  Flagged 2 hours ago
-                </p>
-
-                <div className="mt-3 flex gap-2">
-                  <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm !font-semibold">
-                    Review
-                  </button>
-
-                  <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm !font-semibold">
-                    Dismiss
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ClinicalAlert
+            tone="warning"
+            title="Schedule review"
+            body={
+              upcomingAppointments[0]
+                ? `${upcomingAppointments[0].patient_display || 'A patient'} is next on ${formatAppointmentDateTime(upcomingAppointments[0].date, upcomingAppointments[0].start_time)}.`
+                : 'No upcoming appointment needs review in the loaded window.'
+            }
+            to="/staff/patient/search"
+          />
+          <ClinicalAlert
+            tone="danger"
+            title="Schedule coverage"
+            body="Open times and booked visits are aligned with the clinic calendar for this doctor."
+            to="/staff/availability"
+          />
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -409,75 +257,86 @@ export function DoctorDashboardPage() {
             <ClipboardList size={18} />
             Pending Tasks
           </h3>
-          <div>
-            <div className="space-y-3">
-              <div className="rounded-lg border border-[#d7e5ec] p-3">
-                <span className="inline-flex items-center gap-2">
-                <ListTodo size={18} />
-                Review Jordan Brooks scheduling conflict <ArrowUpRight size={18} />
+          <div className="space-y-3">
+            {upcomingAppointments.slice(0, 4).map((appointment) => (
+              <Link
+                key={appointment.appointment_record_id || appointment.appointment_id}
+                to={`/staff/patient/${encodeURIComponent(appointment.patient_display || 'search')}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-[#d7e5ec] p-3 !text-inherit hover:bg-slate-50"
+              >
+                <span className="min-w-0 truncate">
+                  Review {appointment.patient_display || 'patient'} visit
                 </span>
+                <ArrowUpRight size={18} className="shrink-0" />
+              </Link>
+            ))}
+            {upcomingAppointments.length === 0 && (
+              <div className="rounded-lg border border-dashed border-[#d7e5ec] p-3 text-sm font-bold text-slate-500">
+                No appointment-driven tasks.
               </div>
-
-              <div className="rounded-lg border border-[#d7e5ec] p-3">
-                <span className="inline-flex items-center gap-2">
-                <ListTodo size={18} />
-                Sign 2 consultation notes <ArrowUpRight size={18} />
-                </span>
-              </div>
-
-              <div className="rounded-lg border border-[#d7e5ec] p-3">
-                <span className="inline-flex items-center gap-2">
-                <ListTodo size={18} />
-                Approve medication update for Priya Singh <ArrowUpRight size={18} />
-                </span>
-              </div>
-
-              <div className="rounded-lg border border-[#d7e5ec] p-3">
-                <span className="inline-flex items-center gap-2">
-                <ListTodo size={18} />
-                Complete discharge summary <ArrowUpRight size={18} />
-                </span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
-            {/* NOTES */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                <FileText size={18} />
-                Quick Notes
-              </h3>
-              <div>
-                <textarea
-                  className="h-32 w-full rounded-lg border border-slate-300 p-3"
-                  placeholder="Add a clinical note for today's shift..."
-                />
 
-                <button className="mt-3 rounded-lg bg-[#143A57] px-4 py-2 !font-semibold text-white !text-sm">
-                  Save Note
-                </button>
-
-                <div className="mt-5 border-t border-slate-200 pt-4">
-                  <div className="mb-2 text-sm font-semibold text-slate-600">
-                    Recent Notes
-                  </div>
-
-                  <div className="text-sm text-slate-600">
-                    <span className="font-semibold text-slate-900">
-                      Owen Miller
-                    </span>
-                    {' '}— Post-op wound healing well. No signs of
-                    infection. Follow-up in 2 weeks.
-                  </div>
-
-                  <div className="mt-1 text-xs text-slate-400">
-                    5 Jun · 10:52 AM
-                  </div>
-                </div>
-              </div>
-
-            </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+            <FileText size={18} />
+            Quick Notes
+          </h3>
+          <textarea
+            className="h-32 w-full rounded-lg border border-slate-300 p-3"
+            placeholder="Add a clinical note for today's shift..."
+          />
+          <button className="mt-3 rounded-lg bg-[#143A57] px-4 py-2 !text-sm !font-semibold text-white">
+            Save Note
+          </button>
+          <div className="mt-5 border-t border-slate-200 pt-4 text-sm text-slate-600">
+            <span className="font-semibold text-slate-900">{upcomingAppointments[0]?.patient_display || 'No patient selected'}</span>
+            {' '}schedule context is loaded from ServiceNow appointments.
           </div>
-        </DoctorPage>
-        )
+        </div>
+      </div>
+    </DoctorPage>
+  )
+}
+
+function ProfileLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[92px_1fr] gap-2">
+      <span className="font-bold text-slate-500">{label}</span>
+      <span className="min-w-0 truncate font-semibold text-slate-900">{value}</span>
+    </div>
+  )
+}
+
+function ClinicalAlert({
+  body,
+  title,
+  tone,
+  to,
+}: {
+  body: string
+  title: string
+  tone: 'warning' | 'danger'
+  to: string
+}) {
+  const classes =
+    tone === 'warning'
+      ? 'border-amber-300 bg-amber-50 text-amber-800'
+      : 'border-red-300 bg-red-50 text-red-800'
+
+  return (
+    <div className={`rounded-xl border p-4 ${classes}`}>
+      <div className="flex gap-3">
+        <AlertTriangle size={20} className="mt-0.5 shrink-0" />
+        <div>
+          <h4 className="font-semibold">{title}</h4>
+          <p className="mt-1 text-sm text-slate-600">{body}</p>
+          <Link to={to} className="mt-3 inline-flex rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold !text-slate-800">
+            Open
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
 }

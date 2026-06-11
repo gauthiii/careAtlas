@@ -32,7 +32,8 @@ const signedInClinicianNav = [
   { label: 'Dashboard', to: '/staff/doctor', icon: LayoutDashboard, end: true },
   { label: 'Admin', to: '/staff/admin', icon: CalendarCheck },
   { label: 'Availability', to: '/staff/availability', icon: Clock3 },
-  { label: 'Patient record', to: '/staff/patient/P-2193', icon: UserRound, matchPrefix: '/staff/patient' },
+  { label: 'Profile', to: '/staff/profile', icon: Stethoscope },
+  { label: 'Patient record', to: '/staff/patient/search', icon: UserRound, matchPrefix: '/staff/patient' },
 ] as const
 
 export function DoctorShell({ children }: { children: React.ReactNode }) {

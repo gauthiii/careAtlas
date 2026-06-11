@@ -17,6 +17,34 @@ import { patient, type Appointment } from '../../data/patientPortalData'
 import { patientDisplayName, usePatientAuth } from '../../contexts/PatientAuthContext'
 import { cn } from '../../lib/cn'
 import {
+  ANY_SPECIALITY,
+  APPOINTMENT_HISTORY_RANGE_DAYS,
+  APPOINTMENT_LOOKBACK_DAYS,
+  BOOKING_RANGE_DAYS,
+  CALENDAR_HOURS,
+  MAX_WEEK_START_OFFSET,
+  WEEK_LENGTH,
+  addDays,
+  appointmentOverlapsHour,
+  appointmentReason,
+  appointmentSortValue,
+  doctorSpeciality,
+  formatAppointmentDateTime,
+  formatDate,
+  formatShortDate,
+  formatTime,
+  getScheduleForDoctor,
+  hourTime,
+  isBookableHour,
+  isCancelledAppointment,
+  isSpecialAppointment,
+  nameParts,
+  normalizedSearchTerms,
+  timeRangeForHour,
+  todayIso,
+  type SpecialtySchedule,
+} from '../../lib/scheduling'
+import {
   bookPatientAppointment,
   fetchPatientBookingAvailability,
   fetchPatientProfile,
@@ -35,26 +63,6 @@ const STEPS = [
 const fieldClass =
   'w-full rounded-[9px] border border-[#cbdde6] bg-white px-3 py-[11px] text-inherit'
 const labelClass = 'grid gap-[7px] text-[0.84rem] font-bold'
-const ANY_SPECIALITY = 'Any speciality'
-const CALENDAR_START_HOUR = 9
-const CALENDAR_END_HOUR = 18
-const APPOINTMENT_DURATION_MINUTES = 60
-const WEEK_LENGTH = 7
-const BOOKING_RANGE_DAYS = 31
-const APPOINTMENT_LOOKBACK_DAYS = 180
-const APPOINTMENT_HISTORY_RANGE_DAYS = APPOINTMENT_LOOKBACK_DAYS + BOOKING_RANGE_DAYS
-const MAX_WEEK_START_OFFSET = BOOKING_RANGE_DAYS - WEEK_LENGTH
-const CALENDAR_HOURS = Array.from(
-  { length: CALENDAR_END_HOUR - CALENDAR_START_HOUR },
-  (_, index) => CALENDAR_START_HOUR + index,
-)
-
-type SpecialtySchedule = {
-  startHour: number
-  endHour: number
-  breakHour: number
-  breakLabel: string
-}
 
 type SelectedCalendarSlot = {
   id: string
@@ -62,166 +70,6 @@ type SelectedCalendarSlot = {
   date: string
   startTime: string
   hour: number
-}
-
-const DEFAULT_SPECIALTY_SCHEDULE: SpecialtySchedule = {
-  startHour: 10,
-  endHour: 15,
-  breakHour: 12,
-  breakLabel: 'Break',
-}
-
-const SPECIALTY_SCHEDULES: Record<string, SpecialtySchedule> = {
-  cardiology: { startHour: 10, endHour: 16, breakHour: 13, breakLabel: 'Break' },
-  'general practice': { startHour: 9, endHour: 18, breakHour: 12, breakLabel: 'Lunch' },
-  general: { startHour: 9, endHour: 18, breakHour: 12, breakLabel: 'Lunch' },
-  'mental health': { startHour: 10, endHour: 15, breakHour: 12, breakLabel: 'Break' },
-  neurology: { startHour: 9, endHour: 14, breakHour: 11, breakLabel: 'Break' },
-  oncology: { startHour: 8, endHour: 13, breakHour: 10, breakLabel: 'Break' },
-  orthopedics: { startHour: 11, endHour: 17, breakHour: 14, breakLabel: 'Break' },
-  paediatrics: { startHour: 8, endHour: 15, breakHour: 12, breakLabel: 'Break' },
-  pediatrics: { startHour: 8, endHour: 15, breakHour: 12, breakLabel: 'Break' },
-}
-
-function todayIso() {
-  const now = new Date()
-  return dateToIso(new Date(now.getFullYear(), now.getMonth(), now.getDate()))
-}
-
-function dateToIso(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function dateFromIso(date: string) {
-  const [year, month, day] = date.split('-').map(Number)
-  return new Date(year, (month || 1) - 1, day || 1)
-}
-
-function addDays(date: string, days: number) {
-  const next = dateFromIso(date)
-  next.setDate(next.getDate() + days)
-  return dateToIso(next)
-}
-
-function formatDate(date: string) {
-  const [year, month, day] = date.split('-').map(Number)
-  if (!year || !month || !day) return date
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    weekday: 'short',
-  }).format(new Date(year, month - 1, day))
-}
-
-function formatShortDate(date: string) {
-  const [year, month, day] = date.split('-').map(Number)
-  if (!year || !month || !day) return date
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-  }).format(new Date(year, month - 1, day))
-}
-
-function formatTime(time: string) {
-  const [hours, minutes] = time.split(':').map(Number)
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return time
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(2026, 0, 1, hours, minutes))
-}
-
-function formatAppointmentDateTime(date: string, time: string) {
-  return `${formatDate(date)} at ${formatTime(time)}`
-}
-
-function hourTime(hour: number) {
-  return `${String(hour).padStart(2, '0')}:00`
-}
-
-function timeRangeForHour(hour: number) {
-  return `${formatTime(hourTime(hour))} - ${formatTime(hourTime(hour + 1))}`
-}
-
-function minutesFromTime(time: string) {
-  const [hours, minutes] = time.split(':').map(Number)
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return 0
-  return hours * 60 + minutes
-}
-
-function doctorSpeciality(doctor: BookingDoctor) {
-  return doctor.speciality || doctor.department || 'General'
-}
-
-function getScheduleForDoctor(doctor: BookingDoctor) {
-  return SPECIALTY_SCHEDULES[doctorSpeciality(doctor).trim().toLowerCase()] ?? DEFAULT_SPECIALTY_SCHEDULE
-}
-
-function appointmentEndMinutes(appointment: BookingAppointment) {
-  return minutesFromTime(appointment.start_time) + APPOINTMENT_DURATION_MINUTES
-}
-
-function appointmentOverlapsHour(appointment: BookingAppointment, hour: number) {
-  const appointmentStart = minutesFromTime(appointment.start_time)
-  const appointmentEnd = appointmentStart + APPOINTMENT_DURATION_MINUTES
-  const hourStart = hour * 60
-  const hourEnd = hourStart + 60
-  return appointmentStart < hourEnd && appointmentEnd > hourStart
-}
-
-function appointmentOverlapsBreak(appointment: BookingAppointment, schedule: SpecialtySchedule) {
-  const breakStart = schedule.breakHour * 60
-  const breakEnd = breakStart + 60
-  return minutesFromTime(appointment.start_time) < breakEnd && appointmentEndMinutes(appointment) > breakStart
-}
-
-function appointmentOutsideSchedule(appointment: BookingAppointment, schedule: SpecialtySchedule) {
-  const appointmentStart = minutesFromTime(appointment.start_time)
-  const appointmentEnd = appointmentEndMinutes(appointment)
-  return appointmentStart < schedule.startHour * 60 || appointmentEnd > schedule.endHour * 60
-}
-
-function isSpecialAppointment(appointment: BookingAppointment, schedule: SpecialtySchedule) {
-  return appointmentOverlapsBreak(appointment, schedule) || appointmentOutsideSchedule(appointment, schedule)
-}
-
-function isBookableHour(hour: number, schedule: SpecialtySchedule) {
-  return hour >= schedule.startHour && hour < schedule.endHour
-}
-
-function isCancelledAppointment(appointment: BookingAppointment) {
-  return appointment.status === 'cancelled' || appointment.status === 'canceled'
-}
-
-function normalizeSearchValue(value: string | null | undefined) {
-  return (value ?? '').trim().toLowerCase()
-}
-
-function normalizedSearchTerms(values: Array<string | null | undefined>) {
-  return Array.from(
-    new Set(
-      values
-        .map(normalizeSearchValue)
-        .filter((value) => value.length >= 2),
-    ),
-  )
-}
-
-function nameParts(value: string | null | undefined) {
-  return normalizeSearchValue(value)
-    .split(/\s+/)
-    .filter((part) => part.length >= 2)
-}
-
-function appointmentSortValue(appointment: BookingAppointment) {
-  return dateFromIso(appointment.date).getTime() + minutesFromTime(appointment.start_time) * 60_000
-}
-
-function appointmentReason(appointment: BookingAppointment) {
-  return appointment.reason_category || appointment.reason_text || 'Appointment'
 }
 
 function selectedAppointmentFromSlot(doctor: BookingDoctor, date: string, hour: number): Appointment {

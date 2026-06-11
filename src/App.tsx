@@ -18,6 +18,7 @@ import { SignInPage as PatientSignInPage } from './pages/patient/SignInPage'
 import { AdminDashboardPage } from './pages/staff/AdminDashboardPage'
 import { AvailabilityPage } from './pages/staff/AvailabilityPage'
 import { DoctorDashboardPage } from './pages/staff/DoctorDashboardPage'
+import { DoctorProfilePage } from './pages/staff/DoctorProfilePage'
 import { PatientRecordPage } from './pages/staff/PatientRecordPage'
 import { StaffSignInPage } from './pages/staff/StaffSignInPage'
 import { AiAssistantWidget, type AiAssistantAgentConfig } from './components/AiAssistantWidget'
@@ -174,6 +175,18 @@ function App() {
               <PatientRoleBlocker>
                 <ClinicianProtectedRoute>
                   <AvailabilityPage />
+                </ClinicianProtectedRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
+          }
+        />
+        <Route
+          path="/staff/profile"
+          element={
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianProtectedRoute>
+                  <DoctorProfilePage />
                 </ClinicianProtectedRoute>
               </PatientRoleBlocker>
             </GovernanceRoleBlocker>
