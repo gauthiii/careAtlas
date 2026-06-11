@@ -11,6 +11,7 @@ import {
 } from '../../lib/portalNav'
 import { hospital } from '../../data/patientPortalData'
 import { usePatientAuth } from '../../contexts/PatientAuthContext'
+import { OverrideSignInNavLink } from '../auth/OverrideSignInNavLink'
 
 
 const loggedOutPatientNav = [
@@ -28,7 +29,7 @@ const loggedInPatientNav = [
 
 export function PatientShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
-  const { isAuthenticated } = usePatientAuth()
+  const { isAuthenticated, overrideLogin } = usePatientAuth()
   const patientNav = isAuthenticated ? loggedInPatientNav : loggedOutPatientNav
   const patientPortalHome = isAuthenticated ? '/patient/dashboard' : '/patient/home'
 
@@ -43,21 +44,35 @@ export function PatientShell({ children }: { children: React.ReactNode }) {
           </span>
         </NavLink>
         <nav className="min-w-0 justify-self-center flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-[#f7fbfd] p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto" aria-label="Patient portal navigation">
-          {patientNav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end
-              className={({ isActive }) =>
-                cn(
-                  'inline-flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
-                  isActive && 'bg-[#143A57] !text-white',
-                )
-              }
-            >
-            {item.icon && <item.icon size={15} />} {item.label}
-            </NavLink>
-          ))}
+          {patientNav.map((item) => {
+            const navClassName = ({ isActive }: { isActive: boolean }) =>
+              cn(
+                'inline-flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
+                isActive && 'bg-[#143A57] !text-white',
+              )
+
+            if (!isAuthenticated && item.to === '/patient/sign-in') {
+              return (
+                <OverrideSignInNavLink
+                  key={item.to}
+                  to={item.to}
+                  end
+                  label={item.label}
+                  icon={item.icon}
+                  className={navClassName}
+                  portalLabel="Patient Portal"
+                  redirectTo="/patient/dashboard"
+                  onOverrideLogin={overrideLogin}
+                />
+              )
+            }
+
+            return (
+              <NavLink key={item.to} to={item.to} end className={navClassName}>
+                {item.icon && <item.icon size={15} />} {item.label}
+              </NavLink>
+            )
+          })}
         </nav>
         <nav className="min-w-0 justify-self-end flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto" aria-label="Switch portal view">
           <NavLink

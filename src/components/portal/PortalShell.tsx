@@ -14,6 +14,7 @@ import { hospital } from '../../data/patientPortalData'
 import { useClinicianAuth } from '../../contexts/ClinicianAuthContext'
 import { useGovernanceAuth } from '../../contexts/GovernanceAuthContext'
 import { usePatientAuth } from '../../contexts/PatientAuthContext'
+import { OverrideSignInNavLink } from '../auth/OverrideSignInNavLink'
 
 export type PortalTone = 'patient' | 'staff' | 'admin' | 'governance' | 'risk' | 'neutral'
 
@@ -39,7 +40,7 @@ const signedOutGovernanceNav = [
 export function PortalHeader({ label }: { label: string }) {
   const location = useLocation()
   const { isAuthenticated: isClinicianAuthenticated } = useClinicianAuth()
-  const { isAuthenticated: isGovernanceAuthenticated } = useGovernanceAuth()
+  const { isAuthenticated: isGovernanceAuthenticated, overrideLogin } = useGovernanceAuth()
   const { isAuthenticated: isPatientAuthenticated } = usePatientAuth()
   const showGovernanceNav = isGovernancePortalPath(location.pathname)
   const visibleGovernanceNav = isGovernanceAuthenticated ? governanceNav : signedOutGovernanceNav
@@ -64,18 +65,34 @@ export function PortalHeader({ label }: { label: string }) {
         >
           {visibleGovernanceNav.map((item) => {
             const Icon = item.icon
+            const navClassName = ({ isActive }: { isActive: boolean }) =>
+              cn(
+                'inline-flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
+                isActive && 'bg-[#143A57] !text-white',
+              )
+
+            if (!isGovernanceAuthenticated && item.to === '/governance/sign-in') {
+              return (
+                <OverrideSignInNavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  label={item.label}
+                  icon={Icon}
+                  className={navClassName}
+                  portalLabel="AI Governance"
+                  redirectTo="/governance"
+                  onOverrideLogin={overrideLogin}
+                />
+              )
+            }
 
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
-                className={({ isActive }) =>
-                  cn(
-                    'inline-flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
-                    isActive && 'bg-[#143A57] !text-white',
-                  )
-                }
+                className={navClassName}
               >
                 <Icon size={15} />
                 {item.label}

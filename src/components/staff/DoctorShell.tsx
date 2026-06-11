@@ -22,6 +22,7 @@ import {
 import { hospital } from '../../data/patientPortalData'
 import { useClinicianAuth } from '../../contexts/ClinicianAuthContext'
 import { usePatientAuth } from '../../contexts/PatientAuthContext'
+import { OverrideSignInNavLink } from '../auth/OverrideSignInNavLink'
 
 const signedOutClinicianNav = [
   { label: 'Sign in', to: '/staff/sign-in', icon: LockKeyhole, end: true },
@@ -36,7 +37,7 @@ const signedInClinicianNav = [
 
 export function DoctorShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
-  const { isAuthenticated: isClinicianAuthenticated } = useClinicianAuth()
+  const { isAuthenticated: isClinicianAuthenticated, overrideLogin } = useClinicianAuth()
   const { isAuthenticated: isPatientAuthenticated } = usePatientAuth()
   const clinicianNav = isClinicianAuthenticated ? signedInClinicianNav : signedOutClinicianNav
   const patientPortalHome = isPatientAuthenticated ? '/patient/dashboard' : '/patient/home'
@@ -66,19 +67,34 @@ export function DoctorShell({ children }: { children: React.ReactNode }) {
           {clinicianNav.map((item) => {
             const Icon = item.icon
             const prefix = 'matchPrefix' in item ? item.matchPrefix : undefined
+            const navClassName = ({ isActive }: { isActive: boolean }) =>
+              cn(
+                'inline-flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
+                (isActive || (prefix && location.pathname.startsWith(prefix))) && 'bg-[#143A57] !text-white',
+              )
+
+            if (!isClinicianAuthenticated && item.to === '/staff/sign-in') {
+              return (
+                <OverrideSignInNavLink
+                  key={item.to}
+                  to={item.to}
+                  end={'end' in item ? item.end : false}
+                  label={item.label}
+                  icon={Icon}
+                  className={navClassName}
+                  portalLabel="Clinician Portal"
+                  redirectTo="/staff/doctor"
+                  onOverrideLogin={overrideLogin}
+                />
+              )
+            }
 
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={'end' in item ? item.end : false}
-                className={({ isActive }) =>
-                  cn(
-                    'inline-flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
-                    (isActive || (prefix && location.pathname.startsWith(prefix))) &&
-                      'bg-[#143A57] !text-white',
-                  )
-                }
+                className={navClassName}
               >
                 <Icon size={15} />
                 {item.label}

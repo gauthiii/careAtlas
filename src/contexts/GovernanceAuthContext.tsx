@@ -18,8 +18,15 @@ import {
   type AwsLoginResponse,
   type AwsValidatedUser,
 } from '../services/awsAuth'
+import {
+  clearOtherPortalAuth,
+  createOverrideStoredAuth,
+  isOverrideStoredAuth,
+  PORTAL_AUTH_OVERRIDE_EVENT,
+  PORTAL_AUTH_STORAGE_KEYS,
+} from '../lib/overrideAuth'
 
-const STORAGE_KEY = 'careatlas.governanceAuth'
+const STORAGE_KEY = PORTAL_AUTH_STORAGE_KEYS.governance
 
 export interface GovernanceAuthUser {
   username: string
@@ -30,6 +37,7 @@ interface StoredGovernanceAuth {
   idToken: string
   accessToken: string
   refreshToken?: string | null
+  isOverride?: boolean
   user?: GovernanceAuthUser | null
 }
 
@@ -42,6 +50,7 @@ interface GovernanceAuthContextValue {
   completeNewPasswordChallenge: (session: string, username: string, newPassword: string, name: string) => Promise<AwsLoginResponse>
   verifyLoginMfa: (session: string, username: string, code: string) => Promise<void>
   completeMfaSetup: (session: string, username: string, code: string) => Promise<void>
+  overrideLogin: () => void
   logout: () => Promise<void>
 }
 
@@ -87,6 +96,16 @@ export function GovernanceAuthProvider({ children }: { children: ReactNode }) {
     setStoredAuth(null)
   }, [])
 
+  useEffect(() => {
+    function handlePortalOverride(event: Event) {
+      const currentPortal = (event as CustomEvent<{ currentPortal?: string }>).detail?.currentPortal
+      if (currentPortal !== 'governance') clearAuth()
+    }
+
+    window.addEventListener(PORTAL_AUTH_OVERRIDE_EVENT, handlePortalOverride)
+    return () => window.removeEventListener(PORTAL_AUTH_OVERRIDE_EVENT, handlePortalOverride)
+  }, [clearAuth])
+
   const persistTokens = useCallback(async (tokens: AwsAuthTokens) => {
     const validated = await validateAwsToken(tokens.access_token)
     const nextAuth: StoredGovernanceAuth = {
@@ -102,6 +121,11 @@ export function GovernanceAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const current = readStoredAuth()
     if (!current?.accessToken) {
+      setIsHydrating(false)
+      return
+    }
+    if (isOverrideStoredAuth(current)) {
+      setStoredAuth(current)
       setIsHydrating(false)
       return
     }
@@ -165,14 +189,21 @@ export function GovernanceAuthProvider({ children }: { children: ReactNode }) {
     [persistTokens],
   )
 
+  const overrideLogin = useCallback(() => {
+    clearOtherPortalAuth('governance')
+    const nextAuth: StoredGovernanceAuth = createOverrideStoredAuth('governance')
+    writeStoredAuth(nextAuth)
+    setStoredAuth(nextAuth)
+  }, [])
+
   const logout = useCallback(async () => {
     const accessToken = storedAuth?.accessToken
     try {
-      if (accessToken) await logoutAwsPatient(accessToken)
+      if (accessToken && !isOverrideStoredAuth(storedAuth)) await logoutAwsPatient(accessToken)
     } finally {
       clearAuth()
     }
-  }, [clearAuth, storedAuth?.accessToken])
+  }, [clearAuth, storedAuth])
 
   const value = useMemo<GovernanceAuthContextValue>(
     () => ({
@@ -184,9 +215,10 @@ export function GovernanceAuthProvider({ children }: { children: ReactNode }) {
       completeNewPasswordChallenge,
       verifyLoginMfa,
       completeMfaSetup,
+      overrideLogin,
       logout,
     }),
-    [completeMfaSetup, completeNewPasswordChallenge, isHydrating, login, logout, storedAuth, verifyLoginMfa],
+    [completeMfaSetup, completeNewPasswordChallenge, isHydrating, login, logout, overrideLogin, storedAuth, verifyLoginMfa],
   )
 
   return <GovernanceAuthContext.Provider value={value}>{children}</GovernanceAuthContext.Provider>
