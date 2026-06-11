@@ -164,16 +164,6 @@ class BookingDoctor(BaseModel):
     active: bool = True
 
 
-class BookingAppointmentOverlay(BaseModel):
-    appointment_id: str
-    appointment_record_id: str
-    status: str
-    reason_category: str = ""
-    reason_text: str = ""
-    patient_id: str = ""
-    patient_display: str = ""
-
-
 class BookingAppointment(BaseModel):
     appointment_id: str
     appointment_record_id: str
@@ -192,32 +182,10 @@ class BookingAppointment(BaseModel):
     patient_display: str = ""
 
 
-class BookingSlot(BaseModel):
-    slot_id: str
-    slot_record_id: str
-    doctor_id: str
-    doctor_record_id: str
-    doctor_name: str
-    department: str = ""
-    speciality: str = ""
-    date: str
-    start_time: str
-    end_time: str
-    status: str
-    status_label: str
-    appointment_type: str
-    appointment_type_label: str
-    location: str = ""
-    floor: str = ""
-    selectable: bool
-    appointment: BookingAppointmentOverlay | None = None
-
-
 class BookingCalendarDay(BaseModel):
     date: str
     label: str
     appointments: list[BookingAppointment] = Field(default_factory=list)
-    slots: list[BookingSlot] = Field(default_factory=list)
 
 
 class BookingAvailabilityResponse(BaseModel):
@@ -226,7 +194,49 @@ class BookingAvailabilityResponse(BaseModel):
     days: list[BookingCalendarDay]
     doctors: list[BookingDoctor]
     appointments: list[BookingAppointment] = Field(default_factory=list)
-    slots: list[BookingSlot] = Field(default_factory=list)
+
+
+class BookingAppointmentRequest(BaseModel):
+    email: str | None = None
+    username: str | None = None
+    name: str | None = None
+    doctor_record_id: str
+    date: str
+    start_time: str
+    visit_type: str
+    reason_category: str
+    specialty: str | None = None
+    concern: str | None = None
+    insurance_provider: str | None = None
+    member_id: str | None = None
+    accessibility: str | None = None
+    interpreter: str | None = None
+
+    @field_validator("doctor_record_id", "date", "start_time", "visit_type", "reason_category")
+    @classmethod
+    def require_booking_field(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("field is required")
+        return value
+
+    @field_validator(
+        "email",
+        "username",
+        "name",
+        "specialty",
+        "concern",
+        "insurance_provider",
+        "member_id",
+        "accessibility",
+        "interpreter",
+    )
+    @classmethod
+    def trim_optional_booking_field(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
 
 
 class AclTestRequest(BaseModel):

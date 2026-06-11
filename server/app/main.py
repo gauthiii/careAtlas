@@ -30,6 +30,8 @@ from .models import (
     AclTestRequest,
     AclTestResponse,
     AISystem,
+    BookingAppointment,
+    BookingAppointmentRequest,
     BookingAvailabilityResponse,
     ExecuteAgentRequest,
     ExecuteAgentResponse,
@@ -43,7 +45,10 @@ from .models import (
 )
 from .pwned_passwords import PwnedPasswordsError, check_pwned_password
 from .servicenow import (
+    BookingConflictError,
+    BookingPatientNotFoundError,
     ServiceNowError,
+    create_patient_booking_appointment,
     create_patient_registration,
     execute_agent,
     fetch_agents,
@@ -198,6 +203,21 @@ async def get_patient_booking_availability(
 ) -> BookingAvailabilityResponse:
     try:
         return await fetch_patient_booking_availability(settings, start_date=start_date, days=days)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.post("/patients/booking/appointments", response_model=BookingAppointment)
+async def post_patient_booking_appointment(
+    body: BookingAppointmentRequest,
+    settings: Settings = Depends(get_settings),
+) -> BookingAppointment:
+    try:
+        return await create_patient_booking_appointment(settings, body)
+    except BookingPatientNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except BookingConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

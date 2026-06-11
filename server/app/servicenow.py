@@ -20,6 +20,7 @@ from .models import (
     AclTestCheck,
     AclTestResponse,
     BookingAppointment,
+    BookingAppointmentRequest,
     BookingAvailabilityResponse,
     BookingCalendarDay,
     BookingDoctor,
@@ -67,6 +68,7 @@ APPOINTMENT_FIELDS = [
     "u_status",
     "u_reason_category",
     "u_reason_text",
+    "u_triage_priority",
 ]
 
 BOOKING_AVAILABILITY_MAX_DAYS = 211
@@ -227,6 +229,14 @@ ACL_TEST_PROBES: dict[str, tuple[AclProbe, AclProbe]] = {
 
 class ServiceNowError(RuntimeError):
     """Raised when ServiceNow returns a non-OK response we can't recover from."""
+
+
+class BookingPatientNotFoundError(RuntimeError):
+    """Raised when a booking request cannot be linked to a u_patient record."""
+
+
+class BookingConflictError(RuntimeError):
+    """Raised when the requested appointment time cannot be booked safely."""
 
 
 @dataclass
@@ -798,7 +808,6 @@ async def fetch_patient_booking_availability(
         days=calendar_days,
         doctors=doctors,
         appointments=appointments,
-        slots=[],
     )
 
 
@@ -847,6 +856,193 @@ def _map_booking_appointment(
         patient_id=_field_value(record.get("u_patient")),
         patient_display=_field_display(record.get("u_patient")),
     )
+
+
+async def create_patient_booking_appointment(
+    settings: Settings,
+    booking: BookingAppointmentRequest,
+    http_client: httpx.AsyncClient | None = None,
+) -> BookingAppointment:
+    """Create a confirmed u_appointment using the UI schedule and appointment conflicts only."""
+
+    async def run(client: httpx.AsyncClient) -> BookingAppointment:
+        profile = await fetch_patient_profile(
+            settings,
+            email=booking.email,
+            username=booking.username,
+            name=booking.name,
+            http_client=client,
+        )
+        if profile is None or not profile.sys_id:
+            raise BookingPatientNotFoundError("Patient profile not found for this booking.")
+
+        doctor_record = await _fetch_doctor_record(settings, client, booking.doctor_record_id)
+        doctor = _map_booking_doctor(doctor_record)
+        if not doctor.active:
+            raise BookingConflictError("Selected doctor is no longer active.")
+
+        conflicts = await _fetch_doctor_appointments_for_date(
+            settings,
+            client,
+            booking.doctor_record_id,
+            booking.date,
+        )
+        if any(
+            _time_key(appointment.start_time) == _time_key(booking.start_time)
+            and not is_cancelled_booking_status(appointment.status)
+            for appointment in conflicts
+        ):
+            raise BookingConflictError("Selected appointment time is no longer available.")
+
+        payload = _booking_payload(booking, profile.sys_id)
+        create_response = await client.post(
+            f"{settings.snow_base_url}/api/now/table/u_appointment",
+            params={
+                "sysparm_fields": ",".join(APPOINTMENT_FIELDS),
+                "sysparm_display_value": "all",
+            },
+            json=payload,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if not create_response.is_success:
+            _raise_snow_error(create_response)
+
+        try:
+            record = create_response.json().get("result", {})
+        except ValueError as exc:
+            raise ServiceNowError("ServiceNow appointment create response was invalid JSON") from exc
+        if not isinstance(record, dict):
+            raise ServiceNowError("ServiceNow appointment create response did not include a result object")
+
+        appointment = _map_booking_appointment(record, {doctor.doctor_record_id: doctor})
+        if appointment.doctor_name == "Unknown doctor":
+            appointment.doctor_name = doctor.name
+        return appointment
+
+    if http_client is not None:
+        return await run(http_client)
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+async def _fetch_doctor_record(
+    settings: Settings,
+    client: httpx.AsyncClient,
+    doctor_record_id: str,
+) -> dict[str, Any]:
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/table/u_doctor",
+        params={
+            "sysparm_query": f"sys_id={_service_now_query_value(doctor_record_id)}",
+            "sysparm_fields": ",".join(DOCTOR_FIELDS),
+            "sysparm_display_value": "all",
+            "sysparm_limit": "1",
+        },
+        headers={"Accept": "application/json"},
+        auth=(settings.snow_username, settings.snow_password),
+    )
+    if not response.is_success:
+        _raise_snow_error(response)
+    try:
+        records = response.json().get("result", [])
+    except ValueError as exc:
+        raise ServiceNowError("ServiceNow doctor response was invalid JSON") from exc
+    if not isinstance(records, list):
+        raise ServiceNowError("ServiceNow doctor response did not include a result list")
+    if not records:
+        raise BookingConflictError("Selected doctor is no longer available.")
+    record = records[0]
+    if not isinstance(record, dict):
+        raise ServiceNowError("ServiceNow doctor response included an invalid record")
+    return record
+
+
+async def _fetch_doctor_appointments_for_date(
+    settings: Settings,
+    client: httpx.AsyncClient,
+    doctor_record_id: str,
+    appointment_date: str,
+) -> list[BookingAppointment]:
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/table/u_appointment",
+        params={
+            "sysparm_query": (
+                f"u_doctor={_service_now_query_value(doctor_record_id)}"
+                f"^u_appointment_date={_service_now_query_value(appointment_date)}"
+            ),
+            "sysparm_fields": ",".join(APPOINTMENT_FIELDS),
+            "sysparm_display_value": "all",
+            "sysparm_limit": "100",
+        },
+        headers={"Accept": "application/json"},
+        auth=(settings.snow_username, settings.snow_password),
+    )
+    if not response.is_success:
+        _raise_snow_error(response)
+    try:
+        records = response.json().get("result", [])
+    except ValueError as exc:
+        raise ServiceNowError("ServiceNow appointment conflict response was invalid JSON") from exc
+    if not isinstance(records, list):
+        raise ServiceNowError("ServiceNow appointment conflict response did not include a result list")
+    return [_map_booking_appointment(record, {}) for record in records if isinstance(record, dict)]
+
+
+def is_cancelled_booking_status(status: str) -> bool:
+    return status.strip().lower() in {"cancelled", "canceled"}
+
+
+def _booking_payload(booking: BookingAppointmentRequest, patient_sys_id: str) -> dict[str, str]:
+    return {
+        "u_appointment_id": f"APT-{uuid4().hex[:12].upper()}",
+        "u_doctor": booking.doctor_record_id,
+        "u_patient": patient_sys_id,
+        "u_appointment_date": booking.date,
+        "u_appointment_time": booking.start_time,
+        "u_status": "confirmed",
+        "u_triage_priority": _booking_triage_priority(booking.reason_category),
+        "u_reason_category": _booking_reason_category(booking.reason_category),
+        "u_reason_text": _booking_reason_text(booking),
+        "u_created_by_agent": "careatlas-patient-portal",
+    }
+
+
+def _booking_reason_category(value: str) -> str:
+    normalized = value.strip().lower().replace("_", " ")
+    aliases = {
+        "general check-up": "general-checkup",
+        "general checkup": "general-checkup",
+        "follow-up": "follow-up",
+        "follow up": "follow-up",
+        "urgent concern": "urgent",
+        "urgent": "urgent",
+        "specialist referral": "specialist",
+        "specialist": "specialist",
+        "mental health": "mental-health",
+        "chronic condition management": "chronic",
+        "chronic": "chronic",
+    }
+    return aliases.get(normalized, normalized.replace(" ", "-"))
+
+
+def _booking_triage_priority(reason_category: str) -> str:
+    return "urgent" if _booking_reason_category(reason_category) == "urgent" else "routine"
+
+
+def _booking_reason_text(booking: BookingAppointmentRequest) -> str:
+    parts = [
+        ("Concern", booking.concern),
+        ("Visit type", booking.visit_type),
+        ("Specialty", booking.specialty),
+        ("Insurance provider", booking.insurance_provider),
+        ("Member ID", booking.member_id),
+        ("Accessibility", booking.accessibility),
+        ("Interpreter", booking.interpreter),
+    ]
+    text = " | ".join(f"{label}: {value}" for label, value in parts if value)
+    return text[:500]
 
 
 async def test_service_account_acl(

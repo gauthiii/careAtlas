@@ -11,17 +11,19 @@ import {
   LoaderCircle,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { PatientPanel } from '../../components/patient/PatientPanel'
 import { PatientPage } from '../../components/patient/PatientShell'
 import { patient, type Appointment } from '../../data/patientPortalData'
 import { patientDisplayName, usePatientAuth } from '../../contexts/PatientAuthContext'
 import { cn } from '../../lib/cn'
 import {
+  bookPatientAppointment,
   fetchPatientBookingAvailability,
+  fetchPatientProfile,
   type BookingAppointment,
   type BookingCalendarResponse,
   type BookingDoctor,
+  type PatientProfile,
 } from '../../services/serviceNow'
 
 const STEPS = [
@@ -52,6 +54,14 @@ type SpecialtySchedule = {
   endHour: number
   breakHour: number
   breakLabel: string
+}
+
+type SelectedCalendarSlot = {
+  id: string
+  doctorRecordId: string
+  date: string
+  startTime: string
+  hour: number
 }
 
 const DEFAULT_SPECIALTY_SCHEDULE: SpecialtySchedule = {
@@ -190,6 +200,22 @@ function normalizeSearchValue(value: string | null | undefined) {
   return (value ?? '').trim().toLowerCase()
 }
 
+function normalizedSearchTerms(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      values
+        .map(normalizeSearchValue)
+        .filter((value) => value.length >= 2),
+    ),
+  )
+}
+
+function nameParts(value: string | null | undefined) {
+  return normalizeSearchValue(value)
+    .split(/\s+/)
+    .filter((part) => part.length >= 2)
+}
+
 function appointmentSortValue(appointment: BookingAppointment) {
   return dateFromIso(appointment.date).getTime() + minutesFromTime(appointment.start_time) * 60_000
 }
@@ -216,13 +242,17 @@ export function BookAppointmentPage() {
   const [step, setStep] = useState(1)
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<Appointment | null>(null)
-  const [booked, setBooked] = useState(false)
+  const [selectedBookingCell, setSelectedBookingCell] = useState<SelectedCalendarSlot | null>(null)
+  const [isBooking, setIsBooking] = useState(false)
+  const [bookingError, setBookingError] = useState<string | null>(null)
   const [selectedSpeciality, setSelectedSpeciality] = useState(ANY_SPECIALITY)
   const [selectedDoctorId, setSelectedDoctorId] = useState('')
   const [weekStart, setWeekStart] = useState(todayIso())
   const [availability, setAvailability] = useState<BookingCalendarResponse | null>(null)
   const [availabilityError, setAvailabilityError] = useState<string | null>(null)
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(true)
+  const [loadedPatientProfile, setLoadedPatientProfile] = useState<PatientProfile | null>(null)
+  const [isPatientProfileLoading, setIsPatientProfileLoading] = useState(false)
 
   const [visitType, setVisitType] = useState('In-person')
   const [reasonCategory, setReasonCategory] = useState('General check-up')
@@ -271,37 +301,92 @@ export function BookAppointmentPage() {
     }
   }, [availabilityStart])
 
+  useEffect(() => {
+    let active = true
+    const email = user?.attributes.email?.trim() || ''
+    const username = user?.username?.trim() || ''
+    const name = user?.attributes.name?.trim() || ''
+
+    if (!email && !username && !name) {
+      setLoadedPatientProfile(null)
+      setIsPatientProfileLoading(false)
+      return () => {
+        active = false
+      }
+    }
+
+    async function loadPatientProfile() {
+      setIsPatientProfileLoading(true)
+      try {
+        const profile = await fetchPatientProfile({ email, username, name })
+        if (active) setLoadedPatientProfile(profile)
+      } catch {
+        if (active) setLoadedPatientProfile(null)
+      } finally {
+        if (active) setIsPatientProfileLoading(false)
+      }
+    }
+
+    loadPatientProfile()
+
+    return () => {
+      active = false
+    }
+  }, [user?.attributes.email, user?.attributes.name, user?.username])
+
   const doctors = useMemo(() => availability?.doctors.filter((doctor) => doctor.active) ?? [], [availability])
   const appointments = useMemo(() => availability?.appointments ?? [], [availability])
   const currentPatientAppointments = useMemo(() => {
+    const profileName = loadedPatientProfile
+      ? `${loadedPatientProfile.first_name} ${loadedPatientProfile.last_name}`
+      : ''
+    const profileTerms = loadedPatientProfile
+      ? normalizedSearchTerms([
+          loadedPatientProfile.sys_id,
+          loadedPatientProfile.patient_id,
+          profileName,
+          loadedPatientProfile.first_name,
+          loadedPatientProfile.last_name,
+          loadedPatientProfile.email,
+          loadedPatientProfile.username,
+        ])
+      : []
+    const displayName = user ? patientDisplayName(user) : ''
     const userTerms = user
-      ? [
-          patientDisplayName(user),
+      ? normalizedSearchTerms([
+          displayName,
+          ...nameParts(displayName),
           user.attributes.email,
           user.username,
-        ]
-          .map(normalizeSearchValue)
-          .filter(Boolean)
-      : []
-    const fallbackTerms = [
-      `${patient.firstName} ${patient.lastName}`,
-      patient.email,
-      patient.username,
-      patient.id,
-    ]
-      .map(normalizeSearchValue)
-      .filter(Boolean)
-    const terms = userTerms.length > 0 ? userTerms : fallbackTerms
+        ])
+      : normalizedSearchTerms([
+          `${patient.firstName} ${patient.lastName}`,
+          patient.firstName,
+          patient.lastName,
+          patient.email,
+          patient.username,
+          patient.id,
+        ])
+    const terms = normalizedSearchTerms([...profileTerms, ...userTerms])
 
     if (terms.length === 0) return []
 
     return appointments.filter((appointment) => {
       if (isCancelledAppointment(appointment)) return false
 
-      const patientText = normalizeSearchValue(`${appointment.patient_display} ${appointment.patient_id}`)
-      return terms.some((term) => patientText.includes(term))
+      const appointmentTerms = normalizedSearchTerms([
+        appointment.patient_id,
+        appointment.patient_display,
+        ...nameParts(appointment.patient_display),
+      ])
+      return terms.some((term) =>
+        appointmentTerms.some(
+          (appointmentTerm) =>
+            appointmentTerm === term || appointmentTerm.includes(term) || term.includes(appointmentTerm),
+        ),
+      )
     })
-  }, [appointments, user])
+  }, [appointments, loadedPatientProfile, user])
   const specialityOptions = useMemo(() => {
     const names = new Set(doctors.map(doctorSpeciality).filter(Boolean))
     return [ANY_SPECIALITY, ...Array.from(names).sort((a, b) => a.localeCompare(b))]
@@ -323,12 +408,14 @@ export function BookAppointmentPage() {
       setSelectedDoctorId('')
       setSelectedSlotId(null)
       setSelectedSlot(null)
+      setSelectedBookingCell(null)
       return
     }
     if (!doctorOptions.some((doctor) => doctor.doctor_record_id === selectedDoctorId)) {
       setSelectedDoctorId(doctorOptions[0].doctor_record_id)
       setSelectedSlotId(null)
       setSelectedSlot(null)
+      setSelectedBookingCell(null)
     }
   }, [doctorOptions, selectedDoctorId])
 
@@ -340,12 +427,21 @@ export function BookAppointmentPage() {
     if (selected) {
       setSelectedSlotId(null)
       setSelectedSlot(null)
+      setSelectedBookingCell(null)
       return
     }
 
     const nextSelectedSlot = selectedAppointmentFromSlot(doctor, date, hour)
     setSelectedSlotId(nextSelectedSlot.id)
     setSelectedSlot(nextSelectedSlot)
+    setSelectedBookingCell({
+      id: nextSelectedSlot.id,
+      doctorRecordId: doctor.doctor_record_id,
+      date,
+      startTime: hourTime(hour),
+      hour,
+    })
+    setBookingError(null)
     if (step === 1) setStep(2)
   }
 
@@ -368,6 +464,44 @@ export function BookAppointmentPage() {
         const next = addDays(current, WEEK_LENGTH)
         return next > maxWeekStart ? maxWeekStart : next
       })
+    }
+  }
+
+  async function confirmBooking() {
+    if (!selectedBookingCell || isBooking) return
+
+    const email = user?.attributes.email?.trim() || ''
+    const username = user?.username?.trim() || ''
+    const name = user?.attributes.name?.trim() || ''
+    if (!email && !username && !name) {
+      setBookingError('Unable to confirm booking because no live patient profile is attached to this session.')
+      return
+    }
+
+    setIsBooking(true)
+    setBookingError(null)
+    try {
+      await bookPatientAppointment({
+        email,
+        username,
+        name,
+        doctor_record_id: selectedBookingCell.doctorRecordId,
+        date: selectedBookingCell.date,
+        start_time: selectedBookingCell.startTime,
+        visit_type: visitType,
+        reason_category: reasonCategory,
+        specialty,
+        concern,
+        insurance_provider: provider,
+        member_id: memberId,
+        accessibility,
+        interpreter,
+      })
+      window.location.reload()
+    } catch (error) {
+      setBookingError(error instanceof Error ? error.message : 'Unable to confirm this appointment.')
+    } finally {
+      setIsBooking(false)
     }
   }
 
@@ -415,6 +549,8 @@ export function BookAppointmentPage() {
                   setSelectedDoctorId(event.target.value)
                   setSelectedSlotId(null)
                   setSelectedSlot(null)
+                  setSelectedBookingCell(null)
+                  setBookingError(null)
                 }}
                 disabled={isLoadingAvailability || doctorOptions.length === 0}
               >
@@ -668,19 +804,13 @@ export function BookAppointmentPage() {
           tone="success"
           className="mt-6"
         >
-          {booked ? (
-            <div className="grid gap-4">
-              <p className="rounded-[9px] bg-[#e8f7ef] p-4 font-bold text-[#0f6b4f]">
-                Your appointment has been confirmed. A confirmation email will be sent shortly.
-              </p>
-              <Link
-                className="inline-flex min-h-[42px] w-max items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#143A57] px-[15px] !font-bold text-white max-[720px]:w-full"
-                to="/patient/dashboard"
-              >
-                Return to dashboard
-              </Link>
-            </div>
-          ) : (
+          <div className="grid gap-4">
+            {bookingError && (
+              <div className="flex items-start gap-2 rounded-[10px] border border-[#f6c6c4] bg-[#fff4f3] p-3 text-[0.86rem] font-bold text-[#a22828]">
+                <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                <span>{bookingError}</span>
+              </div>
+            )}
             <div className="grid gap-4 rounded-[10px] border border-[#d7e5ec] bg-[#f7fbfd] p-4">
               {selectedSlot ? (
                 <>
@@ -728,7 +858,7 @@ export function BookAppointmentPage() {
                 </span>
               )}
             </div>
-          )}
+          </div>
         </PatientPanel>
       )}
 
@@ -736,7 +866,7 @@ export function BookAppointmentPage() {
         <button
           type="button"
           onClick={goPrevious}
-          disabled={step === 1 || booked}
+          disabled={step === 1 || isBooking}
           className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#143A57] disabled:cursor-not-allowed disabled:opacity-50 max-[720px]:flex-1"
         >
           <ChevronLeft size={18} />
@@ -754,27 +884,35 @@ export function BookAppointmentPage() {
             <ChevronRight size={18} />
           </button>
         ) : (
-          !booked && (
-            <button
-              type="button"
-              onClick={() => setBooked(true)}
-              disabled={!selectedSlot}
-              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#143A57] px-[15px] !font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 max-[720px]:flex-1"
-            >
-              Confirm booking
-            </button>
-          )
+          <button
+            type="button"
+            onClick={confirmBooking}
+            disabled={!selectedBookingCell || isBooking}
+            className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#143A57] px-[15px] !font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 max-[720px]:flex-1"
+          >
+            {isBooking ? (
+              <>
+                <LoaderCircle size={18} className="animate-spin" />
+                Confirming
+              </>
+            ) : (
+              'Confirm booking'
+            )}
+          </button>
         )}
       </div>
 
       {currentPatientAppointments.length > 0 && (
         <ScheduledAppointmentsPanel appointments={currentPatientAppointments} today={today} />
       )}
-      {!isLoadingAvailability && !availabilityError && currentPatientAppointments.length === 0 && (
-        <p className="m-0 mt-6 rounded-[10px] border border-dashed border-[#cbdde6] bg-[#f7fbfd] p-3 text-center text-[0.84rem] font-bold text-[#6b7f91]">
-          You have not scheduled any appointments before.
-        </p>
-      )}
+      {!isLoadingAvailability &&
+        !isPatientProfileLoading &&
+        !availabilityError &&
+        currentPatientAppointments.length === 0 && (
+          <p className="m-0 mt-6 rounded-[10px] border border-dashed border-[#cbdde6] bg-[#f7fbfd] p-3 text-center text-[0.84rem] font-bold text-[#6b7f91]">
+            You have not scheduled any appointments before.
+          </p>
+        )}
     </PatientPage>
   )
 }

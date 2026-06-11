@@ -20,13 +20,18 @@ os.environ.setdefault("SNOW_PASSWORD", "snow-password")
 from app.config import get_settings
 from app.main import create_app
 from app.models import (
+    BookingAppointment,
     BookingAvailabilityResponse,
+    BookingAppointmentRequest,
     PatientProfileResponse,
     PatientRegistrationRequest,
     PatientRegistrationResponse,
 )
 from app.servicenow import (
+    BookingConflictError,
+    BookingPatientNotFoundError,
     ServiceNowError,
+    create_patient_booking_appointment,
     create_patient_registration,
     fetch_patient_booking_availability,
     fetch_patient_profile,
@@ -67,6 +72,25 @@ def registration_data() -> dict[str, object]:
         "emergency_relationship": "Partner",
         "username": "aisha.evans77",
         "consent_accepted": True,
+    }
+
+
+def booking_data() -> dict[str, object]:
+    return {
+        "email": "aisha.evans77@example.com",
+        "username": "aisha.evans77",
+        "name": "Aisha Evans",
+        "doctor_record_id": "doctor-sys-id",
+        "date": "2026-06-09",
+        "start_time": "09:00:00",
+        "visit_type": "In-person",
+        "reason_category": "Urgent concern",
+        "specialty": "Cardiology",
+        "concern": "Chest discomfort",
+        "insurance_provider": "Aetna",
+        "member_id": "MEM-100",
+        "accessibility": "Wheelchair access",
+        "interpreter": "No interpreter",
     }
 
 
@@ -322,7 +346,6 @@ class PatientBookingAvailabilityServiceNowTest(unittest.IsolatedAsyncioTestCase)
         self.assertEqual(response.doctors[0].name, "Sarah Patel")
         self.assertEqual(response.doctors[0].doctor_id, "DOC-100")
         self.assertEqual(response.appointments, [])
-        self.assertEqual(response.slots, [])
 
     async def test_appointment_overlay_by_doctor_date_and_time(self):
         def handler(request: httpx.Request) -> httpx.Response:
@@ -402,6 +425,182 @@ class PatientBookingAvailabilityServiceNowTest(unittest.IsolatedAsyncioTestCase)
         self.assertEqual(response.end_date, "2027-01-05")
         self.assertEqual(len(response.days), 211)
 
+    async def test_create_booking_creates_appointment_without_slot(self):
+        requests: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            if request.method == "GET" and request.url.path.endswith("/u_patient"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "patient-sys-id",
+                                "u_first_name": "Aisha",
+                                "u_last_name": "Evans",
+                                "u_email": "aisha.evans77@example.com",
+                            }
+                        ]
+                    },
+                )
+            if request.method == "GET" and request.url.path.endswith("/u_doctor"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "doctor-sys-id",
+                                "u_doctor_id": "DOC-100",
+                                "u_first_name": "Sarah",
+                                "u_last_name": "Patel",
+                                "u_department": "General Practice",
+                                "u_speciality": "Family Medicine",
+                                "u_email": "sarah@example.com",
+                                "u_active": "true",
+                            }
+                        ]
+                    },
+                )
+            if request.method == "GET" and request.url.path.endswith("/u_appointment"):
+                return httpx.Response(200, json={"result": []})
+            if request.method == "POST" and request.url.path.endswith("/u_appointment"):
+                payload = json.loads(request.content)
+                return httpx.Response(
+                    201,
+                    json={
+                        "result": {
+                            "sys_id": "appointment-sys-id",
+                            "u_appointment_id": payload["u_appointment_id"],
+                            "u_doctor": {"value": payload["u_doctor"], "display_value": "doctor-sys-id"},
+                            "u_patient": {"value": payload["u_patient"], "display_value": "Aisha Evans"},
+                            "u_appointment_date": payload["u_appointment_date"],
+                            "u_appointment_time": {
+                                "value": f"1970-01-01 {payload['u_appointment_time']}",
+                                "display_value": payload["u_appointment_time"],
+                            },
+                            "u_status": {"value": payload["u_status"], "display_value": "Confirmed"},
+                            "u_reason_category": payload["u_reason_category"],
+                            "u_reason_text": payload["u_reason_text"],
+                        }
+                    },
+                )
+            return httpx.Response(404)
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            response = await create_patient_booking_appointment(
+                FakeSettings(),
+                BookingAppointmentRequest(**booking_data()),
+                http_client=http_client,
+            )
+
+        post_request = next(request for request in requests if request.method == "POST")
+        payload = json.loads(post_request.content)
+        self.assertTrue(payload["u_appointment_id"].startswith("APT-"))
+        self.assertEqual(payload["u_doctor"], "doctor-sys-id")
+        self.assertNotIn("u_slot", payload)
+        self.assertEqual(payload["u_patient"], "patient-sys-id")
+        self.assertEqual(payload["u_appointment_date"], "2026-06-09")
+        self.assertEqual(payload["u_appointment_time"], "09:00:00")
+        self.assertEqual(payload["u_status"], "confirmed")
+        self.assertEqual(payload["u_triage_priority"], "urgent")
+        self.assertEqual(payload["u_reason_category"], "urgent")
+        self.assertFalse(any(request.method == "PATCH" for request in requests))
+        self.assertEqual(response.appointment_record_id, "appointment-sys-id")
+
+    async def test_create_booking_rejects_missing_patient(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/u_patient"):
+                return httpx.Response(200, json={"result": []})
+            return httpx.Response(404)
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            with self.assertRaises(BookingPatientNotFoundError):
+                await create_patient_booking_appointment(
+                    FakeSettings(),
+                    BookingAppointmentRequest(**booking_data()),
+                    http_client=http_client,
+                )
+
+    async def test_create_booking_rejects_inactive_doctor(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/u_patient"):
+                return httpx.Response(200, json={"result": [{"sys_id": "patient-sys-id"}]})
+            if request.url.path.endswith("/u_doctor"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "doctor-sys-id",
+                                "u_doctor_id": "DOC-100",
+                                "u_first_name": "Sarah",
+                                "u_last_name": "Patel",
+                                "u_active": "false",
+                            }
+                        ]
+                    },
+                )
+            return httpx.Response(404)
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            with self.assertRaises(BookingConflictError):
+                await create_patient_booking_appointment(
+                    FakeSettings(),
+                    BookingAppointmentRequest(**booking_data()),
+                    http_client=http_client,
+                )
+
+    async def test_create_booking_rejects_existing_appointment_conflict(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/u_patient"):
+                return httpx.Response(200, json={"result": [{"sys_id": "patient-sys-id"}]})
+            if request.url.path.endswith("/u_doctor"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "doctor-sys-id",
+                                "u_doctor_id": "DOC-100",
+                                "u_first_name": "Sarah",
+                                "u_last_name": "Patel",
+                                "u_active": "true",
+                            }
+                        ]
+                    },
+                )
+            if request.url.path.endswith("/u_appointment"):
+                return httpx.Response(
+                    200,
+                    json={
+                        "result": [
+                            {
+                                "sys_id": "appointment-sys-id",
+                                "u_appointment_id": "APT-100",
+                                "u_doctor": {"value": "doctor-sys-id", "display_value": "doctor-sys-id"},
+                                "u_patient": {"value": "patient-sys-id", "display_value": "Aisha Evans"},
+                                "u_appointment_date": "2026-06-09",
+                                "u_appointment_time": {"value": "1970-01-01 09:00:00", "display_value": "09:00:00"},
+                                "u_status": {"value": "confirmed", "display_value": "Confirmed"},
+                            }
+                        ]
+                    },
+                )
+            return httpx.Response(404)
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            with self.assertRaises(BookingConflictError):
+                await create_patient_booking_appointment(
+                    FakeSettings(),
+                    BookingAppointmentRequest(**booking_data()),
+                    http_client=http_client,
+                )
+
 
 class PatientRegistrationEndpointTest(unittest.TestCase):
     def setUp(self):
@@ -452,10 +651,9 @@ class PatientRegistrationEndpointTest(unittest.TestCase):
         expected = BookingAvailabilityResponse(
             start_date="2026-06-09",
             end_date="2026-06-09",
-            days=[{"date": "2026-06-09", "label": "Jun 9", "appointments": [], "slots": []}],
+            days=[{"date": "2026-06-09", "label": "Jun 9", "appointments": []}],
             doctors=[],
             appointments=[],
-            slots=[],
         )
 
         with patch("app.main.fetch_patient_booking_availability", new=AsyncMock(return_value=expected)):
@@ -463,6 +661,44 @@ class PatientRegistrationEndpointTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["start_date"], "2026-06-09")
+
+    def test_booking_create_endpoint_returns_created_appointment(self):
+        expected = BookingAppointment(
+            appointment_id="APT-123",
+            appointment_record_id="appointment-sys-id",
+            doctor_id="DOC-100",
+            doctor_record_id="doctor-sys-id",
+            doctor_name="Sarah Patel",
+            date="2026-06-09",
+            start_time="09:00:00",
+            status="confirmed",
+            status_label="Confirmed",
+        )
+
+        with patch("app.main.create_patient_booking_appointment", new=AsyncMock(return_value=expected)):
+            response = self.client.post("/api/patients/booking/appointments", json=booking_data())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["appointment_record_id"], "appointment-sys-id")
+
+    def test_booking_create_endpoint_returns_409_for_stale_time(self):
+        with patch(
+            "app.main.create_patient_booking_appointment",
+            new=AsyncMock(side_effect=BookingConflictError("Selected appointment time is no longer available.")),
+        ):
+            response = self.client.post("/api/patients/booking/appointments", json=booking_data())
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("no longer available", response.json()["detail"])
+
+    def test_booking_create_endpoint_returns_404_for_missing_patient(self):
+        with patch(
+            "app.main.create_patient_booking_appointment",
+            new=AsyncMock(side_effect=BookingPatientNotFoundError("Patient profile not found.")),
+        ):
+            response = self.client.post("/api/patients/booking/appointments", json=booking_data())
+
+        self.assertEqual(response.status_code, 404)
 
     def test_patient_profile_endpoint_returns_profile(self):
         expected = PatientProfileResponse(

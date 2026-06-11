@@ -134,16 +134,6 @@ export interface BookingDoctor {
   active: boolean
 }
 
-export interface BookingAppointmentOverlay {
-  appointment_id: string
-  appointment_record_id: string
-  status: string
-  reason_category: string
-  reason_text: string
-  patient_id: string
-  patient_display: string
-}
-
 export interface BookingAppointment {
   appointment_id: string
   appointment_record_id: string
@@ -162,32 +152,10 @@ export interface BookingAppointment {
   patient_display: string
 }
 
-export interface BookingSlot {
-  slot_id: string
-  slot_record_id: string
-  doctor_id: string
-  doctor_record_id: string
-  doctor_name: string
-  department: string
-  speciality: string
-  date: string
-  start_time: string
-  end_time: string
-  status: string
-  status_label: string
-  appointment_type: string
-  appointment_type_label: string
-  location: string
-  floor: string
-  selectable: boolean
-  appointment?: BookingAppointmentOverlay | null
-}
-
 export interface BookingCalendarDay {
   date: string
   label: string
   appointments: BookingAppointment[]
-  slots: BookingSlot[]
 }
 
 export interface BookingCalendarResponse {
@@ -196,7 +164,23 @@ export interface BookingCalendarResponse {
   days: BookingCalendarDay[]
   doctors: BookingDoctor[]
   appointments: BookingAppointment[]
-  slots: BookingSlot[]
+}
+
+export interface BookPatientAppointmentRequest {
+  email?: string | null
+  username?: string | null
+  name?: string | null
+  doctor_record_id: string
+  date: string
+  start_time: string
+  visit_type: string
+  reason_category: string
+  specialty?: string | null
+  concern?: string | null
+  insurance_provider?: string | null
+  member_id?: string | null
+  accessibility?: string | null
+  interpreter?: string | null
 }
 
 export interface PasswordPwnedCheckResponse {
@@ -362,6 +346,25 @@ export async function fetchPatientBookingAvailability(
   }
 
   return (await res.json()) as BookingCalendarResponse
+}
+
+export async function bookPatientAppointment(
+  booking: BookPatientAppointmentRequest,
+): Promise<BookingAppointment> {
+  const res = await fetch(`${API_BASE}/patients/booking/appointments`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(booking),
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as BookingAppointment
 }
 
 export async function testServiceAccountAcl(serviceAccount: string): Promise<AclTestResponse> {
