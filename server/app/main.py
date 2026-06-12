@@ -29,6 +29,7 @@ from .a2a_callbacks import (
 from .models import (
     AclTestRequest,
     AclTestResponse,
+    AiDecisionLogEntry,
     AISystem,
     BookingAppointment,
     BookingAppointmentRequest,
@@ -38,6 +39,7 @@ from .models import (
     PatientProfileResponse,
     PatientRegistrationRequest,
     PatientRegistrationResponse,
+    PatientRegistrationSummary,
     PasswordPwnedCheckRequest,
     PasswordPwnedCheckResponse,
     ValidateRequest,
@@ -52,8 +54,10 @@ from .servicenow import (
     create_patient_registration,
     execute_agent,
     fetch_agents,
+    fetch_ai_decision_log,
     fetch_patient_booking_availability,
     fetch_patient_profile,
+    fetch_patient_registrations,
     test_service_account_acl,
     validate_user,
 )
@@ -218,6 +222,29 @@ async def post_patient_booking_appointment(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except BookingConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/staff/registrations", response_model=list[PatientRegistrationSummary])
+async def get_patient_registrations(
+    status: str | None = None,
+    limit: int = 100,
+    settings: Settings = Depends(get_settings),
+) -> list[PatientRegistrationSummary]:
+    try:
+        return await fetch_patient_registrations(settings, status=status, limit=limit)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/decision-log", response_model=list[AiDecisionLogEntry])
+async def get_governance_decision_log(
+    limit: int = 25,
+    settings: Settings = Depends(get_settings),
+) -> list[AiDecisionLogEntry]:
+    try:
+        return await fetch_ai_decision_log(settings, limit=limit)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

@@ -19,6 +19,7 @@ from .models import (
     AISystem,
     AclTestCheck,
     AclTestResponse,
+    AiDecisionLogEntry,
     BookingAppointment,
     BookingAppointmentRequest,
     BookingAvailabilityResponse,
@@ -27,6 +28,7 @@ from .models import (
     PatientProfileResponse,
     PatientRegistrationRequest,
     PatientRegistrationResponse,
+    PatientRegistrationSummary,
 )
 
 logger = logging.getLogger("careatlas.servicenow")
@@ -111,6 +113,38 @@ PATIENT_PROFILE_FIELDS = [
     "u_time_preference",
     "u_blood_type",
     "u_known_allergies",
+]
+
+
+# Fields pulled from u_patient for the staff intake / registration approval queue.
+REGISTRATION_SUMMARY_FIELDS = [
+    "sys_id",
+    "sys_created_on",
+    "u_patient_id",
+    "u_first_name",
+    "u_last_name",
+    "u_email",
+    "u_phone",
+    "u_health_condition",
+    "u_registration_status",
+    "u_account_status",
+    "u_confidence_score",
+    "u_profile_complete",
+]
+
+# Fields pulled from u_ai_decision_log for the governance Action Fabric audit log.
+DECISION_LOG_FIELDS = [
+    "sys_id",
+    "u_log_id",
+    "u_timestamp",
+    "u_confidence_score",
+    "u_model_version",
+    "u_patient_id_anon",
+    "u_reason_parsed",
+    "u_triage_input",
+    "u_slots_considered",
+    "u_slots_returned",
+    "u_appointment",
 ]
 
 
@@ -716,6 +750,117 @@ def _has_complete_patient_profile(registration: PatientRegistrationRequest) -> b
         "u_username": registration.username,
     }
     return all(str(patient_payload.get(field) or "").strip() for field in REQUIRED_PATIENT_FIELDS)
+
+
+async def fetch_patient_registrations(
+    settings: Settings,
+    status: str | None = None,
+    limit: int = 100,
+    http_client: httpx.AsyncClient | None = None,
+) -> list[PatientRegistrationSummary]:
+    """Return u_patient records as intake summaries, optionally filtered by status.
+
+    Used by the staff/admin intake queue. ``status`` matches u_registration_status
+    case-insensitively (e.g. "pending", "approved"); omit it to return every record.
+    """
+    query_parts = []
+    normalized_status = _service_now_query_value(status or "").strip()
+    if normalized_status:
+        query_parts.append(f"u_registration_statusSTARTSWITH{normalized_status.lower()}")
+    query_parts.append("ORDERBYDESCsys_created_on")
+    params = {
+        "sysparm_query": "^".join(query_parts),
+        "sysparm_fields": ",".join(REGISTRATION_SUMMARY_FIELDS),
+        "sysparm_display_value": "true",
+        "sysparm_limit": str(max(1, min(limit, 500))),
+    }
+
+    async def run(client: httpx.AsyncClient) -> httpx.Response:
+        return await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_patient",
+            params=params,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+
+    if http_client is not None:
+        response = await run(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+            response = await run(client)
+
+    if not response.is_success:
+        _raise_snow_error(response)
+
+    records = response.json().get("result", [])
+    return [_map_registration_summary(record) for record in records if isinstance(record, dict)]
+
+
+def _map_registration_summary(record: dict[str, Any]) -> PatientRegistrationSummary:
+    return PatientRegistrationSummary(
+        sys_id=_field_best(record.get("sys_id")),
+        patient_id=_field_best(record.get("u_patient_id")),
+        first_name=_field_best(record.get("u_first_name")),
+        last_name=_field_best(record.get("u_last_name")),
+        email=_field_best(record.get("u_email")),
+        phone=_field_best(record.get("u_phone")),
+        health_condition=_field_best(record.get("u_health_condition")),
+        registration_status=_field_best(record.get("u_registration_status")),
+        account_status=_field_best(record.get("u_account_status")),
+        confidence_score=_field_best(record.get("u_confidence_score")),
+        profile_complete=_truthy_snow(record.get("u_profile_complete")),
+        created_on=_date_value(record.get("sys_created_on")),
+    )
+
+
+async def fetch_ai_decision_log(
+    settings: Settings,
+    limit: int = 25,
+    http_client: httpx.AsyncClient | None = None,
+) -> list[AiDecisionLogEntry]:
+    """Return u_ai_decision_log entries, newest first, for the governance audit board."""
+    params = {
+        "sysparm_query": "ORDERBYDESCu_timestamp",
+        "sysparm_fields": ",".join(DECISION_LOG_FIELDS),
+        "sysparm_display_value": "all",
+        "sysparm_limit": str(max(1, min(limit, 200))),
+    }
+
+    async def run(client: httpx.AsyncClient) -> httpx.Response:
+        return await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_ai_decision_log",
+            params=params,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+
+    if http_client is not None:
+        response = await run(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+            response = await run(client)
+
+    if not response.is_success:
+        _raise_snow_error(response)
+
+    records = response.json().get("result", [])
+    return [_map_decision_log_entry(record) for record in records if isinstance(record, dict)]
+
+
+def _map_decision_log_entry(record: dict[str, Any]) -> AiDecisionLogEntry:
+    return AiDecisionLogEntry(
+        sys_id=_field_best(record.get("sys_id")),
+        log_id=_field_best(record.get("u_log_id")),
+        timestamp=_field_best(record.get("u_timestamp")),
+        confidence_score=_field_best(record.get("u_confidence_score")),
+        model_version=_field_best(record.get("u_model_version")),
+        patient_anon=_field_best(record.get("u_patient_id_anon")),
+        reason_parsed=_field_best(record.get("u_reason_parsed")),
+        triage_input=_field_best(record.get("u_triage_input")),
+        slots_considered=_field_best(record.get("u_slots_considered")),
+        slots_returned=_field_best(record.get("u_slots_returned")),
+        appointment=_field_display(record.get("u_appointment")) or _field_value(record.get("u_appointment")),
+    )
 
 
 async def fetch_patient_booking_availability(

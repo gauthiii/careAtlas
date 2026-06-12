@@ -239,6 +239,35 @@ class BookingAppointmentRequest(BaseModel):
         return value or None
 
 
+class PatientRegistrationSummary(BaseModel):
+    sys_id: str = ""
+    patient_id: str = ""
+    first_name: str = ""
+    last_name: str = ""
+    email: str = ""
+    phone: str = ""
+    health_condition: str = ""
+    registration_status: str = ""
+    account_status: str = ""
+    confidence_score: str = ""
+    profile_complete: bool = False
+    created_on: str = ""
+
+
+class AiDecisionLogEntry(BaseModel):
+    sys_id: str = ""
+    log_id: str = ""
+    timestamp: str = ""
+    confidence_score: str = ""
+    model_version: str = ""
+    patient_anon: str = ""
+    reason_parsed: str = ""
+    triage_input: str = ""
+    slots_considered: str = ""
+    slots_returned: str = ""
+    appointment: str = ""
+
+
 class AclTestRequest(BaseModel):
     service_account: str
 

@@ -188,6 +188,35 @@ export interface PasswordPwnedCheckResponse {
   count: number
 }
 
+export interface PatientRegistrationSummary {
+  sys_id: string
+  patient_id: string
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  health_condition: string
+  registration_status: string
+  account_status: string
+  confidence_score: string
+  profile_complete: boolean
+  created_on: string
+}
+
+export interface AiDecisionLogEntry {
+  sys_id: string
+  log_id: string
+  timestamp: string
+  confidence_score: string
+  model_version: string
+  patient_anon: string
+  reason_parsed: string
+  triage_input: string
+  slots_considered: string
+  slots_returned: string
+  appointment: string
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 async function readError(res: Response): Promise<string> {
@@ -365,6 +394,37 @@ export async function bookPatientAppointment(
   }
 
   return (await res.json()) as BookingAppointment
+}
+
+export async function fetchPatientRegistrations(
+  status?: string,
+  limit = 100,
+): Promise<PatientRegistrationSummary[]> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (status?.trim()) params.set('status', status.trim())
+
+  const res = await fetch(`${API_BASE}/staff/registrations?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as PatientRegistrationSummary[]
+}
+
+export async function fetchAiDecisionLog(limit = 25): Promise<AiDecisionLogEntry[]> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  const res = await fetch(`${API_BASE}/governance/decision-log?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as AiDecisionLogEntry[]
 }
 
 export async function testServiceAccountAcl(serviceAccount: string): Promise<AclTestResponse> {

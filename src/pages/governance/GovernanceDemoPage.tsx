@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Bot, ExternalLink, Hospital, TowerControl, Users } from 'lucide-react'
+import { ArrowRight, Bot, ExternalLink, Hospital, HeartPulse, TowerControl, Users } from 'lucide-react'
 
 import { PortalPage } from '../../components/portal/PortalShell'
+import { PatientLifecycleModal } from '../../components/governance/PatientLifecycleModal'
 
 const SNOW_BASE = 'https://ven04690.service-now.com'
 
@@ -58,6 +60,8 @@ const demoLinks: DemoLink[] = [
 ]
 
 export function GovernanceDemoPage() {
+  const [pipelineOpen, setPipelineOpen] = useState(false)
+
   return (
     <PortalPage
       label="AI Governance Officer"
@@ -65,12 +69,36 @@ export function GovernanceDemoPage() {
       intro="Launchpad for the live ServiceNow walkthrough. Each card opens its destination on the instance in a new tab."
     >
       <section className="px-6 pb-6">
+        {/* Application pipeline launcher */}
+        <button
+          type="button"
+          onClick={() => setPipelineOpen(true)}
+          title="View the end-to-end secure patient lifecycle pipeline"
+          className="group mb-6 flex w-full items-center gap-4 rounded-xl border border-[#cfe0ea] bg-gradient-to-r from-[#e7f3f8] to-white p-5 text-left transition hover:-translate-y-0.5 hover:border-[#143A57] hover:shadow-[0_14px_30px_rgba(25,64,93,0.12)]"
+        >
+          <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-[#143A57] text-white">
+            <HeartPulse size={28} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-lg font-bold text-[#102033]">Application Pipeline</div>
+            <p className="mt-0.5 text-sm leading-snug text-[#53687b]">
+              Animated end-to-end patient lifecycle — Registration → Booking → Encounter → Discharge —
+              with the governing AI agent and table at every hand-off.
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-lg bg-[#143A57] px-4 py-2 text-sm font-bold text-white transition group-hover:bg-[#1d4d73]">
+            View pipeline <ArrowRight size={16} />
+          </span>
+        </button>
+
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {demoLinks.map((link) => (
             <DemoCard key={link.label} link={link} />
           ))}
         </div>
       </section>
+
+      <PatientLifecycleModal open={pipelineOpen} onClose={() => setPipelineOpen(false)} />
     </PortalPage>
   )
 }

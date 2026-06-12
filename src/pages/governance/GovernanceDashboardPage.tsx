@@ -9,8 +9,10 @@ import {
   ArrowRight,
   Plus,
   ChartBar,
+  LoaderCircle,
   LogOut,
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import {
@@ -18,11 +20,55 @@ import {
   PortalPanel,
 } from '../../components/portal/PortalShell'
 import { governanceDisplayName, useGovernanceAuth } from '../../contexts/GovernanceAuthContext'
+import { useUnmanagedAISystems } from '../../hooks/useUnmanagedAISystems'
+import { fetchAiDecisionLog, type AiDecisionLogEntry } from '../../services/serviceNow'
+
+function decisionCategory(entry: AiDecisionLogEntry): string {
+  try {
+    const parsed = JSON.parse(entry.reason_parsed) as { rawCategory?: string; specialtyRequired?: string }
+    return parsed.rawCategory || parsed.specialtyRequired || 'scheduling'
+  } catch {
+    return 'scheduling'
+  }
+}
+
+function arrayCount(value: string): number {
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed.length : 0
+  } catch {
+    return 0
+  }
+}
 
 export function GovernanceDashboardPage() {
   const navigate = useNavigate()
   const { logout, user } = useGovernanceAuth()
   const displayName = governanceDisplayName(user)
+  const { systems, state: agentsState } = useUnmanagedAISystems()
+  const [decisionLog, setDecisionLog] = useState<AiDecisionLogEntry[]>([])
+  const [isLogLoading, setIsLogLoading] = useState(true)
+  const [logError, setLogError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    setIsLogLoading(true)
+    fetchAiDecisionLog(15)
+      .then((entries) => {
+        if (active) setDecisionLog(entries)
+      })
+      .catch((error: Error) => {
+        if (active) setLogError(error.message)
+      })
+      .finally(() => {
+        if (active) setIsLogLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const registeredAgents = agentsState === 'ok' ? systems.length : null
 
   async function handleLogout() {
     await logout()
@@ -62,11 +108,11 @@ export function GovernanceDashboardPage() {
           </div>
 
           <div className="mt-2 text-2xl font-bold">
-            4
+            {registeredAgents ?? '—'}
           </div>
 
           <div className="text-sm font-semibold text-emerald-600">
-            3 active • 1 quarantined
+            Live from sn_aia_agent
           </div>
         </div>
 
@@ -427,31 +473,54 @@ export function GovernanceDashboardPage() {
           title="Action Fabric Audit Log"
           icon={<ClipboardList size={18} />}
         >
-          <table className="w-full border-separate border-spacing-y-3 text-sm text-left">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Action</th>
-                <th>Subject</th>
-                <th>Agent</th>
-                <th>Decision Trail</th>
-                <th>Outcome</th>
-              </tr>
-            </thead>
+          {isLogLoading ? (
+            <div className="flex items-center gap-2 text-[#607487]">
+              <LoaderCircle size={18} className="animate-spin" /> Loading decision log from ServiceNow
+            </div>
+          ) : logError ? (
+            <div className="rounded-[10px] border border-[#f6c6c4] bg-[#fff4f3] p-3 text-sm font-bold text-[#a22828]">
+              {logError}
+            </div>
+          ) : decisionLog.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-[#d7e5ec] p-4 text-center text-sm text-[#607487]">
+              No AI decision log entries returned from u_ai_decision_log.
+            </div>
+          ) : (
+            <table className="w-full border-separate border-spacing-y-3 text-sm text-left">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Action</th>
+                  <th>Subject</th>
+                  <th>Model</th>
+                  <th>Decision Trail</th>
+                  <th>Outcome</th>
+                </tr>
+              </thead>
 
-            <tbody>
-              <tr>
-                <td>09:18</td>
-                <td>Booking confirmation</td>
-                <td>Maya Patel</td>
-                <td>Scheduling Ranker</td>
-                <td>Ranked slot selected after fairness validation</td>
-                <td>
-                  <Badge success>Approved</Badge>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+              <tbody>
+                {decisionLog.map((entry) => {
+                  const confidence = Number(entry.confidence_score)
+                  const approved = !Number.isNaN(confidence) && confidence >= 0.5
+                  return (
+                    <tr key={entry.sys_id || entry.log_id}>
+                      <td>{entry.timestamp}</td>
+                      <td>Scheduling decision · {decisionCategory(entry)}</td>
+                      <td>{entry.patient_anon || '—'}</td>
+                      <td>{entry.model_version || '—'}</td>
+                      <td>
+                        {arrayCount(entry.slots_considered)} slots ranked → {arrayCount(entry.slots_returned)} returned
+                        {Number.isNaN(confidence) ? '' : ` · conf ${(confidence * 100).toFixed(0)}%`}
+                      </td>
+                      <td>
+                        {approved ? <Badge success>Approved</Badge> : <Badge warning>Low confidence</Badge>}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
         </PortalPanel>
       </section>
     </PortalPage>
