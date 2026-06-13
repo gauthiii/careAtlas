@@ -22,11 +22,10 @@ import { DoctorProfilePage } from './pages/staff/DoctorProfilePage'
 import { PatientRecordPage } from './pages/staff/PatientRecordPage'
 import { StaffSignInPage } from './pages/staff/StaffSignInPage'
 import { AiAssistantWidget, type AiAssistantAgentConfig } from './components/AiAssistantWidget'
+import { BOOK_APPOINTMENT_AGENT_ID } from './services/serviceNow'
 import { useClinicianAuth } from './contexts/ClinicianAuthContext'
 import { useGovernanceAuth } from './contexts/GovernanceAuthContext'
 import { patientDisplayName, usePatientAuth, type PatientAuthUser } from './contexts/PatientAuthContext'
-
-const BOOK_APPOINTMENT_AGENT_ID = 'b2cdf70e1bd50f54d7eaea45604bcb0c'
 
 function App() {
   return (

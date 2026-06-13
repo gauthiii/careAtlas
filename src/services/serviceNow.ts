@@ -28,6 +28,9 @@ export interface ExecuteAgentResponse {
   error?: string | null
 }
 
+/** ServiceNow sys_id of the patient Book Appointment scheduling agent. */
+export const BOOK_APPOINTMENT_AGENT_ID = 'b2cdf70e1bd50f54d7eaea45604bcb0c'
+
 export interface AclTestCheck {
   label: string
   expected: 'allowed' | 'denied'

@@ -7,6 +7,7 @@ import {
   CheckCircle,
   ClipboardList,
   FlaskConical,
+  GitCompareArrows,
   Info,
   Loader2,
   ShieldCheck,
@@ -17,6 +18,7 @@ import {
 import {
   PortalPage,
 } from '../../components/portal/PortalShell'
+import { SchedulingAgentCompareModal } from '../../components/governance/SchedulingAgentCompareModal'
 
 import {
   nonHumanIdentities,
@@ -29,6 +31,8 @@ import {
 } from '../../services/serviceNow'
 
 export function GovernanceAclPage() {
+  const [compareOpen, setCompareOpen] = useState(false)
+
   return (
     <PortalPage
       label="AI Governance Officer"
@@ -36,12 +40,31 @@ export function GovernanceAclPage() {
       intro="Service accounts operating as agents. All accounts are web-service-only and hold no direct roles — permissions are granted exclusively via group membership and ACL rules."
     >
       <section className="px-6 pb-6">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#d7e5ec] bg-white px-5 py-4">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-[#102033]">Scheduling agent comparison</div>
+            <p className="m-0 mt-0.5 text-[0.82rem] text-[#53687b]">
+              See the same scheduling agent side by side — with and without access controls applied.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCompareOpen(true)}
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-[#143A57] px-3 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            <GitCompareArrows size={15} />
+            Compare agents
+          </button>
+        </div>
+
         <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
           {nonHumanIdentities.map((nhi) => (
             <NHICard key={nhi.userId} nhi={nhi} />
           ))}
         </div>
       </section>
+
+      {compareOpen && <SchedulingAgentCompareModal onClose={() => setCompareOpen(false)} />}
     </PortalPage>
   )
 }
