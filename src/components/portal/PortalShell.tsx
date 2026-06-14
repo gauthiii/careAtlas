@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Bot, HeartPulse, Home, Hospital, LockKeyhole, Presentation, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
+import { Bot, CalendarDays, HeartPulse, Home, Hospital, LockKeyhole, Presentation, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import {
@@ -31,6 +31,7 @@ const governanceNav = [
   { label: 'AI Agents', to: '/governance/ai-agents', icon: Bot, end: true },
   { label: 'ACL', to: '/governance/acl', icon: UserCog, end: true },
   { label: 'Demo', to: '/governance/demo', icon: Presentation, end: true },
+  { label: 'Agenda', to: '/governance/agenda', icon: CalendarDays, end: true },
 ] as const
 
 const signedOutGovernanceNav = [

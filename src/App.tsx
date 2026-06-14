@@ -4,6 +4,7 @@ import { Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 
 import { GovernanceAclPage } from './pages/governance/GovernanceAclPage'
 import { GovernanceAiAgentsPage } from './pages/governance/GovernanceAiAgentsPage'
 import { GovernanceDashboardPage } from './pages/governance/GovernanceDashboardPage'
+import { GovernanceAgendaPage } from './pages/governance/GovernanceAgendaPage'
 import { GovernanceDemoPage } from './pages/governance/GovernanceDemoPage'
 import { GovernanceSignInPage } from './pages/governance/GovernanceSignInPage'
 import { ViewChooserPage } from './pages/home/ViewChooserPage'
@@ -246,6 +247,18 @@ function App() {
               <ClinicianRoleBlocker>
                 <GovernanceProtectedRoute>
                   <GovernanceDemoPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
+        <Route
+          path="/governance/agenda"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernanceAgendaPage />
                 </GovernanceProtectedRoute>
               </ClinicianRoleBlocker>
             </PatientRoleBlocker>

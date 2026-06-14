@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { ArrowRight, Bot, ExternalLink, Hospital, HeartPulse, TowerControl, Users } from 'lucide-react'
+import { ArrowRight, Bot, CalendarDays, ExternalLink, Hospital, HeartPulse, TowerControl, Users } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import { PortalPage } from '../../components/portal/PortalShell'
 import { PatientLifecycleModal } from '../../components/governance/PatientLifecycleModal'
@@ -90,6 +91,25 @@ export function GovernanceDemoPage() {
             View pipeline <ArrowRight size={16} />
           </span>
         </button>
+
+        {/* Agenda card */}
+        <Link
+          to="/governance/agenda"
+          className="group mb-5 flex w-full items-center gap-4 rounded-xl border border-[#cfe0ea] bg-gradient-to-r from-[#f0ebff] to-white p-5 text-left transition hover:-translate-y-0.5 hover:border-[#6d28d9] hover:shadow-[0_14px_30px_rgba(109,40,217,0.10)]"
+        >
+          <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-[#6d28d9] text-white">
+            <CalendarDays size={28} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-lg font-bold text-[#102033]">Agenda &mdash; Jun 14</div>
+            <p className="mt-0.5 text-sm leading-snug text-[#53687b]">
+              Full walkthrough of everything built: portals, auth, tables, agent pipeline, A2A, ACL, shadow discovery, and AI Control Tower lifecycle.
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-lg bg-[#6d28d9] px-4 py-2 text-sm font-bold text-white transition group-hover:bg-[#5b21b6]">
+            View agenda <ArrowRight size={16} />
+          </span>
+        </Link>
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {demoLinks.map((link) => (
