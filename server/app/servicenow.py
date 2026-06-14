@@ -16,6 +16,7 @@ import httpx
 
 from .config import Settings
 from .models import (
+    AIAsset,
     AISystem,
     AclTestCheck,
     AclTestResponse,
@@ -34,6 +35,18 @@ from .models import (
 logger = logging.getLogger("careatlas.servicenow")
 
 _A2A_TOKEN_CACHE: dict[str, tuple[str, float]] = {}
+
+# Fields pulled from alm_ai_system_digital_asset for the managed/unmanaged AI asset tables.
+ASSET_FIELDS = [
+    "sys_id",
+    "display_name",
+    "vendor",
+    "managed_by",
+    "life_cycle_stage",
+    "install_status",
+    "life_cycle_stage_status",
+    "sys_created_on",
+]
 
 # Fields pulled from sn_aia_agent for the AI Agent inventory view.
 AGENT_FIELDS = [
@@ -490,6 +503,67 @@ async def fetch_agents(settings: Settings) -> list[AISystem]:
 
     result = response.json().get("result", [])
     return [_map_agent(record) for record in result]
+
+
+def _map_asset(record: dict[str, Any]) -> AIAsset:
+    return AIAsset(
+        sys_id=_field_best(record.get("sys_id")),
+        name=_field_best(record.get("display_name")),
+        display_name=_field_best(record.get("display_name")),
+        vendor=_field_best(record.get("vendor")),
+        managed_by=_field_best(record.get("managed_by")),
+        lifecycle_phase=_field_best(record.get("life_cycle_stage")),
+        state=_field_best(record.get("install_status")),
+        lifecycle_status=_field_best(record.get("life_cycle_stage_status")),
+    )
+
+
+async def fetch_managed_ai_assets(settings: Settings) -> list[AIAsset]:
+    """Return post-June-2 assets that have an owner (managed_by is set)."""
+    params = {
+        "sysparm_query": (
+            f"sys_created_on>={settings.agents_created_since}"
+            "^managed_byISNOTEMPTY"
+            "^ORDERBYDESCsys_created_on"
+        ),
+        "sysparm_fields": ",".join(ASSET_FIELDS),
+        "sysparm_display_value": "true",
+    }
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        response = await client.get(
+            f"{settings.snow_base_url}/api/now/table/alm_ai_system_digital_asset",
+            params=params,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+    if not response.is_success:
+        _raise_snow_error(response)
+    result = response.json().get("result", [])
+    return [_map_asset(record) for record in result]
+
+
+async def fetch_unmanaged_ai_assets(settings: Settings) -> list[AIAsset]:
+    """Return post-June-2 assets with no owner assigned (unmanaged/shadow AI)."""
+    params = {
+        "sysparm_query": (
+            f"sys_created_on>={settings.agents_created_since}"
+            "^managed_byISEMPTY"
+            "^ORDERBYDESCsys_created_on"
+        ),
+        "sysparm_fields": ",".join(ASSET_FIELDS),
+        "sysparm_display_value": "true",
+    }
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        response = await client.get(
+            f"{settings.snow_base_url}/api/now/table/alm_ai_system_digital_asset",
+            params=params,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+    if not response.is_success:
+        _raise_snow_error(response)
+    result = response.json().get("result", [])
+    return [_map_asset(record) for record in result]
 
 
 async def create_patient_registration(

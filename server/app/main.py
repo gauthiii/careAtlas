@@ -30,6 +30,7 @@ from .models import (
     AclTestRequest,
     AclTestResponse,
     AiDecisionLogEntry,
+    AIAsset,
     AISystem,
     BookingAppointment,
     BookingAppointmentRequest,
@@ -55,9 +56,11 @@ from .servicenow import (
     execute_agent,
     fetch_agents,
     fetch_ai_decision_log,
+    fetch_managed_ai_assets,
     fetch_patient_booking_availability,
     fetch_patient_profile,
     fetch_patient_registrations,
+    fetch_unmanaged_ai_assets,
     test_service_account_acl,
     validate_user,
 )
@@ -81,6 +84,22 @@ async def health() -> dict[str, str]:
 async def get_agents(settings: Settings = Depends(get_settings)) -> list[AISystem]:
     try:
         return await fetch_agents(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/agents/managed", response_model=list[AIAsset])
+async def get_managed_ai_assets(settings: Settings = Depends(get_settings)) -> list[AIAsset]:
+    try:
+        return await fetch_managed_ai_assets(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/agents/unmanaged", response_model=list[AIAsset])
+async def get_unmanaged_ai_assets(settings: Settings = Depends(get_settings)) -> list[AIAsset]:
+    try:
+        return await fetch_unmanaged_ai_assets(settings)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

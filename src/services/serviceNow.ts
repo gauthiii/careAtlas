@@ -18,6 +18,17 @@ export interface SnowAISystem {
   condition: string
 }
 
+export interface SnowAIAsset {
+  sys_id: string
+  name: string
+  display_name: string
+  vendor: string
+  managed_by: string
+  lifecycle_phase: string
+  state: string
+  lifecycle_status: string
+}
+
 export interface ExecuteAgentResponse {
   request_id: string
   output: string
@@ -241,6 +252,22 @@ export async function fetchUnmanagedAIStewardSystems(): Promise<SnowAISystem[]> 
   }
 
   return (await res.json()) as SnowAISystem[]
+}
+
+export async function fetchManagedAIAssets(): Promise<SnowAIAsset[]> {
+  const res = await fetch(`${API_BASE}/agents/managed`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as SnowAIAsset[]
+}
+
+export async function fetchUnmanagedAIAssets(): Promise<SnowAIAsset[]> {
+  const res = await fetch(`${API_BASE}/agents/unmanaged`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as SnowAIAsset[]
 }
 
 export async function executeAgent(

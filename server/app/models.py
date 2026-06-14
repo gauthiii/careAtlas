@@ -22,6 +22,17 @@ class AISystem(BaseModel):
     condition: str
 
 
+class AIAsset(BaseModel):
+    sys_id: str = ""
+    name: str = ""
+    display_name: str = ""
+    vendor: str = ""
+    managed_by: str = ""
+    lifecycle_phase: str = ""
+    state: str = ""
+    lifecycle_status: str = ""
+
+
 class ValidateRequest(BaseModel):
     username: str
     password: str
