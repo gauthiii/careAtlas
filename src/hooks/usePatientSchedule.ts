@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePatientAuth } from '../contexts/PatientAuthContext'
 import {
   APPOINTMENT_HISTORY_RANGE_DAYS,
@@ -26,6 +26,7 @@ export function usePatientSchedule() {
   const [appointments, setAppointments] = useState<BookingAppointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const today = useMemo(todayIso, [])
   const windowStart = useMemo(() => addDays(today, -APPOINTMENT_LOOKBACK_DAYS), [today])
@@ -73,7 +74,9 @@ export function usePatientSchedule() {
     return () => {
       active = false
     }
-  }, [email, name, username, windowStart])
+  }, [email, name, username, windowStart, refreshKey])
+
+  const refetch = useCallback(() => setRefreshKey((k) => k + 1), [])
 
   const patientAppointments = useMemo(
     () => appointmentsForPatient(appointments, profile),
@@ -104,6 +107,7 @@ export function usePatientSchedule() {
     nextAppointment: upcoming[0] ?? null,
     error,
     isLoading,
+    refetch,
     today,
     user,
   }

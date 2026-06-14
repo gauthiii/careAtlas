@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   fetchUnmanagedAIStewardSystems,
   type SnowAISystem,
@@ -10,6 +10,7 @@ export function useUnmanagedAISystems() {
   const [systems, setSystems] = useState<SnowAISystem[]>([])
   const [state, setState] = useState<FetchState>('loading')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -28,7 +29,9 @@ export function useUnmanagedAISystems() {
       })
 
     return () => { cancelled = true }
-  }, [])
+  }, [refreshKey])
 
-  return { systems, state, errorMsg }
+  const refetch = useCallback(() => setRefreshKey((k) => k + 1), [])
+
+  return { systems, state, errorMsg, refetch }
 }

@@ -10,6 +10,7 @@ import {
   Lock,
   MessageCircle,
   Move,
+  RefreshCw,
   ShieldAlert,
   Upload,
   X,
@@ -240,6 +241,7 @@ export function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [loadedProfile, setLoadedProfile] = useState<PatientProfile | null>(null)
   const [isProfileLoading, setIsProfileLoading] = useState(false)
+  const [profileRefreshKey, setProfileRefreshKey] = useState(0)
   const [modal, setModal] = useState<ModalKind>(null)
   const [emailReminders, setEmailReminders] = useState(true)
   const [smsReminders, setSmsReminders] = useState(true)
@@ -284,7 +286,7 @@ export function ProfilePage() {
     return () => {
       cancelled = true
     }
-  }, [user?.attributes.email, user?.attributes.name, user?.username])
+  }, [user?.attributes.email, user?.attributes.name, user?.username, profileRefreshKey])
 
   const profile = useMemo(() => mergeProfile(loadedProfile), [loadedProfile])
   const displayName = `${profile.firstName} ${profile.lastName}`.trim()
@@ -344,6 +346,16 @@ export function ProfilePage() {
       title="Patient profile"
       intro="Non-sensitive contact details can be edited directly. Sensitive scheduling fields require clinic support."
     >
+      <div className="-mt-3 mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setProfileRefreshKey((k) => k + 1)}
+          className="inline-flex items-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-4 py-2 text-sm font-bold text-[#0f5f8c] hover:bg-[#f5f9fb]"
+        >
+          <RefreshCw size={14} />
+          Refresh
+        </button>
+      </div>
       <div className="grid grid-cols-[1fr_400px] gap-10 rounded-xl border border-[#d7e5ec] bg-white p-6 max-[1100px]:grid-cols-1">
         <div className="space-y-10">
           <div>

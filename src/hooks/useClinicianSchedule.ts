@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useClinicianAuth } from '../contexts/ClinicianAuthContext'
 import {
   APPOINTMENT_HISTORY_RANGE_DAYS,
@@ -20,6 +20,7 @@ export function useClinicianSchedule() {
   const [availability, setAvailability] = useState<BookingCalendarResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
   const today = useMemo(todayIso, [])
   const availabilityStart = useMemo(() => addDays(today, -APPOINTMENT_LOOKBACK_DAYS), [today])
 
@@ -50,7 +51,9 @@ export function useClinicianSchedule() {
     return () => {
       active = false
     }
-  }, [availabilityStart])
+  }, [availabilityStart, refreshKey])
+
+  const refetch = useCallback(() => setRefreshKey((k) => k + 1), [])
 
   const doctors = useMemo(() => availability?.doctors ?? [], [availability])
   const appointments = useMemo(() => availability?.appointments ?? [], [availability])
@@ -67,6 +70,7 @@ export function useClinicianSchedule() {
     doctorAppointments,
     error,
     isLoading,
+    refetch,
     today,
     user,
   }

@@ -4,6 +4,7 @@ import {
   ClipboardList,
   LoaderCircle,
   LogOut,
+  RefreshCw,
   UserRound,
   Pill,
   Activity,
@@ -54,7 +55,7 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const { user, logout } = usePatientAuth()
   const displayName = patientDisplayName(user)
-  const { profile, upcoming, past, nextAppointment, isLoading, error } = usePatientSchedule()
+  const { profile, upcoming, past, nextAppointment, isLoading, error, refetch } = usePatientSchedule()
 
   async function handleLogout() {
     await logout()
@@ -73,7 +74,15 @@ export function DashboardPage() {
       title={`Welcome back, ${displayName}`}
       intro="Your central place for appointments, health records, medications, and clinic messages."
     >
-      <div className="-mt-3 mb-5 flex justify-end">
+      <div className="-mt-3 mb-5 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={refetch}
+          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
+        >
+          <RefreshCw size={15} />
+          Refresh
+        </button>
         <button
           type="button"
           onClick={handleLogout}

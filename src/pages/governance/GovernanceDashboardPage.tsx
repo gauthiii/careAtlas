@@ -11,6 +11,7 @@ import {
   ChartBar,
   LoaderCircle,
   LogOut,
+  RefreshCw,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -45,14 +46,16 @@ export function GovernanceDashboardPage() {
   const navigate = useNavigate()
   const { logout, user } = useGovernanceAuth()
   const displayName = governanceDisplayName(user)
-  const { systems, state: agentsState } = useUnmanagedAISystems()
+  const { systems, state: agentsState, refetch: refetchAgents } = useUnmanagedAISystems()
   const [decisionLog, setDecisionLog] = useState<AiDecisionLogEntry[]>([])
   const [isLogLoading, setIsLogLoading] = useState(true)
   const [logError, setLogError] = useState<string | null>(null)
+  const [logRefreshKey, setLogRefreshKey] = useState(0)
 
   useEffect(() => {
     let active = true
     setIsLogLoading(true)
+    setLogError(null)
     fetchAiDecisionLog(15)
       .then((entries) => {
         if (active) setDecisionLog(entries)
@@ -66,7 +69,12 @@ export function GovernanceDashboardPage() {
     return () => {
       active = false
     }
-  }, [])
+  }, [logRefreshKey])
+
+  function handleRefresh() {
+    refetchAgents()
+    setLogRefreshKey((k) => k + 1)
+  }
 
   const registeredAgents = agentsState === 'ok' ? systems.length : null
 
@@ -89,7 +97,15 @@ export function GovernanceDashboardPage() {
       title="Control Tower evidence board"
       intro={`Signed in as ${displayName}. Consolidated governance view for agent inventory, shadow AI detection, fairness monitoring, prompt injection, access violations and Action Fabric audit evidence.`}
     >
-      <div className="-mt-3 flex justify-end px-6">
+      <div className="-mt-3 flex justify-end gap-2 px-6">
+        <button
+          type="button"
+          onClick={handleRefresh}
+          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
+        >
+          <RefreshCw size={15} />
+          Refresh
+        </button>
         <button
           type="button"
           onClick={handleLogout}

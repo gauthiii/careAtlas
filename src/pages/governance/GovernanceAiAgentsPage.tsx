@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -19,6 +20,7 @@ import {
   MessageSquare,
   Minus,
   Plus,
+  RefreshCw,
   Send,
   ShieldAlert,
   ShieldCheck,
@@ -162,6 +164,7 @@ function useAIAssets(managed: boolean) {
   const [assets, setAssets] = useState<SnowAIAsset[]>([])
   const [state, setState] = useState<FetchState>('loading')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -179,9 +182,11 @@ function useAIAssets(managed: boolean) {
         setState('error')
       })
     return () => { cancelled = true }
-  }, [managed])
+  }, [managed, refreshKey])
 
-  return { assets, state, errorMsg }
+  const refetch = useCallback(() => setRefreshKey((k) => k + 1), [])
+
+  return { assets, state, errorMsg, refetch }
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +194,7 @@ function useAIAssets(managed: boolean) {
 // ---------------------------------------------------------------------------
 
 function AssetTable({ managed }: { managed: boolean }) {
-  const { assets, state, errorMsg } = useAIAssets(managed)
+  const { assets, state, errorMsg, refetch } = useAIAssets(managed)
 
   // Column visibility
   const [visibleCols, setVisibleCols] = useState<ColKey[]>(DEFAULT_COLS)
@@ -262,6 +267,17 @@ function AssetTable({ managed }: { managed: boolean }) {
               )}
             </span>
           )}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={refetch}
+            className="inline-flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-[0.7rem] font-bold text-[#53687b] transition-colors hover:bg-white/60"
+          >
+            <RefreshCw size={12} />
+            Refresh
+          </button>
         </div>
 
         {state === 'ok' && (
@@ -556,7 +572,7 @@ function LifecycleStatusBadge({ status }: { status: string }) {
 // ---------------------------------------------------------------------------
 
 function AgentInventory() {
-  const { systems, state, errorMsg } = useUnmanagedAISystems()
+  const { systems, state, errorMsg, refetch } = useUnmanagedAISystems()
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<Record<string, ChatSession>>({})
@@ -576,14 +592,24 @@ function AgentInventory() {
 
   return (
     <PortalPanel title={title} icon={<ShieldAlert size={18} />} className="relative">
-      <button
-        type="button"
-        onClick={() => setWorkflowOpen(true)}
-        className="absolute right-5 top-5 inline-flex items-center gap-2 rounded-lg border border-[#cfe0ea] bg-[#e7f3f8] px-3 py-2 text-xs font-bold text-[#0f5f8c] transition-colors hover:border-[#0f5f8c] hover:bg-[#d8edf5]"
-      >
-        <Workflow size={16} />
-        <span className="max-[640px]:hidden">End-to-End Workflow</span>
-      </button>
+      <div className="absolute right-5 top-5 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={refetch}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#cfe0ea] bg-[#f5f9fb] px-3 py-2 text-xs font-bold text-[#53687b] transition-colors hover:bg-[#e7f3f8]"
+        >
+          <RefreshCw size={14} />
+          <span className="max-[640px]:hidden">Refresh</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setWorkflowOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg border border-[#cfe0ea] bg-[#e7f3f8] px-3 py-2 text-xs font-bold text-[#0f5f8c] transition-colors hover:border-[#0f5f8c] hover:bg-[#d8edf5]"
+        >
+          <Workflow size={16} />
+          <span className="max-[640px]:hidden">End-to-End Workflow</span>
+        </button>
+      </div>
 
       <p className="mb-4 pr-40 text-xs text-[#53687b]">
         Agents created in ServiceNow AI Control Tower table{' '}

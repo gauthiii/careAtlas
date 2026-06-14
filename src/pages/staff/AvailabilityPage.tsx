@@ -1,4 +1,4 @@
-import { AlertTriangle, LoaderCircle } from 'lucide-react'
+import { AlertTriangle, LoaderCircle, RefreshCw } from 'lucide-react'
 import { DoctorPage } from '../../components/staff/DoctorShell'
 import { useClinicianSchedule } from '../../hooks/useClinicianSchedule'
 import { cn } from '../../lib/cn'
@@ -21,7 +21,7 @@ import {
 import type { BookingAppointment, BookingDoctor } from '../../services/serviceNow'
 
 export function AvailabilityPage() {
-  const { appointments, doctor, error, isLoading, today } = useClinicianSchedule()
+  const { appointments, doctor, error, isLoading, refetch, today } = useClinicianSchedule()
   const days = Array.from({ length: WEEK_LENGTH }, (_, index) => addDays(today, index))
   const schedule = doctor ? getScheduleForDoctor(doctor) : null
   const activeDoctorAppointments = doctor ? activeAppointmentsForDoctor(appointments, doctor) : []
@@ -31,6 +31,17 @@ export function AvailabilityPage() {
       title="Scheduling availability"
       intro="Review this clinician's weekly schedule, open time, and booked appointments."
     >
+      <div className="-mt-3 mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={refetch}
+          className="inline-flex items-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-4 py-2 text-sm font-bold text-[#0f5f8c] hover:bg-[#f5f9fb]"
+        >
+          <RefreshCw size={14} />
+          Refresh
+        </button>
+      </div>
+
       <div className="mb-5 grid grid-cols-4 gap-3 max-[1000px]:grid-cols-2 max-[640px]:grid-cols-1">
         <AvailabilityMetric label="Doctor" value={doctor?.name || 'No matched doctor'} />
         <AvailabilityMetric label="Speciality" value={doctor?.speciality || doctor?.department || 'General'} />

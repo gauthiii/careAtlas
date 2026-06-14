@@ -9,6 +9,7 @@ import {
   Clock3,
   FileText,
   LoaderCircle,
+  RefreshCw,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { PatientPanel } from '../../components/patient/PatientPanel'
@@ -101,6 +102,7 @@ export function BookAppointmentPage() {
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(true)
   const [loadedPatientProfile, setLoadedPatientProfile] = useState<PatientProfile | null>(null)
   const [isPatientProfileLoading, setIsPatientProfileLoading] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const [visitType, setVisitType] = useState('In-person')
   const [reasonCategory, setReasonCategory] = useState('General check-up')
@@ -147,7 +149,7 @@ export function BookAppointmentPage() {
     return () => {
       active = false
     }
-  }, [availabilityStart])
+  }, [availabilityStart, refreshKey])
 
   useEffect(() => {
     let active = true
@@ -180,7 +182,7 @@ export function BookAppointmentPage() {
     return () => {
       active = false
     }
-  }, [user?.attributes.email, user?.attributes.name, user?.username])
+  }, [user?.attributes.email, user?.attributes.name, user?.username, refreshKey])
 
   const doctors = useMemo(() => availability?.doctors.filter((doctor) => doctor.active) ?? [], [availability])
   const appointments = useMemo(() => availability?.appointments ?? [], [availability])
@@ -358,6 +360,18 @@ export function BookAppointmentPage() {
       title="Find an available clinic slot"
       intro="Choose a reason for visit, select a slot, and confirm your appointment."
     >
+      <div className="-mt-3 mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setRefreshKey((k) => k + 1)}
+          disabled={isLoadingAvailability}
+          className="inline-flex items-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-4 py-2 text-sm font-bold text-[#0f5f8c] hover:bg-[#f5f9fb] disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={isLoadingAvailability ? 'animate-spin' : ''} />
+          Refresh
+        </button>
+      </div>
+
       <PatientPanel title="Clinic availability" icon={<CalendarDays size={21} />} tone="secure">
         <div className="mb-5 grid gap-4">
           <div>

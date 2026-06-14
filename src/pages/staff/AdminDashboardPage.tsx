@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, CalendarCheck, MessageSquare, Search, UserCheck, DoorOpen, CalendarPlus, X, Check, Mail, ArrowUpRight, LoaderCircle } from 'lucide-react'
+import { Activity, CalendarCheck, MessageSquare, Search, UserCheck, DoorOpen, CalendarPlus, X, Check, Mail, ArrowUpRight, LoaderCircle, RefreshCw } from 'lucide-react'
 import { DoctorPage } from '../../components/staff/DoctorShell'
 import { PortalPanel, PortalTable } from '../../components/portal/PortalShell'
 import {
@@ -49,6 +49,7 @@ export function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const today = useMemo(todayIso, [])
   const windowStart = useMemo(() => addDays(today, -APPOINTMENT_LOOKBACK_DAYS), [today])
@@ -79,7 +80,7 @@ export function AdminDashboardPage() {
     return () => {
       active = false
     }
-  }, [windowStart])
+  }, [windowStart, refreshKey])
 
   const todaysAppointments = useMemo(
     () => appointments.filter((appointment) => appointment.date === today),
@@ -111,6 +112,17 @@ export function AdminDashboardPage() {
       title="Master schedule and intake queue"
       intro="A receptionist/admin view for all appointments, patient lookup, manual actions, registration approvals, and contact cases. Appointments and approvals are live from ServiceNow."
     >
+      <div className="-mt-3 mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setRefreshKey((k) => k + 1)}
+          className="inline-flex items-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-4 py-2 text-sm font-bold text-[#0f5f8c] hover:bg-[#f5f9fb]"
+        >
+          <RefreshCw size={14} />
+          Refresh
+        </button>
+      </div>
+
       {error && (
         <div className="mb-4 rounded-[10px] border border-[#f6c6c4] bg-[#fff4f3] p-3 text-[0.86rem] font-bold text-[#a22828]">
           {error}

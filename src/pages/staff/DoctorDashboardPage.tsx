@@ -7,6 +7,7 @@ import {
   FileText,
   LoaderCircle,
   LogOut,
+  RefreshCw,
   UserCheck,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -74,7 +75,7 @@ function statusCount(appointments: BookingAppointment[], status: string) {
 export function DoctorDashboardPage() {
   const navigate = useNavigate()
   const { logout, user } = useClinicianAuth()
-  const { doctor, doctorAppointments, error, isLoading, today } = useClinicianSchedule()
+  const { doctor, doctorAppointments, error, isLoading, refetch, today } = useClinicianSchedule()
   const displayName = doctor?.name || clinicianDisplayName(user)
   const todayAppointments = doctorAppointments
     .filter((appointment) => appointment.date === today && !isCancelledAppointment(appointment))
@@ -117,14 +118,24 @@ export function DoctorDashboardPage() {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
-        >
-          <LogOut size={17} />
-          Logout
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={refetch}
+            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
+          >
+            <RefreshCw size={15} />
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
+          >
+            <LogOut size={17} />
+            Logout
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-4 gap-4 max-[1200px]:grid-cols-2 max-[640px]:grid-cols-1">
