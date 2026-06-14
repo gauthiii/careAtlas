@@ -1543,7 +1543,11 @@ def _part_texts(node: Any) -> list[str]:
 
     texts = []
     for part in parts:
-        if isinstance(part, dict) and part.get("kind") == "text":
+        if not isinstance(part, dict):
+            continue
+        # A2A spec uses "kind", some ServiceNow responses use "type"
+        kind = part.get("kind") or part.get("type")
+        if kind == "text":
             text = str(part.get("text") or "").strip()
             if text:
                 texts.append(text)
@@ -1551,7 +1555,7 @@ def _part_texts(node: Any) -> list[str]:
 
 
 def _extract_a2a_text(body: Any) -> str:
-    """Extract the human-visible text from common Zurich A2A response shapes."""
+    """Extract the human-visible text from all known ServiceNow A2A response shapes."""
     roots = [body]
     if isinstance(body, dict) and isinstance(body.get("content"), dict):
         roots.append(body["content"])
@@ -1568,18 +1572,31 @@ def _extract_a2a_text(body: Any) -> str:
         if not isinstance(result, dict):
             continue
 
+        # result.status.message.parts
         status = result.get("status")
         if isinstance(status, dict):
             texts.extend(_part_texts(status.get("message")))
 
+        # result.message.parts
         texts.extend(_part_texts(result.get("message")))
 
+        # result.parts (direct parts on result)
+        texts.extend(_part_texts(result))
+
+        # result.artifacts[].parts
         artifacts = result.get("artifacts")
         if isinstance(artifacts, list):
             for artifact in artifacts:
                 texts.extend(_part_texts(artifact))
 
-    return "\n\n".join(texts)
+        # result.history[role="agent"].parts — present in many ServiceNow agents
+        history = result.get("history")
+        if isinstance(history, list):
+            for msg in history:
+                if isinstance(msg, dict) and msg.get("role") == "agent":
+                    texts.extend(_part_texts(msg))
+
+    return "\n\n".join(t for t in texts if t)
 
 
 def _a2a_results(body: Any) -> list[dict[str, Any]]:
