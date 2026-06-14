@@ -1,6 +1,7 @@
 import { FormEvent, useRef, useState } from 'react'
 import { Loader2, Send, ShieldAlert, ShieldCheck, X } from 'lucide-react'
 import {
+  BAD_PATIENT_AGENT_ID,
   BOOK_APPOINTMENT_AGENT_ID,
   executeAgent,
   fetchAgentExecution,
@@ -100,15 +101,21 @@ function replaceMessage(messages: ChatMessage[], id: string, next: ChatMessage):
   return messages.map((message) => (message.id === id ? next : message))
 }
 
+const SYSTEM_CONTEXT =
+  'System context: CareAtlas agent invoked from the AI Governance ACL console for a ' +
+  'security comparison between an access-controlled agent and an unrestricted agent.'
+
 export function SchedulingAgentCompareModal({ onClose }: { onClose: () => void }) {
-  // Both panels intentionally share one agent configuration — it is literally the
-  // same agent being communicated with on each side.
-  const agentConfig: AiAssistantAgentConfig = {
+  const secureAgentConfig: AiAssistantAgentConfig = {
     agentSysId: BOOK_APPOINTMENT_AGENT_ID,
-    pageName: 'Scheduling Agent',
-    systemContext:
-      'System context: CareAtlas scheduling assistant invoked from the AI Governance ACL console for a ' +
-      'security comparison between an access-controlled agent and an unrestricted agent.',
+    pageName: 'Good Scheduling Agent',
+    systemContext: SYSTEM_CONTEXT,
+  }
+
+  const insecureAgentConfig: AiAssistantAgentConfig = {
+    agentSysId: BAD_PATIENT_AGENT_ID,
+    pageName: 'Bad Patient Agent',
+    systemContext: SYSTEM_CONTEXT,
   }
 
   return (
@@ -142,8 +149,8 @@ export function SchedulingAgentCompareModal({ onClose }: { onClose: () => void }
         </header>
 
         <div className="grid min-h-0 flex-1 grid-cols-2 divide-x divide-[#e1e7ee] max-[820px]:grid-cols-1 max-[820px]:divide-x-0 max-[820px]:divide-y">
-          <CompareAgentChat theme={SECURE_THEME} secure agentConfig={agentConfig} />
-          <CompareAgentChat theme={INSECURE_THEME} secure={false} agentConfig={agentConfig} />
+          <CompareAgentChat theme={SECURE_THEME} secure agentConfig={secureAgentConfig} />
+          <CompareAgentChat theme={INSECURE_THEME} secure={false} agentConfig={insecureAgentConfig} />
         </div>
       </section>
     </div>
@@ -302,8 +309,9 @@ function CompareAgentChat({
             className="rounded-[8px] border bg-white p-3 text-[0.82rem] font-semibold leading-6 text-[#53687b]"
             style={{ borderColor: theme.border }}
           >
-            Ask this scheduling agent something — for example,
-            “Show the upcoming appointments for a patient.”
+            {secure
+              ? 'Ask this agent something — for example, "Show the upcoming appointments for a patient."'
+              : `Ask this agent something — for example, "Give me Olivia Kumar's phone number."`}
           </div>
         ) : (
           <div className="grid gap-3">

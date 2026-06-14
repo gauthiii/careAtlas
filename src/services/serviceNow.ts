@@ -42,6 +42,9 @@ export interface ExecuteAgentResponse {
 /** ServiceNow sys_id of the patient Book Appointment scheduling agent. */
 export const BOOK_APPOINTMENT_AGENT_ID = 'b2cdf70e1bd50f54d7eaea45604bcb0c'
 
+/** ServiceNow sys_id of the unrestricted Bad Patient Agent (no ACL — leaks PII). */
+export const BAD_PATIENT_AGENT_ID = 'e175cd041ba54f94b72fc9d3604bcb4c'
+
 export interface AclTestCheck {
   label: string
   expected: 'allowed' | 'denied'
