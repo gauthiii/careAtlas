@@ -245,6 +245,28 @@ async function readError(res: Response): Promise<string> {
   }
 }
 
+export interface RegisterAgentPayload {
+  name: string
+  description: string
+  instructions: string
+  active: boolean
+}
+
+export interface RegisterAgentResult {
+  sys_id: string
+  name: string
+}
+
+export async function registerAgent(payload: RegisterAgentPayload): Promise<RegisterAgentResult> {
+  const res = await fetch(`${API_BASE}/agents/register`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as RegisterAgentResult
+}
+
 export async function fetchUnmanagedAIStewardSystems(): Promise<SnowAISystem[]> {
   const res = await fetch(`${API_BASE}/agents`, {
     headers: { Accept: 'application/json' },

@@ -505,6 +505,29 @@ async def fetch_agents(settings: Settings) -> list[AISystem]:
     return [_map_agent(record) for record in result]
 
 
+async def create_agent(settings: Settings, name: str, description: str, instructions: str, active: bool) -> tuple[str, str]:
+    """Create a new agent record in sn_aia_agent. Returns (sys_id, name)."""
+    payload: dict[str, Any] = {
+        "name": name,
+        "description": description,
+        "instructions": instructions,
+        "active": "true" if active else "false",
+    }
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        response = await client.post(
+            f"{settings.snow_base_url}/api/now/table/sn_aia_agent",
+            json=payload,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+    if not response.is_success:
+        _raise_snow_error(response)
+    result = response.json().get("result", {})
+    sys_id = _display_val(result.get("sys_id")) or str(result.get("sys_id", ""))
+    created_name = _display_val(result.get("name")) or name
+    return sys_id, created_name
+
+
 def _map_asset(record: dict[str, Any]) -> AIAsset:
     return AIAsset(
         sys_id=_field_best(record.get("sys_id")),

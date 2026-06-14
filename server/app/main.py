@@ -43,6 +43,8 @@ from .models import (
     PatientRegistrationSummary,
     PasswordPwnedCheckRequest,
     PasswordPwnedCheckResponse,
+    RegisterAgentRequest,
+    RegisterAgentResponse,
     ValidateRequest,
     ValidateResponse,
 )
@@ -51,6 +53,7 @@ from .servicenow import (
     BookingConflictError,
     BookingPatientNotFoundError,
     ServiceNowError,
+    create_agent,
     create_patient_booking_appointment,
     create_patient_registration,
     execute_agent,
@@ -86,6 +89,24 @@ async def get_agents(settings: Settings = Depends(get_settings)) -> list[AISyste
         return await fetch_agents(settings)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.post("/agents/register", response_model=RegisterAgentResponse)
+async def post_register_agent(
+    body: RegisterAgentRequest,
+    settings: Settings = Depends(get_settings),
+) -> RegisterAgentResponse:
+    try:
+        sys_id, name = await create_agent(
+            settings,
+            name=body.name,
+            description=body.description,
+            instructions=body.instructions,
+            active=body.active,
+        )
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return RegisterAgentResponse(sys_id=sys_id, name=name)
 
 
 @api.get("/agents/managed", response_model=list[AIAsset])

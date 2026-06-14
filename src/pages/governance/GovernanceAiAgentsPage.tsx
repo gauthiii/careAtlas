@@ -31,6 +31,7 @@ import {
 
 import { PortalPage, PortalPanel } from '../../components/portal/PortalShell'
 import { ShadowAiWorkflowModal } from '../../components/governance/ShadowAiWorkflowModal'
+import { RegisterAgentModal } from '../../components/governance/RegisterAgentModal'
 import { cn } from '../../lib/cn'
 import { useUnmanagedAISystems } from '../../hooks/useUnmanagedAISystems'
 import {
@@ -560,6 +561,7 @@ function AgentInventory() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<Record<string, ChatSession>>({})
   const [workflowOpen, setWorkflowOpen] = useState(false)
+  const [registerOpen, setRegisterOpen] = useState(false)
 
   const selectedAgent = systems.find((a) => a.sys_id === selectedAgentId) ?? null
 
@@ -623,7 +625,11 @@ function AgentInventory() {
         <button className="inline-flex cursor-default items-center gap-2 rounded-md bg-[#143A57] px-4 py-2 text-white opacity-60">
           View all agents <ArrowRight size={16} />
         </button>
-        <button className="inline-flex cursor-default items-center gap-2 rounded-md bg-[#143A57] px-4 py-2 text-white opacity-60">
+        <button
+          type="button"
+          onClick={() => setRegisterOpen(true)}
+          className="inline-flex items-center gap-2 rounded-md bg-[#143A57] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0f5f8c]"
+        >
           <Plus size={16} /> Register new agent
         </button>
       </div>
@@ -635,6 +641,11 @@ function AgentInventory() {
         onSessionChange={(id, sess) => setSessions((prev) => ({ ...prev, [id]: sess }))}
       />
       <ShadowAiWorkflowModal open={workflowOpen} onClose={() => setWorkflowOpen(false)} />
+      <RegisterAgentModal
+        open={registerOpen}
+        onClose={() => setRegisterOpen(false)}
+        onRegistered={(_sys_id, _name) => setRegisterOpen(false)}
+      />
     </PortalPanel>
   )
 }

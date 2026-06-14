@@ -300,6 +300,26 @@ class AclTestResponse(BaseModel):
     checks: list[AclTestCheck]
 
 
+class RegisterAgentRequest(BaseModel):
+    name: str
+    description: str
+    instructions: str
+    active: bool = True
+
+    @field_validator("name", "description", "instructions")
+    @classmethod
+    def require_nonblank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("field is required")
+        return value
+
+
+class RegisterAgentResponse(BaseModel):
+    sys_id: str
+    name: str
+
+
 class ExecuteAgentRequest(BaseModel):
     # sys_id of the agent in ServiceNow AI Agent Studio / sn_aia_agent.
     agent_sys_id: str
