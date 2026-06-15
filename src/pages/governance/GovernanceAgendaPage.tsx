@@ -19,10 +19,22 @@ import {
   Users,
   Workflow,
 } from 'lucide-react'
+import {
+  Download,
+  Loader2,
+  RectangleHorizontal,
+  RectangleVertical,
+} from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useRef, useState } from 'react'
+
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas-pro'
 
 import { PortalPage } from '../../components/portal/PortalShell'
 import { cn } from '../../lib/cn'
+
+type Orientation = 'portrait' | 'landscape'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -208,6 +220,46 @@ const SECTIONS: AgendaSection[] = [
 // ---------------------------------------------------------------------------
 
 export function GovernanceAgendaPage() {
+  // One ref per exported PDF page: index 0 = title banner, 1..9 = agenda cards.
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([])
+  const [orientation, setOrientation] = useState<Orientation>('portrait')
+  const [exporting, setExporting] = useState(false)
+
+  async function handleExport() {
+    if (exporting) return
+    setExporting(true)
+    try {
+      const pdf = new jsPDF({ orientation, unit: 'pt', format: 'a4' })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const margin = 28
+
+      const pages = pageRefs.current.filter(Boolean) as HTMLDivElement[]
+      for (let i = 0; i < pages.length; i++) {
+        const canvas = await html2canvas(pages[i], {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          useCORS: true,
+          logging: false,
+        })
+        const img = canvas.toDataURL('image/png')
+        const availW = pageW - margin * 2
+        const availH = pageH - margin * 2
+        const ratio = Math.min(availW / canvas.width, availH / canvas.height)
+        const w = canvas.width * ratio
+        const h = canvas.height * ratio
+        if (i > 0) pdf.addPage()
+        pdf.addImage(img, 'PNG', (pageW - w) / 2, margin, w, h)
+      }
+
+      pdf.save(`careatlas-agenda-${orientation}.pdf`)
+    } catch (err) {
+      console.error('Agenda PDF export failed', err)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <PortalPage
       label="AI Governance Officer"
@@ -215,8 +267,60 @@ export function GovernanceAgendaPage() {
       intro="A scrollable walkthrough of everything built and configured for the June 14 demo. Each section maps to a live area of the application."
     >
       <section className="min-w-0 px-6 pb-10">
+        {/* Export toolbar */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#cfe0ea] bg-white px-4 py-3 shadow-[0_4px_16px_rgba(25,64,93,0.07)]">
+          <div className="min-w-0">
+            <div className="text-sm font-black text-[#102033]">Export agenda</div>
+            <div className="text-xs text-[#53687b]">
+              Saves the title page plus all {SECTIONS.length} sections as a {SECTIONS.length + 1}-page PDF.
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Orientation toggle */}
+            <div className="flex items-center rounded-xl border border-[#cfe0ea] bg-[#f5f9fb] p-0.5">
+              {(
+                [
+                  { value: 'portrait', label: 'Portrait', icon: RectangleVertical },
+                  { value: 'landscape', label: 'Landscape', icon: RectangleHorizontal },
+                ] as const
+              ).map((opt) => {
+                const OptIcon = opt.icon
+                const active = orientation === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setOrientation(opt.value)}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition',
+                      active
+                        ? 'bg-[#143A57] text-white shadow-sm'
+                        : 'text-[#53687b] hover:text-[#102033]',
+                    )}
+                  >
+                    <OptIcon size={14} />
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+            {/* Export button */}
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={exporting}
+              className="flex items-center gap-2 rounded-xl bg-[#143A57] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#1d5c87] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              {exporting ? 'Exporting…' : 'Export PDF'}
+            </button>
+          </div>
+        </div>
+
         {/* Date banner */}
-        <div className="mb-8 flex items-center gap-4 rounded-2xl border border-[#cfe0ea] bg-gradient-to-r from-[#143A57] to-[#1d5c87] p-5 text-white shadow-[0_8px_24px_rgba(20,58,87,0.25)]">
+        <div
+          ref={(el) => { pageRefs.current[0] = el }}
+          className="mb-8 flex items-center gap-4 rounded-2xl border border-[#cfe0ea] bg-gradient-to-r from-[#143A57] to-[#1d5c87] p-5 text-white shadow-[0_8px_24px_rgba(20,58,87,0.25)]">
           <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-white/15 text-white">
             <Sparkles size={28} />
           </span>
@@ -258,8 +362,12 @@ export function GovernanceAgendaPage() {
 
         {/* Sections */}
         <div className="space-y-10">
-          {SECTIONS.map((section) => (
-            <AgendaCard key={section.id} section={section} />
+          {SECTIONS.map((section, i) => (
+            <AgendaCard
+              key={section.id}
+              section={section}
+              cardRef={(el) => { pageRefs.current[i + 1] = el }}
+            />
           ))}
         </div>
       </section>
@@ -271,11 +379,18 @@ export function GovernanceAgendaPage() {
 // Agenda card
 // ---------------------------------------------------------------------------
 
-function AgendaCard({ section }: { section: AgendaSection }) {
+function AgendaCard({
+  section,
+  cardRef,
+}: {
+  section: AgendaSection
+  cardRef?: (el: HTMLDivElement | null) => void
+}) {
   const Icon = section.icon
 
   return (
     <div
+      ref={cardRef}
       id={section.id}
       className="scroll-mt-24 overflow-hidden rounded-2xl border bg-white shadow-[0_4px_16px_rgba(25,64,93,0.07)]"
       style={{ borderColor: section.border }}
