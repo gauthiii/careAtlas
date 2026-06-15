@@ -22,6 +22,7 @@ export interface SnowAIAsset {
   sys_id: string
   name: string
   display_name: string
+  asset_type: string
   vendor: string
   managed_by: string
   lifecycle_phase: string

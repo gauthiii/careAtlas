@@ -40,6 +40,7 @@ _A2A_TOKEN_CACHE: dict[str, tuple[str, float]] = {}
 ASSET_FIELDS = [
     "sys_id",
     "display_name",
+    "model_category",
     "vendor",
     "managed_by",
     "life_cycle_stage",
@@ -533,6 +534,7 @@ def _map_asset(record: dict[str, Any]) -> AIAsset:
         sys_id=_field_best(record.get("sys_id")),
         name=_field_best(record.get("display_name")),
         display_name=_field_best(record.get("display_name")),
+        asset_type=_field_best(record.get("model_category")),
         vendor=_field_best(record.get("vendor")),
         managed_by=_field_best(record.get("managed_by")),
         lifecycle_phase=_field_best(record.get("life_cycle_stage")),

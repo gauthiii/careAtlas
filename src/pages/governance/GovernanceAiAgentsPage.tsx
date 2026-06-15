@@ -50,10 +50,11 @@ import {
 // Column definitions
 // ---------------------------------------------------------------------------
 
-type ColKey = 'name' | 'vendor' | 'managed_by' | 'lifecycle_phase' | 'state' | 'lifecycle_status'
+type ColKey = 'name' | 'asset_type' | 'vendor' | 'managed_by' | 'lifecycle_phase' | 'state' | 'lifecycle_status'
 
 const ALL_COLUMNS: { key: ColKey; label: string }[] = [
   { key: 'name', label: 'Display name' },
+  { key: 'asset_type', label: 'Asset type' },
   { key: 'lifecycle_phase', label: 'Lifecycle phase' },
   { key: 'state', label: 'State' },
   { key: 'lifecycle_status', label: 'Lifecycle status' },
@@ -61,11 +62,14 @@ const ALL_COLUMNS: { key: ColKey; label: string }[] = [
   { key: 'managed_by', label: 'Managed by' },
 ]
 
-const DEFAULT_COLS: ColKey[] = ['name', 'lifecycle_phase', 'state', 'lifecycle_status']
+const DEFAULT_COLS: ColKey[] = ['name', 'asset_type', 'lifecycle_phase', 'state', 'lifecycle_status', 'managed_by']
+
+const PAGE_SIZE = 10
 
 function cellValue(asset: SnowAIAsset, key: ColKey): string {
   switch (key) {
     case 'name': return asset.name || asset.display_name || ''
+    case 'asset_type': return asset.asset_type || ''
     case 'vendor': return asset.vendor || ''
     case 'managed_by': return asset.managed_by || ''
     case 'lifecycle_phase': return asset.lifecycle_phase || ''
@@ -210,8 +214,18 @@ function AssetTable({ managed }: { managed: boolean }) {
   // Sort
   const [sort, setSort] = useState<SortState | null>(null)
 
+  // Pagination
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+
   const displayed = filterAndSort(assets, filters, sort)
+  const paged = displayed.slice(0, visibleCount)
+  const hasMore = displayed.length > visibleCount
   const activeFilterCount = filters.filter((f) => f.value.trim()).length
+
+  // Reset paging when the result set changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [filters, sort, assets])
 
   const addFilter = () => {
     if (!draftValue.trim()) return
@@ -501,11 +515,24 @@ function AssetTable({ managed }: { managed: boolean }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#eef3f7]">
-              {displayed.map((asset) => (
+              {paged.map((asset) => (
                 <AssetRow key={asset.sys_id} asset={asset} cols={orderedCols.map((c) => c.key)} />
               ))}
             </tbody>
           </table>
+
+          {hasMore && (
+            <div className="border-t border-[#eef3f7] bg-[#f8fbfc] px-4 py-2.5 text-center">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-[#dbe6ee] bg-white px-3 py-1.5 text-[0.72rem] font-bold text-[#0f5f8c] transition-colors hover:border-[#0f5f8c] hover:bg-[#f5f9fb]"
+              >
+                <ChevronDown size={13} />
+                Show more ({displayed.length - visibleCount} remaining)
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -520,7 +547,7 @@ function AssetRow({ asset, cols }: { asset: SnowAIAsset; cols: ColKey[] }) {
   return (
     <tr className="transition-colors hover:bg-[#f5f9fb]">
       {cols.map((col) => (
-        <td key={col} className="px-3 py-2.5">
+        <td key={col} className="px-3 py-4">
           {col === 'name' ? (
             <div>
               <div className="flex items-center gap-2">
@@ -532,6 +559,10 @@ function AssetRow({ asset, cols }: { asset: SnowAIAsset; cols: ColKey[] }) {
                 </span>
               </div>
             </div>
+          ) : col === 'asset_type' ? (
+            asset.asset_type
+              ? <AssetTypeBadge type={asset.asset_type} />
+              : <span className="text-[#c0cdd8]">—</span>
           ) : col === 'lifecycle_phase' ? (
             asset.lifecycle_phase ? (
               <span className="rounded bg-[#eef3f7] px-1.5 py-0.5 text-[0.68rem] font-medium text-[#40566b]">
@@ -548,6 +579,20 @@ function AssetRow({ asset, cols }: { asset: SnowAIAsset; cols: ColKey[] }) {
         </td>
       ))}
     </tr>
+  )
+}
+
+function AssetTypeBadge({ type }: { type: string }) {
+  const n = type.toLowerCase()
+  let cls = 'bg-slate-100 text-slate-600'
+  if (n.includes('agentic')) cls = 'bg-indigo-50 text-indigo-700'
+  else if (n.includes('generative')) cls = 'bg-violet-50 text-violet-700'
+  else if (n.includes('system')) cls = 'bg-sky-50 text-sky-700'
+  return (
+    <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold', cls)}>
+      <Sparkles size={10} className="flex-shrink-0" />
+      {type}
+    </span>
   )
 }
 

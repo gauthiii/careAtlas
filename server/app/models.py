@@ -26,6 +26,7 @@ class AIAsset(BaseModel):
     sys_id: str = ""
     name: str = ""
     display_name: str = ""
+    asset_type: str = ""
     vendor: str = ""
     managed_by: str = ""
     lifecycle_phase: str = ""
