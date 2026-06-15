@@ -529,7 +529,14 @@ async def create_agent(settings: Settings, name: str, description: str, instruct
     return sys_id, created_name
 
 
-def _map_asset(record: dict[str, Any]) -> AIAsset:
+# Governance lifecycle/risk lives on a related record, keyed by the asset sys_id.
+GOVERNANCE_TABLE = "sn_ai_governance_asset_governance_details"
+GOVERNANCE_FIELDS = ["asset", "status", "risk_score", "lifecycle_phase"]
+_GOV_CHUNK = 80
+
+
+def _map_asset(record: dict[str, Any], gov: dict[str, str] | None = None) -> AIAsset:
+    gov = gov or {}
     return AIAsset(
         sys_id=_field_best(record.get("sys_id")),
         name=_field_best(record.get("display_name")),
@@ -537,58 +544,86 @@ def _map_asset(record: dict[str, Any]) -> AIAsset:
         asset_type=_field_best(record.get("model_category")),
         vendor=_field_best(record.get("vendor")),
         managed_by=_field_best(record.get("managed_by")),
-        lifecycle_phase=_field_best(record.get("life_cycle_stage")),
+        # Prefer the governance-record values (the ones shown in AI Control Tower);
+        # fall back to the asset's own lifecycle fields when no governance record exists.
+        lifecycle_phase=gov.get("lifecycle_phase") or _field_best(record.get("life_cycle_stage")),
         state=_field_best(record.get("install_status")),
-        lifecycle_status=_field_best(record.get("life_cycle_stage_status")),
+        lifecycle_status=gov.get("status") or _field_best(record.get("life_cycle_stage_status")),
+        risk_classification=gov.get("risk_score", ""),
     )
+
+
+async def _fetch_governance_details(
+    client: httpx.AsyncClient, settings: Settings, asset_sys_ids: list[str]
+) -> dict[str, dict[str, str]]:
+    """Map asset sys_id -> {status, risk_score, lifecycle_phase} from the governance table."""
+    out: dict[str, dict[str, str]] = {}
+    for start in range(0, len(asset_sys_ids), _GOV_CHUNK):
+        chunk = asset_sys_ids[start : start + _GOV_CHUNK]
+        params = {
+            "sysparm_query": "assetIN" + ",".join(chunk),
+            "sysparm_fields": ",".join(GOVERNANCE_FIELDS),
+            # "all" returns both .value (sys_id for the asset reference) and
+            # .display_value (human label) for every field.
+            "sysparm_display_value": "all",
+        }
+        response = await client.get(
+            f"{settings.snow_base_url}/api/now/table/{GOVERNANCE_TABLE}",
+            params=params,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if not response.is_success:
+            _raise_snow_error(response)
+        for rec in response.json().get("result", []):
+            asset_field = rec.get("asset")
+            asset_id = asset_field.get("value") if isinstance(asset_field, dict) else asset_field
+            if not asset_id or asset_id in out:
+                continue
+            out[asset_id] = {
+                "status": _field_best(rec.get("status")),
+                "risk_score": _field_best(rec.get("risk_score")),
+                "lifecycle_phase": _field_best(rec.get("lifecycle_phase")),
+            }
+    return out
+
+
+async def _fetch_ai_assets(settings: Settings, *, managed: bool) -> list[AIAsset]:
+    owner_clause = "^managed_byISNOTEMPTY" if managed else "^managed_byISEMPTY"
+    params = {
+        "sysparm_query": (
+            f"sys_created_on>={settings.agents_created_since}"
+            f"{owner_clause}"
+            "^ORDERBYDESCsys_created_on"
+        ),
+        "sysparm_fields": ",".join(ASSET_FIELDS),
+        "sysparm_display_value": "true",
+    }
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        response = await client.get(
+            f"{settings.snow_base_url}/api/now/table/alm_ai_system_digital_asset",
+            params=params,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if not response.is_success:
+            _raise_snow_error(response)
+        records = response.json().get("result", [])
+
+        sys_ids = [sid for r in records if (sid := _field_best(r.get("sys_id")))]
+        gov_map = await _fetch_governance_details(client, settings, sys_ids)
+
+    return [_map_asset(r, gov_map.get(_field_best(r.get("sys_id")))) for r in records]
 
 
 async def fetch_managed_ai_assets(settings: Settings) -> list[AIAsset]:
     """Return post-June-2 assets that have an owner (managed_by is set)."""
-    params = {
-        "sysparm_query": (
-            f"sys_created_on>={settings.agents_created_since}"
-            "^managed_byISNOTEMPTY"
-            "^ORDERBYDESCsys_created_on"
-        ),
-        "sysparm_fields": ",".join(ASSET_FIELDS),
-        "sysparm_display_value": "true",
-    }
-    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
-        response = await client.get(
-            f"{settings.snow_base_url}/api/now/table/alm_ai_system_digital_asset",
-            params=params,
-            headers={"Accept": "application/json"},
-            auth=(settings.snow_username, settings.snow_password),
-        )
-    if not response.is_success:
-        _raise_snow_error(response)
-    result = response.json().get("result", [])
-    return [_map_asset(record) for record in result]
+    return await _fetch_ai_assets(settings, managed=True)
 
 
 async def fetch_unmanaged_ai_assets(settings: Settings) -> list[AIAsset]:
     """Return post-June-2 assets with no owner assigned (unmanaged/shadow AI)."""
-    params = {
-        "sysparm_query": (
-            f"sys_created_on>={settings.agents_created_since}"
-            "^managed_byISEMPTY"
-            "^ORDERBYDESCsys_created_on"
-        ),
-        "sysparm_fields": ",".join(ASSET_FIELDS),
-        "sysparm_display_value": "true",
-    }
-    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
-        response = await client.get(
-            f"{settings.snow_base_url}/api/now/table/alm_ai_system_digital_asset",
-            params=params,
-            headers={"Accept": "application/json"},
-            auth=(settings.snow_username, settings.snow_password),
-        )
-    if not response.is_success:
-        _raise_snow_error(response)
-    result = response.json().get("result", [])
-    return [_map_asset(record) for record in result]
+    return await _fetch_ai_assets(settings, managed=False)
 
 
 async def create_patient_registration(

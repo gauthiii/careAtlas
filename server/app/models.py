@@ -32,6 +32,7 @@ class AIAsset(BaseModel):
     lifecycle_phase: str = ""
     state: str = ""
     lifecycle_status: str = ""
+    risk_classification: str = ""
 
 
 class ValidateRequest(BaseModel):

@@ -28,6 +28,7 @@ export interface SnowAIAsset {
   lifecycle_phase: string
   state: string
   lifecycle_status: string
+  risk_classification: string
 }
 
 export interface ExecuteAgentResponse {

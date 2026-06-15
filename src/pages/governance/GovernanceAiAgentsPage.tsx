@@ -50,19 +50,19 @@ import {
 // Column definitions
 // ---------------------------------------------------------------------------
 
-type ColKey = 'name' | 'asset_type' | 'vendor' | 'managed_by' | 'lifecycle_phase' | 'state' | 'lifecycle_status'
+type ColKey = 'name' | 'asset_type' | 'vendor' | 'managed_by' | 'lifecycle_phase' | 'lifecycle_status' | 'risk_classification'
 
 const ALL_COLUMNS: { key: ColKey; label: string }[] = [
   { key: 'name', label: 'Display name' },
   { key: 'asset_type', label: 'Asset type' },
   { key: 'lifecycle_phase', label: 'Lifecycle phase' },
-  { key: 'state', label: 'State' },
   { key: 'lifecycle_status', label: 'Lifecycle status' },
+  { key: 'risk_classification', label: 'Risk classification' },
   { key: 'vendor', label: 'Vendor' },
   { key: 'managed_by', label: 'Managed by' },
 ]
 
-const DEFAULT_COLS: ColKey[] = ['name', 'asset_type', 'lifecycle_phase', 'state', 'lifecycle_status', 'managed_by']
+const DEFAULT_COLS: ColKey[] = ['name', 'asset_type', 'lifecycle_phase', 'lifecycle_status', 'risk_classification', 'managed_by']
 
 const PAGE_SIZE = 10
 
@@ -73,8 +73,8 @@ function cellValue(asset: SnowAIAsset, key: ColKey): string {
     case 'vendor': return asset.vendor || ''
     case 'managed_by': return asset.managed_by || ''
     case 'lifecycle_phase': return asset.lifecycle_phase || ''
-    case 'state': return asset.state || ''
     case 'lifecycle_status': return asset.lifecycle_status || ''
+    case 'risk_classification': return asset.risk_classification || ''
   }
 }
 
@@ -573,6 +573,10 @@ function AssetRow({ asset, cols }: { asset: SnowAIAsset; cols: ColKey[] }) {
             asset.lifecycle_status
               ? <LifecycleStatusBadge status={asset.lifecycle_status} />
               : <span className="text-[#c0cdd8]">—</span>
+          ) : col === 'risk_classification' ? (
+            asset.risk_classification
+              ? <RiskClassificationBadge risk={asset.risk_classification} />
+              : <span className="text-[#c0cdd8]">—</span>
           ) : (
             <span className="text-[#40566b]">{cellValue(asset, col) || <span className="text-[#c0cdd8]">—</span>}</span>
           )}
@@ -599,15 +603,35 @@ function AssetTypeBadge({ type }: { type: string }) {
 function LifecycleStatusBadge({ status }: { status: string }) {
   const n = status.toLowerCase()
   let dot = 'bg-slate-400'; let text = 'text-slate-600'; let bg = 'bg-slate-50'
-  if (n.includes('deploy')) { dot = 'bg-emerald-500'; text = 'text-emerald-700'; bg = 'bg-emerald-50' }
+  if (n.includes('steward')) { dot = 'bg-sky-500'; text = 'text-sky-700'; bg = 'bg-sky-50' }          // blue
+  else if (n.includes('in review')) { dot = 'bg-violet-500'; text = 'text-violet-700'; bg = 'bg-violet-50' } // purple
+  else if (n.includes('deploy')) { dot = 'bg-emerald-500'; text = 'text-emerald-700'; bg = 'bg-emerald-50' } // green
+  else if (n.includes('approved')) { dot = 'bg-teal-500'; text = 'text-teal-700'; bg = 'bg-teal-50' }
+  else if (n.includes('ready')) { dot = 'bg-indigo-500'; text = 'text-indigo-700'; bg = 'bg-indigo-50' }
   else if (n.includes('review')) { dot = 'bg-violet-500'; text = 'text-violet-700'; bg = 'bg-violet-50' }
-  else if (n.includes('ready')) { dot = 'bg-sky-500'; text = 'text-sky-700'; bg = 'bg-sky-50' }
   else if (n.includes('assess')) { dot = 'bg-amber-500'; text = 'text-amber-700'; bg = 'bg-amber-50' }
-  else if (n.includes('retire') || n.includes('end')) { dot = 'bg-red-400'; text = 'text-red-700'; bg = 'bg-red-50' }
+  else if (n.includes('reject') || n.includes('cancel') || n.includes('offboard') || n.includes('retire')) {
+    dot = 'bg-red-400'; text = 'text-red-700'; bg = 'bg-red-50'
+  }
   return (
     <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5', bg)}>
       <span className={cn('h-1.5 w-1.5 flex-shrink-0 rounded-full', dot)} />
       <span className={cn('text-[0.68rem] font-semibold', text)}>{status}</span>
+    </span>
+  )
+}
+
+function RiskClassificationBadge({ risk }: { risk: string }) {
+  const n = risk.toLowerCase()
+  let cls = 'bg-slate-100 text-slate-600'
+  if (n.includes('unacceptable')) cls = 'bg-red-100 text-red-800'
+  else if (n.includes('critical')) cls = 'bg-red-50 text-red-700'
+  else if (n.includes('high')) cls = 'bg-orange-50 text-orange-700'
+  else if (n.includes('medium')) cls = 'bg-amber-50 text-amber-700'
+  else if (n.includes('low')) cls = 'bg-emerald-50 text-emerald-700'
+  return (
+    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[0.68rem] font-semibold', cls)}>
+      {risk}
     </span>
   )
 }
