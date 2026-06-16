@@ -167,6 +167,7 @@ export interface BookingAppointment {
   status_label: string
   reason_category: string
   reason_text: string
+  triage_priority: string
   patient_id: string
   patient_display: string
 }
@@ -229,6 +230,9 @@ export interface DoctorAppointmentOption {
   start_time: string
   status: string
   status_label: string
+  reason_category: string
+  reason_text: string
+  triage_priority: string
   patient_sys_id: string
   patient_name: string
 }
@@ -533,13 +537,14 @@ export async function fetchAppointment(recordId: string): Promise<DoctorAppointm
 }
 
 export async function fetchSummaryNotes(
-  filters: { doctorSysId?: string; appointmentRecordId?: string } = {},
+  filters: { doctorSysId?: string; appointmentRecordId?: string; patientSysId?: string } = {},
   limit = 200,
 ): Promise<SummaryNote[]> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (filters.doctorSysId?.trim()) params.set('doctor_sys_id', filters.doctorSysId.trim())
   if (filters.appointmentRecordId?.trim())
     params.set('appointment_record_id', filters.appointmentRecordId.trim())
+  if (filters.patientSysId?.trim()) params.set('patient_sys_id', filters.patientSysId.trim())
 
   const res = await fetch(`${API_BASE}/staff/summary-notes?${params.toString()}`, {
     headers: { Accept: 'application/json' },
@@ -550,6 +555,99 @@ export async function fetchSummaryNotes(
   }
 
   return (await res.json()) as SummaryNote[]
+}
+
+export async function updateSummaryNote(sysId: string, notes: string): Promise<SummaryNote> {
+  const res = await fetch(`${API_BASE}/staff/summary-notes`, {
+    method: 'PATCH',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sys_id: sysId, notes }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as SummaryNote
+}
+
+export async function deleteSummaryNote(sysId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/staff/summary-notes/${encodeURIComponent(sysId)}`, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+}
+
+export interface AppointmentUpdate {
+  record_id: string
+  status?: string
+  date?: string
+  start_time?: string
+}
+
+export async function updateAppointment(update: AppointmentUpdate): Promise<DoctorAppointmentOption> {
+  const res = await fetch(`${API_BASE}/staff/appointments`, {
+    method: 'PATCH',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(update),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as DoctorAppointmentOption
+}
+
+export interface CreateClinicianAppointmentRequest {
+  doctor_record_id: string
+  patient_sys_id: string
+  date: string
+  start_time: string
+  reason_category?: string
+  reason_text?: string
+}
+
+export async function createClinicianAppointment(
+  req: CreateClinicianAppointmentRequest,
+): Promise<DoctorAppointmentOption> {
+  const res = await fetch(`${API_BASE}/staff/appointments`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as DoctorAppointmentOption
+}
+
+export async function updateRegistrationStatus(
+  sysId: string,
+  registrationStatus: string,
+): Promise<PatientRegistrationSummary> {
+  const res = await fetch(`${API_BASE}/staff/registrations`, {
+    method: 'PATCH',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sys_id: sysId, registration_status: registrationStatus }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as PatientRegistrationSummary
+}
+
+export interface PatientProfileUpdate {
+  sys_id: string
+  phone?: string
+  address_line1?: string
+  address_line2?: string
+  city?: string
+  postcode?: string
+  emergency_name?: string
+  emergency_phone?: string
+  emergency_relationship?: string
+  time_preference?: string
+  primary_language?: string
+}
+
+export async function updatePatientProfile(update: PatientProfileUpdate): Promise<PatientProfile> {
+  const res = await fetch(`${API_BASE}/patients/profile`, {
+    method: 'PATCH',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(update),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as PatientProfile
 }
 
 export async function createSummaryNote(

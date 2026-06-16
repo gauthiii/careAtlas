@@ -4,9 +4,10 @@ import {
   ChevronRight,
   LoaderCircle,
   RefreshCw,
+  Search,
   User,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DoctorPage } from '../../components/staff/DoctorShell'
 import { clinicianDisplayName, useClinicianAuth } from '../../contexts/ClinicianAuthContext'
@@ -34,6 +35,24 @@ export function DoctorAppointmentsPage() {
   const [appointments, setAppointments] = useState<DoctorAppointmentOption[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+
+  const statuses = useMemo(() => {
+    const set = new Set<string>()
+    appointments.forEach((a) => a.status && set.add(a.status.toLowerCase()))
+    return Array.from(set).sort()
+  }, [appointments])
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return appointments.filter((a) => {
+      if (statusFilter !== 'all' && a.status.toLowerCase() !== statusFilter) return false
+      if (!q) return true
+      return [a.patient_name, a.appointment_id, a.reason_category, a.reason_text, a.date]
+        .some((v) => (v || '').toLowerCase().includes(q))
+    })
+  }, [appointments, query, statusFilter])
 
   const loadAppointments = useCallback(async () => {
     if (!doctorSysId) return
@@ -75,7 +94,8 @@ export function DoctorAppointmentsPage() {
           )}
           {!isBusy && !scheduleError && !error && (
             <span>
-              {appointments.length} {appointments.length === 1 ? 'appointment' : 'appointments'}
+              {filtered.length} of {appointments.length}{' '}
+              {appointments.length === 1 ? 'appointment' : 'appointments'}
             </span>
           )}
         </div>
@@ -90,6 +110,33 @@ export function DoctorAppointmentsPage() {
         </button>
       </div>
 
+      {appointments.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[240px] flex-1">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search patient, ID, reason…"
+              className="w-full rounded-[9px] border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-[9px] border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold capitalize"
+          >
+            <option value="all">All statuses</option>
+            {statuses.map((s) => (
+              <option key={s} value={s} className="capitalize">
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {appointments.length === 0 && !isBusy ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
           <CalendarClock size={32} className="mx-auto mb-3 text-slate-400" />
@@ -98,9 +145,13 @@ export function DoctorAppointmentsPage() {
             There are no appointments on record for this doctor.
           </p>
         </div>
+      ) : filtered.length === 0 && !isBusy ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-sm font-bold text-slate-500">
+          No appointments match your search.
+        </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          {appointments.map((appointment, index) => (
+          {filtered.map((appointment, index) => (
             <Link
               key={appointment.appointment_record_id}
               to={`/staff/appointments/${encodeURIComponent(appointment.appointment_record_id)}`}

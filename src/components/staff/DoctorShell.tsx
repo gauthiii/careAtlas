@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   CalendarCheck,
   CalendarDays,
   Clock3,
@@ -6,6 +7,7 @@ import {
   HeartPulse,
   Hospital,
   LayoutDashboard,
+  ListChecks,
   LockKeyhole,
   ShieldCheck,
   Stethoscope,
@@ -33,7 +35,9 @@ const signedOutClinicianNav = [
 const signedInClinicianNav = [
   { label: 'Dashboard', to: '/staff/doctor', icon: LayoutDashboard, end: true },
   { label: 'Appointments', to: '/staff/appointments', icon: CalendarDays, matchPrefix: '/staff/appointments' },
+  { label: 'Queue', to: '/staff/queue', icon: ListChecks },
   { label: 'My Notes', to: '/staff/notes', icon: FileText },
+  { label: 'Analytics', to: '/staff/analytics', icon: BarChart3 },
   { label: 'Admin', to: '/staff/admin', icon: CalendarCheck },
   { label: 'Availability', to: '/staff/availability', icon: Clock3 },
   { label: 'Profile', to: '/staff/profile', icon: Stethoscope },

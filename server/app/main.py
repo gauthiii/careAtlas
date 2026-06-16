@@ -38,7 +38,11 @@ from .models import (
     ExecuteAgentRequest,
     ExecuteAgentResponse,
     PatientProfileResponse,
+    AppointmentUpdateRequest,
+    ClinicianAppointmentCreateRequest,
     DoctorAppointmentOption,
+    PatientProfileResponse,
+    PatientProfileUpdateRequest,
     PatientRegistrationRequest,
     PatientRegistrationResponse,
     PatientRegistrationSummary,
@@ -46,8 +50,10 @@ from .models import (
     PasswordPwnedCheckResponse,
     RegisterAgentRequest,
     RegisterAgentResponse,
+    RegistrationStatusUpdateRequest,
     SummaryNoteRequest,
     SummaryNoteResponse,
+    SummaryNoteUpdateRequest,
     ValidateRequest,
     ValidateResponse,
 )
@@ -58,9 +64,11 @@ from .servicenow import (
     ServiceNowError,
     SummaryNoteAppointmentNotFoundError,
     create_agent,
+    create_clinician_appointment,
     create_patient_booking_appointment,
     create_patient_registration,
     create_summary_note,
+    delete_summary_note,
     execute_agent,
     fetch_agents,
     fetch_ai_decision_log,
@@ -73,6 +81,10 @@ from .servicenow import (
     fetch_summary_notes,
     fetch_unmanaged_ai_assets,
     test_service_account_acl,
+    update_appointment,
+    update_patient_profile,
+    update_registration_status,
+    update_summary_note,
     validate_user,
 )
 
@@ -315,6 +327,7 @@ async def get_appointment(
 async def get_summary_notes(
     doctor_sys_id: str | None = None,
     appointment_record_id: str | None = None,
+    patient_sys_id: str | None = None,
     limit: int = 200,
     settings: Settings = Depends(get_settings),
 ) -> list[SummaryNoteResponse]:
@@ -323,6 +336,7 @@ async def get_summary_notes(
             settings,
             doctor_sys_id=doctor_sys_id,
             appointment_record_id=appointment_record_id,
+            patient_sys_id=patient_sys_id,
             limit=limit,
         )
     except ServiceNowError as exc:
@@ -337,6 +351,93 @@ async def post_summary_note(
     try:
         return await create_summary_note(settings, body)
     except SummaryNoteAppointmentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.patch("/staff/summary-notes", response_model=SummaryNoteResponse)
+async def patch_summary_note(
+    body: SummaryNoteUpdateRequest,
+    settings: Settings = Depends(get_settings),
+) -> SummaryNoteResponse:
+    try:
+        return await update_summary_note(settings, body.sys_id, body.notes)
+    except SummaryNoteAppointmentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.delete("/staff/summary-notes/{sys_id}")
+async def remove_summary_note(
+    sys_id: str,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    try:
+        await delete_summary_note(settings, sys_id)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"status": "deleted", "sys_id": sys_id}
+
+
+@api.post("/staff/appointments", response_model=DoctorAppointmentOption)
+async def post_clinician_appointment(
+    body: ClinicianAppointmentCreateRequest,
+    settings: Settings = Depends(get_settings),
+) -> DoctorAppointmentOption:
+    try:
+        return await create_clinician_appointment(settings, body)
+    except BookingConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.patch("/staff/appointments", response_model=DoctorAppointmentOption)
+async def patch_appointment(
+    body: AppointmentUpdateRequest,
+    settings: Settings = Depends(get_settings),
+) -> DoctorAppointmentOption:
+    try:
+        return await update_appointment(
+            settings,
+            body.record_id,
+            status=body.status,
+            date=body.date,
+            start_time=body.start_time,
+        )
+    except SummaryNoteAppointmentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except BookingConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.patch("/staff/registrations", response_model=PatientRegistrationSummary)
+async def patch_registration_status(
+    body: RegistrationStatusUpdateRequest,
+    settings: Settings = Depends(get_settings),
+) -> PatientRegistrationSummary:
+    try:
+        return await update_registration_status(settings, body.sys_id, body.registration_status)
+    except BookingPatientNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.patch("/patients/profile", response_model=PatientProfileResponse)
+async def patch_patient_profile(
+    body: PatientProfileUpdateRequest,
+    settings: Settings = Depends(get_settings),
+) -> PatientProfileResponse:
+    try:
+        return await update_patient_profile(settings, body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except BookingPatientNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -440,7 +541,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["*"],
     )
 

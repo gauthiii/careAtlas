@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, CalendarDays, Flag, LoaderCircle, Search, UserRound } from 'lucide-react'
+import { AlertTriangle, Bot, CalendarDays, FileText, Flag, LoaderCircle, Search, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { DoctorPage } from '../../components/staff/DoctorShell'
@@ -9,8 +9,10 @@ import {
   appointmentSortValue,
   appointmentsForPatient,
   formatAppointmentDateTime,
+  formatDate,
+  formatTime,
 } from '../../lib/scheduling'
-import { fetchPatientProfile, type PatientProfile } from '../../services/serviceNow'
+import { fetchPatientProfile, fetchSummaryNotes, type PatientProfile, type SummaryNote } from '../../services/serviceNow'
 
 const fieldClass =
   'w-full rounded-[9px] border border-[#cbdde6] bg-white px-3 py-[11px] text-inherit'
@@ -77,6 +79,20 @@ export function PatientRecordPage() {
     [appointments, patientProfile],
   )
 
+  const [patientNotes, setPatientNotes] = useState<SummaryNote[]>([])
+  useEffect(() => {
+    let active = true
+    const sysId = patientProfile?.sys_id
+    if (!sysId) {
+      setPatientNotes([])
+      return () => { active = false }
+    }
+    fetchSummaryNotes({ patientSysId: sysId })
+      .then((rows) => { if (active) setPatientNotes(rows) })
+      .catch(() => { if (active) setPatientNotes([]) })
+    return () => { active = false }
+  }, [patientProfile?.sys_id])
+
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSearchedName(searchTerm.trim())
@@ -141,6 +157,8 @@ export function PatientRecordPage() {
                 <RecordField label="Email" value={patientProfile.email} />
                 <RecordField label="Address" value={[patientProfile.address_line1, patientProfile.city, patientProfile.postcode, patientProfile.state_region].filter(Boolean).join(', ')} />
                 <RecordField label="Condition" value={patientProfile.health_condition} />
+                <RecordField label="Blood type" value={patientProfile.blood_type} />
+                <RecordField label="Known allergies" value={patientProfile.known_allergies} />
                 <RecordField label="Accessibility" value={patientProfile.accessibility} />
                 <RecordField label="Insurance" value={patientProfile.insurance_provider || patientProfile.insurance_id} />
                 <RecordField label="Emergency contact" value={[patientProfile.emergency_name, patientProfile.emergency_phone, patientProfile.emergency_relationship].filter(Boolean).join(' · ')} />
@@ -176,6 +194,32 @@ export function PatientRecordPage() {
                     appointmentReason(appointment),
                   ])}
                 />
+              )}
+            </PortalPanel>
+
+            <PortalPanel title={`Summary notes (${patientNotes.length})`} icon={<FileText size={21} />}>
+              {patientNotes.length === 0 ? (
+                <div className="rounded-[10px] border border-dashed border-[#cbdde6] bg-[#f7fbfd] p-4 text-center text-[0.86rem] font-bold text-[#53687b]">
+                  No summary notes recorded for this patient.
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {patientNotes.map((note) => (
+                    <div key={note.sys_id} className="rounded-[10px] border border-[#e5eef3] bg-white p-3">
+                      <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-[0.72rem] font-bold text-[#607487]">
+                        <span>
+                          {note.date ? formatDate(note.date) : '—'}
+                          {note.start_time ? ` · ${formatTime(note.start_time)}` : ''}
+                          {note.doctor_name ? ` · ${note.doctor_name}` : ''}
+                        </span>
+                        <span className="rounded-full bg-[#e7f3f8] px-2 py-0.5 text-[#0f5f8c]">
+                          {note.appointment_id || 'Note'}
+                        </span>
+                      </div>
+                      <p className="whitespace-pre-wrap text-[0.9rem] leading-relaxed text-[#102033]">{note.notes}</p>
+                    </div>
+                  ))}
+                </div>
               )}
             </PortalPanel>
           </section>

@@ -1,4 +1,4 @@
-import { HeartPulse, Hospital, LockKeyhole, ShieldCheck, Stethoscope, Home, UserPlus, LayoutDashboard, CalendarCheck, User, MessageCircle } from 'lucide-react'
+import { HeartPulse, Hospital, LockKeyhole, ShieldCheck, Stethoscope, Home, UserPlus, LayoutDashboard, CalendarCheck, CalendarDays, User, MessageCircle } from 'lucide-react'
 import type React from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn'
@@ -23,6 +23,7 @@ const loggedOutPatientNav = [
 const loggedInPatientNav = [
   { label: 'Dashboard', to: '/patient/dashboard', icon: LayoutDashboard },
   { label: 'Book', to: '/patient/book', icon: CalendarCheck },
+  { label: 'Appointments', to: '/patient/appointments', icon: CalendarDays },
   { label: 'Profile', to: '/patient/profile', icon: User },
   { label: 'Contact', to: '/patient/contact', icon: MessageCircle },
 ] as const

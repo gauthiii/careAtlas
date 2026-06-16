@@ -8,6 +8,7 @@ import {
   LoaderCircle,
   LogOut,
   RefreshCw,
+  RotateCcw,
   UserCheck,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -79,9 +80,14 @@ export function DoctorDashboardPage() {
   const { logout, user } = useClinicianAuth()
   const { doctor, doctorAppointments, error, isLoading, refetch, today } = useClinicianSchedule()
   const displayName = doctor?.name || clinicianDisplayName(user)
+  const [selectedDate, setSelectedDate] = useState(today)
   const todayAppointments = doctorAppointments
     .filter((appointment) => appointment.date === today && !isCancelledAppointment(appointment))
     .sort((a, b) => appointmentSortValue(a) - appointmentSortValue(b))
+  const selectedAppointments = doctorAppointments
+    .filter((appointment) => appointment.date === selectedDate && !isCancelledAppointment(appointment))
+    .sort((a, b) => appointmentSortValue(a) - appointmentSortValue(b))
+  const isToday = selectedDate === today
   const upcomingAppointments = doctorAppointments
     .filter((appointment) => appointment.date >= today && !isCancelledAppointment(appointment))
     .sort((a, b) => appointmentSortValue(a) - appointmentSortValue(b))
@@ -166,23 +172,40 @@ export function DoctorDashboardPage() {
 
       <div className="mb-6 grid grid-cols-[1.5fr_1fr] gap-4 max-[1200px]:grid-cols-1">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h3 className="flex items-center gap-2 text-lg font-semibold">
               <Clock3 size={18} />
-              Today's Appointments
+              {isToday ? "Today's Appointments" : `Appointments · ${formatDate(selectedDate)}`}
             </h3>
-            <Link to="/staff/availability" className="rounded-lg bg-[#143A57] px-3 py-2 text-sm font-semibold !text-white">
-              View availability
-            </Link>
+            <div className="flex items-center gap-2">
+              {!isToday && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDate(today)
+                    setWeekOffset(0)
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#b7ceda] bg-white px-3 py-2 text-sm font-semibold text-[#0f5f8c] hover:bg-[#f5f9fb]"
+                >
+                  <RotateCcw size={14} />
+                  Back to today
+                </button>
+              )}
+              <Link to="/staff/availability" className="rounded-lg bg-[#143A57] px-3 py-2 text-sm font-semibold !text-white">
+                View availability
+              </Link>
+            </div>
           </div>
 
-          {todayAppointments.length === 0 ? (
+          {selectedAppointments.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm font-bold text-slate-500">
-              No appointments are scheduled for this doctor today.
+              {isToday
+                ? 'No appointments are scheduled for this doctor today.'
+                : `No appointments scheduled on ${formatDate(selectedDate)}.`}
             </div>
           ) : (
             <div className="space-y-3">
-              {todayAppointments.map((appointment) => (
+              {selectedAppointments.map((appointment) => (
                 <Link
                   key={appointment.appointment_record_id || appointment.appointment_id}
                   to={`/staff/patient/${encodeURIComponent(appointment.patient_display || 'search')}`}
@@ -215,18 +238,33 @@ export function DoctorDashboardPage() {
               <WeekNav weekOffset={weekOffset} onChange={setWeekOffset} weekStart={weekStart} />
             </div>
             <div className="grid grid-cols-7 gap-2 max-[700px]:grid-cols-2">
-              {weekDays.map((item) => (
-                <div
-                  key={item.date}
-                  className={`rounded-xl border p-2 text-center ${
-                    item.date === today ? 'border-[#0397AE] bg-[#e7f3f8] shadow-[inset_0_0_0_1px_#0397AE]' : 'border-slate-200'
-                  }`}
-                >
-                  <div className="text-xs text-slate-500">{formatDate(item.date).split(',')[0]}</div>
-                  <div className="text-xl font-bold">{formatShortDate(item.date).split(' ')[1]}</div>
-                  <div className="text-[10px] text-slate-500">{item.visits} visits</div>
-                </div>
-              ))}
+              {weekDays.map((item) => {
+                const isSelected = item.date === selectedDate
+                const isCurrentDay = item.date === today
+                return (
+                  <button
+                    type="button"
+                    key={item.date}
+                    onClick={() => setSelectedDate(item.date)}
+                    title={`Show appointments for ${formatDate(item.date)}`}
+                    className={`rounded-xl border p-2 text-center transition hover:border-[#0397AE] hover:bg-[#f1f9fb] ${
+                      isSelected
+                        ? 'border-[#143A57] bg-[#143A57] text-white shadow-sm'
+                        : isCurrentDay
+                          ? 'border-[#0397AE] bg-[#e7f3f8] shadow-[inset_0_0_0_1px_#0397AE]'
+                          : 'border-slate-200'
+                    }`}
+                  >
+                    <div className={`text-xs ${isSelected ? 'text-white/70' : 'text-slate-500'}`}>
+                      {formatDate(item.date).split(',')[0]}
+                    </div>
+                    <div className="text-xl font-bold">{formatShortDate(item.date).split(' ')[1]}</div>
+                    <div className={`text-[10px] ${isSelected ? 'text-white/70' : 'text-slate-500'}`}>
+                      {item.visits} visits
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -299,15 +337,19 @@ export function DoctorDashboardPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
             <FileText size={18} />
-            Quick Notes
+            Summary Notes
           </h3>
-          <textarea
-            className="h-32 w-full rounded-lg border border-slate-300 p-3"
-            placeholder="Add a clinical note for today's shift..."
-          />
-          <button className="mt-3 rounded-lg bg-[#143A57] px-4 py-2 !text-sm !font-semibold text-white">
-            Save Note
-          </button>
+          <p className="text-sm text-slate-600">
+            Log clinical summary notes against a specific appointment so the patient, date and time
+            stay linked.
+          </p>
+          <Link
+            to="/staff/notes"
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#143A57] px-4 py-2 text-sm font-semibold !text-white"
+          >
+            <FileText size={15} />
+            Open My Notes
+          </Link>
           <div className="mt-5 border-t border-slate-200 pt-4 text-sm text-slate-600">
             <span className="font-semibold text-slate-900">{upcomingAppointments[0]?.patient_display || 'No patient selected'}</span>
             {' '}schedule context is loaded from ServiceNow appointments.

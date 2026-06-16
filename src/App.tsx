@@ -8,6 +8,8 @@ import { GovernanceAgendaPage } from './pages/governance/GovernanceAgendaPage'
 import { GovernanceDemoPage } from './pages/governance/GovernanceDemoPage'
 import { GovernanceSignInPage } from './pages/governance/GovernanceSignInPage'
 import { ViewChooserPage } from './pages/home/ViewChooserPage'
+import { AppointmentsPage as PatientAppointmentsPage } from './pages/patient/AppointmentsPage'
+import { PatientAppointmentDetailPage } from './pages/patient/AppointmentDetailPage'
 import { BookAppointmentPage } from './pages/patient/BookAppointmentPage'
 import { ContactPage } from './pages/patient/ContactPage'
 import { DashboardPage } from './pages/patient/DashboardPage'
@@ -19,9 +21,11 @@ import { SignInPage as PatientSignInPage } from './pages/patient/SignInPage'
 import { AdminDashboardPage } from './pages/staff/AdminDashboardPage'
 import { AvailabilityPage } from './pages/staff/AvailabilityPage'
 import { AppointmentDetailPage } from './pages/staff/AppointmentDetailPage'
+import { DoctorAnalyticsPage } from './pages/staff/DoctorAnalyticsPage'
 import { DoctorAppointmentsPage } from './pages/staff/DoctorAppointmentsPage'
 import { DoctorDashboardPage } from './pages/staff/DoctorDashboardPage'
 import { DoctorNotesPage } from './pages/staff/DoctorNotesPage'
+import { DoctorQueuePage } from './pages/staff/DoctorQueuePage'
 import { DoctorProfilePage } from './pages/staff/DoctorProfilePage'
 import { PatientRecordPage } from './pages/staff/PatientRecordPage'
 import { StaffSignInPage } from './pages/staff/StaffSignInPage'
@@ -96,6 +100,30 @@ function App() {
               <ClinicianRoleBlocker>
                 <PatientProtectedRoute>
                   <BookAppointmentPage />
+                </PatientProtectedRoute>
+              </ClinicianRoleBlocker>
+            </GovernanceRoleBlocker>
+          }
+        />
+        <Route
+          path="/patient/appointments"
+          element={
+            <GovernanceRoleBlocker>
+              <ClinicianRoleBlocker>
+                <PatientProtectedRoute>
+                  <PatientAppointmentsPage />
+                </PatientProtectedRoute>
+              </ClinicianRoleBlocker>
+            </GovernanceRoleBlocker>
+          }
+        />
+        <Route
+          path="/patient/appointments/:recordId"
+          element={
+            <GovernanceRoleBlocker>
+              <ClinicianRoleBlocker>
+                <PatientProtectedRoute>
+                  <PatientAppointmentDetailPage />
                 </PatientProtectedRoute>
               </ClinicianRoleBlocker>
             </GovernanceRoleBlocker>
@@ -202,6 +230,30 @@ function App() {
               <PatientRoleBlocker>
                 <ClinicianProtectedRoute>
                   <AppointmentDetailPage />
+                </ClinicianProtectedRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
+          }
+        />
+        <Route
+          path="/staff/queue"
+          element={
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianProtectedRoute>
+                  <DoctorQueuePage />
+                </ClinicianProtectedRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
+          }
+        />
+        <Route
+          path="/staff/analytics"
+          element={
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianProtectedRoute>
+                  <DoctorAnalyticsPage />
                 </ClinicianProtectedRoute>
               </PatientRoleBlocker>
             </GovernanceRoleBlocker>

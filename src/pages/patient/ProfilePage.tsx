@@ -7,6 +7,7 @@ import {
   Eye,
   FileText,
   KeyRound,
+  Loader2,
   Lock,
   MessageCircle,
   Move,
@@ -20,7 +21,7 @@ import {
 import { PatientPage } from '../../components/patient/PatientShell'
 import { patient } from '../../data/patientPortalData'
 import { usePatientAuth } from '../../contexts/PatientAuthContext'
-import { fetchPatientProfile, type PatientProfile } from '../../services/serviceNow'
+import { fetchPatientProfile, updatePatientProfile, type PatientProfile } from '../../services/serviceNow'
 
 type ProfileView = {
   patientId: string
@@ -243,6 +244,7 @@ export function ProfilePage() {
   const [isProfileLoading, setIsProfileLoading] = useState(false)
   const [profileRefreshKey, setProfileRefreshKey] = useState(0)
   const [modal, setModal] = useState<ModalKind>(null)
+  const [editOpen, setEditOpen] = useState(false)
   const [emailReminders, setEmailReminders] = useState(true)
   const [smsReminders, setSmsReminders] = useState(true)
   const [clinicNotifications, setClinicNotifications] = useState(true)
@@ -441,7 +443,7 @@ export function ProfilePage() {
           </div>
 
           <section className="border-t border-[#d7e5ec] pt-6">
-            <SectionHeader title="Personal information" action="Edit" onAction={() => setModal('password')} />
+            <SectionHeader title="Personal information" action="Edit" onAction={() => setEditOpen(true)} />
             <div className="grid grid-cols-2 gap-y-8 max-[700px]:grid-cols-1">
               <InfoField label="First Name" value={profile.firstName} loading={isProfileLoading} />
               <InfoField label="Last Name" value={profile.lastName} loading={isProfileLoading} />
@@ -470,7 +472,7 @@ export function ProfilePage() {
                   Clinic-managed
                 </span>
               </div>
-              <button type="button" onClick={() => setModal('privacy')} className="text-[#0f5f8c]">
+              <button type="button" onClick={() => setEditOpen(true)} className="text-[#0f5f8c]">
                 Edit non-sensitive
               </button>
             </div>
@@ -582,6 +584,28 @@ export function ProfilePage() {
       </div>
 
       <MockModal kind={modal} onClose={() => setModal(null)} />
+      {editOpen && (
+        <EditContactModal
+          sysId={loadedProfile?.sys_id || ''}
+          initial={{
+            phone: profile.phone,
+            address_line1: profile.street1,
+            address_line2: profile.street2,
+            city: profile.city,
+            postcode: profile.zip,
+            emergency_name: profile.emergencyName,
+            emergency_phone: profile.emergencyPhone,
+            emergency_relationship: profile.emergencyRelationship,
+            time_preference: profile.timePreference,
+            primary_language: profile.language,
+          }}
+          onClose={() => setEditOpen(false)}
+          onSaved={() => {
+            setEditOpen(false)
+            setProfileRefreshKey((k) => k + 1)
+          }}
+        />
+      )}
       {cropSource && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[#102033]/50 px-4 py-6">
           <section className="grid w-full max-w-[520px] gap-5 rounded-[12px] border border-[#d7e5ec] bg-white p-5 shadow-[0_18px_50px_rgba(16,32,51,0.24)]">
@@ -796,4 +820,131 @@ function loadImage(src: string) {
     image.onerror = reject
     image.src = src
   })
+}
+
+type EditFields = {
+  phone: string
+  address_line1: string
+  address_line2: string
+  city: string
+  postcode: string
+  emergency_name: string
+  emergency_phone: string
+  emergency_relationship: string
+  time_preference: string
+  primary_language: string
+}
+
+function EditContactModal({
+  sysId,
+  initial,
+  onClose,
+  onSaved,
+}: {
+  sysId: string
+  initial: EditFields
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [fields, setFields] = useState<EditFields>(initial)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  function set<K extends keyof EditFields>(key: K, value: string) {
+    setFields((prev) => ({ ...prev, [key]: value }))
+  }
+
+  async function submit(event: ChangeEvent<HTMLFormElement> | { preventDefault: () => void }) {
+    event.preventDefault()
+    if (!sysId) {
+      setErr('Your profile is not linked to a ServiceNow record, so it cannot be edited.')
+      return
+    }
+    setBusy(true)
+    setErr(null)
+    try {
+      await updatePatientProfile({ sys_id: sysId, ...fields })
+      onSaved()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Unable to save changes.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const row = 'w-full rounded-lg border border-[#cbdde6] p-2.5 text-sm'
+  const lbl = 'mb-1.5 block text-xs font-bold uppercase tracking-wider text-[#607487]'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[#d7e5ec] px-6 py-4">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-[#102033]">
+            <Edit3 size={18} className="text-[#0397AE]" /> Edit contact details
+          </h2>
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={18} /></button>
+        </div>
+        <form onSubmit={submit} className="space-y-4 px-6 py-5">
+          <p className="text-sm text-[#607487]">
+            You can update your contact details and emergency contact. Clinical fields (date of birth,
+            condition, blood type) are managed by the clinic.
+          </p>
+          <div>
+            <span className={lbl}>Phone</span>
+            <input className={row} value={fields.phone} onChange={(e) => set('phone', e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3 max-[480px]:grid-cols-1">
+            <div>
+              <span className={lbl}>Address line 1</span>
+              <input className={row} value={fields.address_line1} onChange={(e) => set('address_line1', e.target.value)} />
+            </div>
+            <div>
+              <span className={lbl}>Address line 2</span>
+              <input className={row} value={fields.address_line2} onChange={(e) => set('address_line2', e.target.value)} />
+            </div>
+            <div>
+              <span className={lbl}>City</span>
+              <input className={row} value={fields.city} onChange={(e) => set('city', e.target.value)} />
+            </div>
+            <div>
+              <span className={lbl}>Postcode / ZIP</span>
+              <input className={row} value={fields.postcode} onChange={(e) => set('postcode', e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 max-[480px]:grid-cols-1">
+            <div>
+              <span className={lbl}>Preferred appointment time</span>
+              <input className={row} value={fields.time_preference} onChange={(e) => set('time_preference', e.target.value)} />
+            </div>
+            <div>
+              <span className={lbl}>Primary language</span>
+              <input className={row} value={fields.primary_language} onChange={(e) => set('primary_language', e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 max-[480px]:grid-cols-1">
+            <div>
+              <span className={lbl}>Emergency name</span>
+              <input className={row} value={fields.emergency_name} onChange={(e) => set('emergency_name', e.target.value)} />
+            </div>
+            <div>
+              <span className={lbl}>Emergency phone</span>
+              <input className={row} value={fields.emergency_phone} onChange={(e) => set('emergency_phone', e.target.value)} />
+            </div>
+            <div>
+              <span className={lbl}>Relationship</span>
+              <input className={row} value={fields.emergency_relationship} onChange={(e) => set('emergency_relationship', e.target.value)} />
+            </div>
+          </div>
+          {err && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-[#a22828]">{err}</div>}
+          <div className="flex justify-end gap-2 border-t border-[#eef3f6] pt-4">
+            <button type="button" onClick={onClose} className="rounded-[9px] border border-slate-300 bg-white px-4 py-2.5 font-bold text-slate-700">Cancel</button>
+            <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-[9px] bg-[#143A57] px-4 py-2.5 font-bold text-white disabled:opacity-60">
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              {busy ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }

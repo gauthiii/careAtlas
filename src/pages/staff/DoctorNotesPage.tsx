@@ -6,6 +6,7 @@ import {
   LoaderCircle,
   Plus,
   RefreshCw,
+  Search,
   Stethoscope,
   User,
   X,
@@ -41,6 +42,17 @@ export function DoctorNotesPage() {
   const [notesLoading, setNotesLoading] = useState(false)
   const [notesError, setNotesError] = useState<string | null>(null)
   const [isModalOpen, setModalOpen] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const filteredNotes = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return notes
+    return notes.filter((n) =>
+      [n.patient_name, n.appointment_id, n.notes, n.date, n.logged_by].some((v) =>
+        (v || '').toLowerCase().includes(q),
+      ),
+    )
+  }, [notes, query])
 
   const loadNotes = useCallback(async () => {
     if (!doctorSysId) return
@@ -82,7 +94,8 @@ export function DoctorNotesPage() {
           )}
           {!isBusy && !scheduleError && !notesError && (
             <span>
-              {notes.length} {notes.length === 1 ? 'note' : 'notes'} on record
+              {query.trim() ? `${filteredNotes.length} of ${notes.length}` : notes.length}{' '}
+              {notes.length === 1 ? 'note' : 'notes'}
             </span>
           )}
         </div>
@@ -108,6 +121,19 @@ export function DoctorNotesPage() {
         </div>
       </div>
 
+      {notes.length > 0 && (
+        <div className="relative mb-4 max-w-md">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search notes by patient, ID, text, date…"
+            className="w-full rounded-[9px] border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm"
+          />
+        </div>
+      )}
+
       {notes.length === 0 && !isBusy ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
           <FileText size={32} className="mx-auto mb-3 text-slate-400" />
@@ -126,9 +152,13 @@ export function DoctorNotesPage() {
             Add note
           </button>
         </div>
+      ) : filteredNotes.length === 0 && !isBusy ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-sm font-bold text-slate-500">
+          No notes match your search.
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 max-[900px]:grid-cols-1">
-          {notes.map((note) => (
+          {filteredNotes.map((note) => (
             <article
               key={note.sys_id}
               className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"

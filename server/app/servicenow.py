@@ -26,8 +26,10 @@ from .models import (
     BookingAvailabilityResponse,
     BookingCalendarDay,
     BookingDoctor,
+    ClinicianAppointmentCreateRequest,
     DoctorAppointmentOption,
     PatientProfileResponse,
+    PatientProfileUpdateRequest,
     PatientRegistrationRequest,
     PatientRegistrationResponse,
     PatientRegistrationSummary,
@@ -171,6 +173,9 @@ DOCTOR_APPOINTMENT_OPTION_FIELDS = [
     "u_appointment_date",
     "u_appointment_time",
     "u_status",
+    "u_reason_category",
+    "u_reason_text",
+    "u_triage_priority",
     "u_patient",
     "u_patient.u_first_name",
     "u_patient.u_last_name",
@@ -1170,6 +1175,7 @@ def _map_booking_appointment(
         status_label=status_label,
         reason_category=_field_best(record.get("u_reason_category")),
         reason_text=_field_best(record.get("u_reason_text")),
+        triage_priority=_field_best(record.get("u_triage_priority")),
         patient_id=_field_value(record.get("u_patient")),
         patient_display=_field_display(record.get("u_patient")),
     )
@@ -1383,6 +1389,9 @@ def _map_doctor_appointment_option(record: dict[str, Any]) -> DoctorAppointmentO
         start_time=_time_value(record.get("u_appointment_time")),
         status=_field_value(record.get("u_status")),
         status_label=_field_display(record.get("u_status")),
+        reason_category=_field_best(record.get("u_reason_category")),
+        reason_text=_field_best(record.get("u_reason_text")),
+        triage_priority=_field_best(record.get("u_triage_priority")),
         patient_sys_id=_field_value(record.get("u_patient")),
         patient_name=_dotwalk_full_name(record, "u_patient"),
     )
@@ -1477,15 +1486,18 @@ async def fetch_summary_notes(
     settings: Settings,
     doctor_sys_id: str | None = None,
     appointment_record_id: str | None = None,
+    patient_sys_id: str | None = None,
     limit: int = 200,
     http_client: httpx.AsyncClient | None = None,
 ) -> list[SummaryNoteResponse]:
-    """Return u_summary_notes, newest first, optionally scoped to a doctor and/or appointment."""
+    """Return u_summary_notes, newest first, optionally scoped to a doctor, appointment and/or patient."""
     parts = []
     if doctor_sys_id:
         parts.append(f"u_doctor={_service_now_query_value(doctor_sys_id)}")
     if appointment_record_id:
         parts.append(f"u_appointment={_service_now_query_value(appointment_record_id)}")
+    if patient_sys_id:
+        parts.append(f"u_patient={_service_now_query_value(patient_sys_id)}")
     parts.append("ORDERBYDESCsys_created_on")
     query = "^".join(parts)
 
@@ -1573,6 +1585,264 @@ async def create_summary_note(
         if not isinstance(record, dict):
             raise ServiceNowError("ServiceNow summary note create response did not include a result object")
         return _map_summary_note(record)
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+# ---------------------------------------------------------------------------
+# Mutations across the 4 core tables (appointment / patient / summary notes)
+# ---------------------------------------------------------------------------
+
+async def update_appointment(
+    settings: Settings,
+    record_id: str,
+    *,
+    status: str | None = None,
+    date: str | None = None,
+    start_time: str | None = None,
+    check_conflict: bool = True,
+    http_client: httpx.AsyncClient | None = None,
+) -> DoctorAppointmentOption:
+    """Update an appointment's status and/or date/time (cancel, complete, reschedule)."""
+
+    async def run(client: httpx.AsyncClient) -> DoctorAppointmentOption:
+        # Load the current record so we know the doctor + can validate a reschedule.
+        existing = await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_appointment/{_service_now_query_value(record_id)}",
+            params={"sysparm_fields": "sys_id,u_doctor", "sysparm_display_value": "all"},
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if existing.status_code == 404:
+            raise SummaryNoteAppointmentNotFoundError("Appointment not found.")
+        if not existing.is_success:
+            _raise_snow_error(existing)
+        current = existing.json().get("result", {})
+        doctor_record_id = _field_value(current.get("u_doctor"))
+
+        payload: dict[str, str] = {}
+        if status is not None:
+            payload["u_status"] = status
+        if date is not None:
+            payload["u_appointment_date"] = date
+        if start_time is not None:
+            payload["u_appointment_time"] = start_time
+
+        # Conflict check when rescheduling to a new date/time.
+        if check_conflict and (date is not None or start_time is not None) and doctor_record_id:
+            new_date = date
+            if new_date is None:
+                # No date change — need the existing date to check conflicts.
+                full = await client.get(
+                    f"{settings.snow_base_url}/api/now/table/u_appointment/{_service_now_query_value(record_id)}",
+                    params={"sysparm_fields": "u_appointment_date", "sysparm_display_value": "false"},
+                    headers={"Accept": "application/json"},
+                    auth=(settings.snow_username, settings.snow_password),
+                )
+                new_date = _field_value(full.json().get("result", {}).get("u_appointment_date"))
+            if new_date and start_time is not None:
+                conflicts = await _fetch_doctor_appointments_for_date(
+                    settings, client, doctor_record_id, new_date
+                )
+                for appt in conflicts:
+                    if (
+                        appt.appointment_record_id != record_id
+                        and _time_key(appt.start_time) == _time_key(start_time)
+                        and not is_cancelled_booking_status(appt.status)
+                    ):
+                        raise BookingConflictError("That time is already booked for this doctor.")
+
+        response = await client.patch(
+            f"{settings.snow_base_url}/api/now/table/u_appointment/{_service_now_query_value(record_id)}",
+            params={
+                "sysparm_fields": ",".join(DOCTOR_APPOINTMENT_OPTION_FIELDS),
+                "sysparm_display_value": "all",
+            },
+            json=payload,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if not response.is_success:
+            _raise_snow_error(response)
+        record = response.json().get("result", {})
+        return _map_doctor_appointment_option(record)
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+async def create_clinician_appointment(
+    settings: Settings,
+    req: ClinicianAppointmentCreateRequest,
+    http_client: httpx.AsyncClient | None = None,
+) -> DoctorAppointmentOption:
+    """Create an appointment from the clinician portal (patient sys_id already known)."""
+
+    async def run(client: httpx.AsyncClient) -> DoctorAppointmentOption:
+        conflicts = await _fetch_doctor_appointments_for_date(
+            settings, client, req.doctor_record_id, req.date
+        )
+        for appt in conflicts:
+            if _time_key(appt.start_time) == _time_key(req.start_time) and not is_cancelled_booking_status(appt.status):
+                raise BookingConflictError("That time is already booked for this doctor.")
+
+        payload = {
+            "u_appointment_id": f"APT-{uuid4().hex[:12].upper()}",
+            "u_doctor": req.doctor_record_id,
+            "u_patient": req.patient_sys_id,
+            "u_appointment_date": req.date,
+            "u_appointment_time": req.start_time,
+            "u_status": "confirmed",
+            "u_reason_category": _booking_reason_category(req.reason_category),
+            "u_reason_text": req.reason_text or "Booked via clinician portal",
+            "u_triage_priority": _booking_triage_priority(req.reason_category),
+            "u_created_by_agent": "careatlas-clinician-portal",
+        }
+        response = await client.post(
+            f"{settings.snow_base_url}/api/now/table/u_appointment",
+            params={
+                "sysparm_fields": ",".join(DOCTOR_APPOINTMENT_OPTION_FIELDS),
+                "sysparm_display_value": "all",
+            },
+            json=payload,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if not response.is_success:
+            _raise_snow_error(response)
+        return _map_doctor_appointment_option(response.json().get("result", {}))
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+async def update_summary_note(
+    settings: Settings,
+    sys_id: str,
+    notes: str,
+    http_client: httpx.AsyncClient | None = None,
+) -> SummaryNoteResponse:
+    """Edit the text of an existing summary note."""
+
+    async def run(client: httpx.AsyncClient) -> SummaryNoteResponse:
+        response = await client.patch(
+            f"{settings.snow_base_url}/api/now/table/u_summary_notes/{_service_now_query_value(sys_id)}",
+            params={"sysparm_fields": ",".join(SUMMARY_NOTE_FIELDS), "sysparm_display_value": "all"},
+            json={"u_notes": notes},
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if response.status_code == 404:
+            raise SummaryNoteAppointmentNotFoundError("Summary note not found.")
+        if not response.is_success:
+            _raise_snow_error(response)
+        return _map_summary_note(response.json().get("result", {}))
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+async def delete_summary_note(
+    settings: Settings,
+    sys_id: str,
+    http_client: httpx.AsyncClient | None = None,
+) -> None:
+    """Delete a summary note."""
+
+    async def run(client: httpx.AsyncClient) -> None:
+        response = await client.delete(
+            f"{settings.snow_base_url}/api/now/table/u_summary_notes/{_service_now_query_value(sys_id)}",
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if response.status_code not in (200, 204, 404):
+            _raise_snow_error(response)
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+async def update_registration_status(
+    settings: Settings,
+    sys_id: str,
+    registration_status: str,
+    http_client: httpx.AsyncClient | None = None,
+) -> PatientRegistrationSummary:
+    """Approve / reject a patient registration (u_patient.u_registration_status)."""
+
+    async def run(client: httpx.AsyncClient) -> PatientRegistrationSummary:
+        response = await client.patch(
+            f"{settings.snow_base_url}/api/now/table/u_patient/{_service_now_query_value(sys_id)}",
+            params={"sysparm_fields": ",".join(REGISTRATION_SUMMARY_FIELDS), "sysparm_display_value": "all"},
+            json={"u_registration_status": registration_status},
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if response.status_code == 404:
+            raise BookingPatientNotFoundError("Patient registration not found.")
+        if not response.is_success:
+            _raise_snow_error(response)
+        return _map_registration_summary(response.json().get("result", {}))
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+# Patient self-editable fields → ServiceNow columns.
+_PATIENT_EDITABLE_FIELDS = {
+    "phone": "u_phone",
+    "address_line1": "u_address_line1",
+    "address_line2": "u_address_line2",
+    "city": "u_city",
+    "postcode": "u_postcode",
+    "emergency_name": "u_emergency_name",
+    "emergency_phone": "u_emergency_phone",
+    "emergency_relationship": "u_emergency_relationship",
+    "time_preference": "u_time_preference",
+    "primary_language": "u_primary_language",
+}
+
+
+async def update_patient_profile(
+    settings: Settings,
+    req: PatientProfileUpdateRequest,
+    http_client: httpx.AsyncClient | None = None,
+) -> PatientProfileResponse:
+    """Update the patient-editable subset of a u_patient record."""
+    payload: dict[str, str] = {}
+    for field, column in _PATIENT_EDITABLE_FIELDS.items():
+        value = getattr(req, field)
+        if value is not None:
+            payload[column] = value
+    if not payload:
+        raise ValueError("No editable fields provided.")
+
+    async def run(client: httpx.AsyncClient) -> PatientProfileResponse:
+        response = await client.patch(
+            f"{settings.snow_base_url}/api/now/table/u_patient/{_service_now_query_value(req.sys_id)}",
+            params={"sysparm_fields": ",".join(PATIENT_PROFILE_FIELDS), "sysparm_display_value": "all"},
+            json=payload,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if response.status_code == 404:
+            raise BookingPatientNotFoundError("Patient not found.")
+        if not response.is_success:
+            _raise_snow_error(response)
+        return _map_patient_profile(response.json().get("result", {}))
 
     if http_client is not None:
         return await run(http_client)

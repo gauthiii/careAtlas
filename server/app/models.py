@@ -191,6 +191,7 @@ class BookingAppointment(BaseModel):
     status_label: str
     reason_category: str = ""
     reason_text: str = ""
+    triage_priority: str = ""
     patient_id: str = ""
     patient_display: str = ""
 
@@ -268,7 +269,7 @@ class PatientRegistrationSummary(BaseModel):
 
 
 class DoctorAppointmentOption(BaseModel):
-    """An appointment shown in the "Add note" appointment picker."""
+    """An appointment shown in the "Add note" appointment picker / detail page."""
 
     appointment_record_id: str
     appointment_id: str = ""
@@ -276,8 +277,104 @@ class DoctorAppointmentOption(BaseModel):
     start_time: str = ""
     status: str = ""
     status_label: str = ""
+    reason_category: str = ""
+    reason_text: str = ""
+    triage_priority: str = ""
     patient_sys_id: str = ""
     patient_name: str = ""
+
+
+class AppointmentUpdateRequest(BaseModel):
+    """Update an appointment's status and/or date/time (cancel, complete, reschedule)."""
+
+    record_id: str
+    status: str | None = None
+    date: str | None = None
+    start_time: str | None = None
+
+    @field_validator("record_id")
+    @classmethod
+    def require_record_id(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("record_id is required")
+        return value
+
+    @field_validator("status", "date", "start_time")
+    @classmethod
+    def trim_optional(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
+
+class ClinicianAppointmentCreateRequest(BaseModel):
+    """Create an appointment directly from the clinician portal (patient sys_id known)."""
+
+    doctor_record_id: str
+    patient_sys_id: str
+    date: str
+    start_time: str
+    reason_category: str = "general-checkup"
+    reason_text: str | None = None
+
+    @field_validator("doctor_record_id", "patient_sys_id", "date", "start_time")
+    @classmethod
+    def require_field(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("field is required")
+        return value
+
+
+class SummaryNoteUpdateRequest(BaseModel):
+    sys_id: str
+    notes: str
+
+    @field_validator("sys_id", "notes")
+    @classmethod
+    def require_nonblank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("field is required")
+        return value
+
+
+class RegistrationStatusUpdateRequest(BaseModel):
+    sys_id: str
+    registration_status: str
+
+    @field_validator("sys_id", "registration_status")
+    @classmethod
+    def require_nonblank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("field is required")
+        return value
+
+
+class PatientProfileUpdateRequest(BaseModel):
+    """Patient-editable profile fields (self-owned contact info only)."""
+
+    sys_id: str
+    phone: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    city: str | None = None
+    postcode: str | None = None
+    emergency_name: str | None = None
+    emergency_phone: str | None = None
+    emergency_relationship: str | None = None
+    time_preference: str | None = None
+    primary_language: str | None = None
+
+    @field_validator("sys_id")
+    @classmethod
+    def require_sys_id(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("sys_id is required")
+        return value
 
 
 class SummaryNoteRequest(BaseModel):
