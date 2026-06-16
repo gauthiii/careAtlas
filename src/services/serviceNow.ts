@@ -222,6 +222,39 @@ export interface PatientRegistrationSummary {
   created_on: string
 }
 
+export interface DoctorAppointmentOption {
+  appointment_record_id: string
+  appointment_id: string
+  date: string
+  start_time: string
+  status: string
+  status_label: string
+  patient_sys_id: string
+  patient_name: string
+}
+
+export interface SummaryNote {
+  sys_id: string
+  summary_note_id: string
+  appointment_record_id: string
+  appointment_id: string
+  doctor_record_id: string
+  doctor_name: string
+  patient_sys_id: string
+  patient_name: string
+  date: string
+  start_time: string
+  notes: string
+  logged_by: string
+  created_on: string
+}
+
+export interface CreateSummaryNoteRequest {
+  appointment_record_id: string
+  notes: string
+  logged_by?: string | null
+}
+
 export interface AiDecisionLogEntry {
   sys_id: string
   log_id: string
@@ -469,6 +502,73 @@ export async function fetchPatientRegistrations(
   }
 
   return (await res.json()) as PatientRegistrationSummary[]
+}
+
+export async function fetchDoctorAppointmentOptions(
+  doctorSysId: string,
+): Promise<DoctorAppointmentOption[]> {
+  const params = new URLSearchParams({ doctor_sys_id: doctorSysId })
+  const res = await fetch(`${API_BASE}/staff/appointment-options?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as DoctorAppointmentOption[]
+}
+
+export async function fetchAppointment(recordId: string): Promise<DoctorAppointmentOption> {
+  const params = new URLSearchParams({ record_id: recordId })
+  const res = await fetch(`${API_BASE}/staff/appointment?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as DoctorAppointmentOption
+}
+
+export async function fetchSummaryNotes(
+  filters: { doctorSysId?: string; appointmentRecordId?: string } = {},
+  limit = 200,
+): Promise<SummaryNote[]> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (filters.doctorSysId?.trim()) params.set('doctor_sys_id', filters.doctorSysId.trim())
+  if (filters.appointmentRecordId?.trim())
+    params.set('appointment_record_id', filters.appointmentRecordId.trim())
+
+  const res = await fetch(`${API_BASE}/staff/summary-notes?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as SummaryNote[]
+}
+
+export async function createSummaryNote(
+  note: CreateSummaryNoteRequest,
+): Promise<SummaryNote> {
+  const res = await fetch(`${API_BASE}/staff/summary-notes`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(note),
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as SummaryNote
 }
 
 export async function fetchAiDecisionLog(limit = 25): Promise<AiDecisionLogEntry[]> {

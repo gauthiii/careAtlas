@@ -18,7 +18,10 @@ import { RegistrationPage } from './pages/patient/RegistrationPage'
 import { SignInPage as PatientSignInPage } from './pages/patient/SignInPage'
 import { AdminDashboardPage } from './pages/staff/AdminDashboardPage'
 import { AvailabilityPage } from './pages/staff/AvailabilityPage'
+import { AppointmentDetailPage } from './pages/staff/AppointmentDetailPage'
+import { DoctorAppointmentsPage } from './pages/staff/DoctorAppointmentsPage'
 import { DoctorDashboardPage } from './pages/staff/DoctorDashboardPage'
+import { DoctorNotesPage } from './pages/staff/DoctorNotesPage'
 import { DoctorProfilePage } from './pages/staff/DoctorProfilePage'
 import { PatientRecordPage } from './pages/staff/PatientRecordPage'
 import { StaffSignInPage } from './pages/staff/StaffSignInPage'
@@ -163,6 +166,42 @@ function App() {
               <PatientRoleBlocker>
                 <ClinicianProtectedRoute>
                   <PatientRecordPage />
+                </ClinicianProtectedRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
+          }
+        />
+        <Route
+          path="/staff/notes"
+          element={
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianProtectedRoute>
+                  <DoctorNotesPage />
+                </ClinicianProtectedRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
+          }
+        />
+        <Route
+          path="/staff/appointments"
+          element={
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianProtectedRoute>
+                  <DoctorAppointmentsPage />
+                </ClinicianProtectedRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
+          }
+        />
+        <Route
+          path="/staff/appointments/:recordId"
+          element={
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianProtectedRoute>
+                  <AppointmentDetailPage />
                 </ClinicianProtectedRoute>
               </PatientRoleBlocker>
             </GovernanceRoleBlocker>

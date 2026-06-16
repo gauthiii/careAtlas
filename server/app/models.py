@@ -267,6 +267,58 @@ class PatientRegistrationSummary(BaseModel):
     created_on: str = ""
 
 
+class DoctorAppointmentOption(BaseModel):
+    """An appointment shown in the "Add note" appointment picker."""
+
+    appointment_record_id: str
+    appointment_id: str = ""
+    date: str = ""
+    start_time: str = ""
+    status: str = ""
+    status_label: str = ""
+    patient_sys_id: str = ""
+    patient_name: str = ""
+
+
+class SummaryNoteRequest(BaseModel):
+    # The note is linked to an appointment; the doctor, patient, date and time
+    # are derived server-side from that appointment so the record stays consistent.
+    appointment_record_id: str
+    notes: str
+    logged_by: str | None = None
+
+    @field_validator("appointment_record_id", "notes")
+    @classmethod
+    def require_nonblank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("field is required")
+        return value
+
+    @field_validator("logged_by")
+    @classmethod
+    def trim_optional(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
+
+class SummaryNoteResponse(BaseModel):
+    sys_id: str = ""
+    summary_note_id: str = ""
+    appointment_record_id: str = ""
+    appointment_id: str = ""
+    doctor_record_id: str = ""
+    doctor_name: str = ""
+    patient_sys_id: str = ""
+    patient_name: str = ""
+    date: str = ""
+    start_time: str = ""
+    notes: str = ""
+    logged_by: str = ""
+    created_on: str = ""
+
+
 class AiDecisionLogEntry(BaseModel):
     sys_id: str = ""
     log_id: str = ""

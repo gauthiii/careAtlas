@@ -26,10 +26,13 @@ from .models import (
     BookingAvailabilityResponse,
     BookingCalendarDay,
     BookingDoctor,
+    DoctorAppointmentOption,
     PatientProfileResponse,
     PatientRegistrationRequest,
     PatientRegistrationResponse,
     PatientRegistrationSummary,
+    SummaryNoteRequest,
+    SummaryNoteResponse,
 )
 
 logger = logging.getLogger("careatlas.servicenow")
@@ -161,6 +164,37 @@ DECISION_LOG_FIELDS = [
     "u_appointment",
 ]
 
+# Fields for the "Add note" appointment picker (dot-walked patient name for display).
+DOCTOR_APPOINTMENT_OPTION_FIELDS = [
+    "sys_id",
+    "u_appointment_id",
+    "u_appointment_date",
+    "u_appointment_time",
+    "u_status",
+    "u_patient",
+    "u_patient.u_first_name",
+    "u_patient.u_last_name",
+]
+
+# Fields pulled from u_summary_notes for the clinician "My notes" view.
+SUMMARY_NOTE_FIELDS = [
+    "sys_id",
+    "u_summary_note_id",
+    "u_appointment",
+    "u_appointment.u_appointment_id",
+    "u_doctor",
+    "u_doctor.u_first_name",
+    "u_doctor.u_last_name",
+    "u_patient",
+    "u_patient.u_first_name",
+    "u_patient.u_last_name",
+    "u_appointment_date",
+    "u_appointment_time",
+    "u_notes",
+    "u_logged_by",
+    "sys_created_on",
+]
+
 
 @dataclass(frozen=True)
 class AclProbe:
@@ -285,6 +319,10 @@ class BookingPatientNotFoundError(RuntimeError):
 
 class BookingConflictError(RuntimeError):
     """Raised when the requested appointment time cannot be booked safely."""
+
+
+class SummaryNoteAppointmentNotFoundError(RuntimeError):
+    """Raised when a summary note references an appointment that no longer exists."""
 
 
 @dataclass
@@ -1322,6 +1360,224 @@ def _booking_reason_text(booking: BookingAppointmentRequest) -> str:
     ]
     text = " | ".join(f"{label}: {value}" for label, value in parts if value)
     return text[:500]
+
+
+# ---------------------------------------------------------------------------
+# Summary notes (u_summary_notes) — clinician "My notes"
+# ---------------------------------------------------------------------------
+
+def _dotwalk_full_name(record: dict[str, Any], prefix: str) -> str:
+    """Build "First Last" from dot-walked name fields, falling back to the
+    reference display value (which is just the first name on these tables)."""
+    first = _field_best(record.get(f"{prefix}.u_first_name"))
+    last = _field_best(record.get(f"{prefix}.u_last_name"))
+    name = " ".join(part for part in (first, last) if part).strip()
+    return name or _field_display(record.get(prefix))
+
+
+def _map_doctor_appointment_option(record: dict[str, Any]) -> DoctorAppointmentOption:
+    return DoctorAppointmentOption(
+        appointment_record_id=_field_best(record.get("sys_id")),
+        appointment_id=_field_best(record.get("u_appointment_id")),
+        date=_date_value(record.get("u_appointment_date")),
+        start_time=_time_value(record.get("u_appointment_time")),
+        status=_field_value(record.get("u_status")),
+        status_label=_field_display(record.get("u_status")),
+        patient_sys_id=_field_value(record.get("u_patient")),
+        patient_name=_dotwalk_full_name(record, "u_patient"),
+    )
+
+
+def _map_summary_note(record: dict[str, Any]) -> SummaryNoteResponse:
+    return SummaryNoteResponse(
+        sys_id=_field_best(record.get("sys_id")),
+        summary_note_id=_field_best(record.get("u_summary_note_id")),
+        appointment_record_id=_field_value(record.get("u_appointment")),
+        appointment_id=_field_best(record.get("u_appointment.u_appointment_id")),
+        doctor_record_id=_field_value(record.get("u_doctor")),
+        doctor_name=_dotwalk_full_name(record, "u_doctor"),
+        patient_sys_id=_field_value(record.get("u_patient")),
+        patient_name=_dotwalk_full_name(record, "u_patient"),
+        date=_date_value(record.get("u_appointment_date")),
+        start_time=_time_value(record.get("u_appointment_time")),
+        notes=_field_best(record.get("u_notes")),
+        logged_by=_field_best(record.get("u_logged_by")),
+        created_on=_field_best(record.get("sys_created_on")),
+    )
+
+
+async def fetch_doctor_appointment_options(
+    settings: Settings,
+    doctor_sys_id: str,
+    http_client: httpx.AsyncClient | None = None,
+) -> list[DoctorAppointmentOption]:
+    """Return every appointment for a doctor (no date bound) for the note picker."""
+
+    async def run(client: httpx.AsyncClient) -> list[DoctorAppointmentOption]:
+        response = await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_appointment",
+            params={
+                "sysparm_query": (
+                    f"u_doctor={_service_now_query_value(doctor_sys_id)}"
+                    "^ORDERBYDESCu_appointment_date^ORDERBYu_appointment_time"
+                ),
+                "sysparm_fields": ",".join(DOCTOR_APPOINTMENT_OPTION_FIELDS),
+                "sysparm_display_value": "all",
+                "sysparm_limit": "1000",
+            },
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if not response.is_success:
+            _raise_snow_error(response)
+        records = response.json().get("result", [])
+        if not isinstance(records, list):
+            raise ServiceNowError("ServiceNow appointment options response did not include a result list")
+        return [_map_doctor_appointment_option(r) for r in records if isinstance(r, dict)]
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+async def fetch_appointment_option(
+    settings: Settings,
+    appointment_record_id: str,
+    http_client: httpx.AsyncClient | None = None,
+) -> DoctorAppointmentOption | None:
+    """Return a single appointment (for the appointment detail page)."""
+
+    async def run(client: httpx.AsyncClient) -> DoctorAppointmentOption | None:
+        response = await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_appointment",
+            params={
+                "sysparm_query": f"sys_id={_service_now_query_value(appointment_record_id)}",
+                "sysparm_fields": ",".join(DOCTOR_APPOINTMENT_OPTION_FIELDS),
+                "sysparm_display_value": "all",
+                "sysparm_limit": "1",
+            },
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if not response.is_success:
+            _raise_snow_error(response)
+        records = response.json().get("result", [])
+        if not isinstance(records, list) or not records or not isinstance(records[0], dict):
+            return None
+        return _map_doctor_appointment_option(records[0])
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+async def fetch_summary_notes(
+    settings: Settings,
+    doctor_sys_id: str | None = None,
+    appointment_record_id: str | None = None,
+    limit: int = 200,
+    http_client: httpx.AsyncClient | None = None,
+) -> list[SummaryNoteResponse]:
+    """Return u_summary_notes, newest first, optionally scoped to a doctor and/or appointment."""
+    parts = []
+    if doctor_sys_id:
+        parts.append(f"u_doctor={_service_now_query_value(doctor_sys_id)}")
+    if appointment_record_id:
+        parts.append(f"u_appointment={_service_now_query_value(appointment_record_id)}")
+    parts.append("ORDERBYDESCsys_created_on")
+    query = "^".join(parts)
+
+    async def run(client: httpx.AsyncClient) -> list[SummaryNoteResponse]:
+        response = await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_summary_notes",
+            params={
+                "sysparm_query": query,
+                "sysparm_fields": ",".join(SUMMARY_NOTE_FIELDS),
+                "sysparm_display_value": "all",
+                "sysparm_limit": str(max(1, min(limit, 1000))),
+            },
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if not response.is_success:
+            _raise_snow_error(response)
+        records = response.json().get("result", [])
+        if not isinstance(records, list):
+            raise ServiceNowError("ServiceNow summary notes response did not include a result list")
+        return [_map_summary_note(r) for r in records if isinstance(r, dict)]
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+async def create_summary_note(
+    settings: Settings,
+    note: SummaryNoteRequest,
+    http_client: httpx.AsyncClient | None = None,
+) -> SummaryNoteResponse:
+    """Create a u_summary_notes record, deriving doctor/patient/date/time from
+    the linked appointment so the stored record can never be inconsistent."""
+
+    async def run(client: httpx.AsyncClient) -> SummaryNoteResponse:
+        appt_response = await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_appointment",
+            params={
+                "sysparm_query": f"sys_id={_service_now_query_value(note.appointment_record_id)}",
+                "sysparm_fields": "sys_id,u_doctor,u_patient,u_appointment_date,u_appointment_time",
+                "sysparm_display_value": "all",
+                "sysparm_limit": "1",
+            },
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if not appt_response.is_success:
+            _raise_snow_error(appt_response)
+        appts = appt_response.json().get("result", [])
+        if not isinstance(appts, list) or not appts or not isinstance(appts[0], dict):
+            raise SummaryNoteAppointmentNotFoundError("Appointment not found for this note.")
+        appt = appts[0]
+
+        # glide_time value comes back as "1970-01-01 HH:MM:SS"; store just the
+        # time portion so the new note round-trips to the same displayed time.
+        time_raw = _field_value(appt.get("u_appointment_time"))
+        time_portion = time_raw.split(" ")[-1] if time_raw else ""
+
+        payload = {
+            "u_summary_note_id": f"SN-{uuid4().hex[:12].upper()}",
+            "u_appointment": _field_value(appt.get("sys_id")) or note.appointment_record_id,
+            "u_doctor": _field_value(appt.get("u_doctor")),
+            "u_patient": _field_value(appt.get("u_patient")),
+            "u_appointment_date": _field_value(appt.get("u_appointment_date")),
+            "u_appointment_time": time_portion,
+            "u_notes": note.notes,
+            "u_logged_by": note.logged_by or "",
+        }
+
+        create_response = await client.post(
+            f"{settings.snow_base_url}/api/now/table/u_summary_notes",
+            params={
+                "sysparm_fields": ",".join(SUMMARY_NOTE_FIELDS),
+                "sysparm_display_value": "all",
+            },
+            json=payload,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if not create_response.is_success:
+            _raise_snow_error(create_response)
+        record = create_response.json().get("result", {})
+        if not isinstance(record, dict):
+            raise ServiceNowError("ServiceNow summary note create response did not include a result object")
+        return _map_summary_note(record)
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
 
 
 async def test_service_account_acl(

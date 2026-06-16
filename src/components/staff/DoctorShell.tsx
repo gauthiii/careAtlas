@@ -1,6 +1,8 @@
 import {
   CalendarCheck,
+  CalendarDays,
   Clock3,
+  FileText,
   HeartPulse,
   Hospital,
   LayoutDashboard,
@@ -30,6 +32,8 @@ const signedOutClinicianNav = [
 
 const signedInClinicianNav = [
   { label: 'Dashboard', to: '/staff/doctor', icon: LayoutDashboard, end: true },
+  { label: 'Appointments', to: '/staff/appointments', icon: CalendarDays, matchPrefix: '/staff/appointments' },
+  { label: 'My Notes', to: '/staff/notes', icon: FileText },
   { label: 'Admin', to: '/staff/admin', icon: CalendarCheck },
   { label: 'Availability', to: '/staff/availability', icon: Clock3 },
   { label: 'Profile', to: '/staff/profile', icon: Stethoscope },
@@ -41,6 +45,8 @@ export function DoctorShell({ children }: { children: React.ReactNode }) {
   const { isAuthenticated: isClinicianAuthenticated, overrideLogin } = useClinicianAuth()
   const { isAuthenticated: isPatientAuthenticated } = usePatientAuth()
   const clinicianNav = isClinicianAuthenticated ? signedInClinicianNav : signedOutClinicianNav
+  // As nav items grow, shrink padding/text/icons proportionally so the bar still fits.
+  const compact = clinicianNav.length > 5
   const patientPortalHome = isPatientAuthenticated ? '/patient/dashboard' : '/patient/home'
   const clinicianPortalHome = isClinicianAuthenticated ? '/staff/doctor' : '/staff/sign-in'
 
@@ -70,7 +76,10 @@ export function DoctorShell({ children }: { children: React.ReactNode }) {
             const prefix = 'matchPrefix' in item ? item.matchPrefix : undefined
             const navClassName = ({ isActive }: { isActive: boolean }) =>
               cn(
-                'inline-flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
+                'inline-flex items-center font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
+                compact
+                  ? 'min-h-[30px] gap-1 rounded-lg px-2 text-[0.74rem]'
+                  : 'min-h-[34px] gap-1.5 rounded-[9px] px-2.5 text-[0.82rem]',
                 (isActive || (prefix && location.pathname.startsWith(prefix))) && 'bg-[#143A57] !text-white',
               )
 
@@ -97,7 +106,7 @@ export function DoctorShell({ children }: { children: React.ReactNode }) {
                 end={'end' in item ? item.end : false}
                 className={navClassName}
               >
-                <Icon size={15} />
+                <Icon size={compact ? 13 : 15} />
                 {item.label}
               </NavLink>
             )

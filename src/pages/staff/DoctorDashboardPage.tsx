@@ -10,8 +10,10 @@ import {
   RefreshCw,
   UserCheck,
 } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { DoctorPage } from '../../components/staff/DoctorShell'
+import { WeekNav } from '../../components/staff/WeekNav'
 import { clinicianDisplayName, useClinicianAuth } from '../../contexts/ClinicianAuthContext'
 import { useClinicianSchedule } from '../../hooks/useClinicianSchedule'
 import {
@@ -85,8 +87,10 @@ export function DoctorDashboardPage() {
     .sort((a, b) => appointmentSortValue(a) - appointmentSortValue(b))
   const nextAvailableSlot = doctor ? findNextAvailableSlot(doctor, doctorAppointments, today, WEEK_LENGTH) : null
   const schedule = doctor ? getScheduleForDoctor(doctor) : null
+  const [weekOffset, setWeekOffset] = useState(0)
+  const weekStart = addDays(today, weekOffset * WEEK_LENGTH)
   const weekDays = Array.from({ length: WEEK_LENGTH }, (_, index) => {
-    const date = addDays(today, index)
+    const date = addDays(weekStart, index)
     return {
       date,
       visits: doctorAppointments.filter((appointment) => appointment.date === date && !isCancelledAppointment(appointment)).length,
@@ -203,16 +207,19 @@ export function DoctorDashboardPage() {
 
         <div className="flex flex-col gap-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-              <CalendarCheck size={18} />
-              Next 7 Days
-            </h3>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h3 className="flex items-center gap-2 text-lg font-semibold">
+                <CalendarCheck size={18} />
+                7-Day Schedule
+              </h3>
+              <WeekNav weekOffset={weekOffset} onChange={setWeekOffset} weekStart={weekStart} />
+            </div>
             <div className="grid grid-cols-7 gap-2 max-[700px]:grid-cols-2">
-              {weekDays.map((item, index) => (
+              {weekDays.map((item) => (
                 <div
                   key={item.date}
                   className={`rounded-xl border p-2 text-center ${
-                    index === 0 ? 'border-[#0397AE] bg-[#e7f3f8] shadow-[inset_0_0_0_1px_#0397AE]' : 'border-slate-200'
+                    item.date === today ? 'border-[#0397AE] bg-[#e7f3f8] shadow-[inset_0_0_0_1px_#0397AE]' : 'border-slate-200'
                   }`}
                 >
                   <div className="text-xs text-slate-500">{formatDate(item.date).split(',')[0]}</div>

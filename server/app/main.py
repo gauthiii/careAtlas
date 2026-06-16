@@ -38,6 +38,7 @@ from .models import (
     ExecuteAgentRequest,
     ExecuteAgentResponse,
     PatientProfileResponse,
+    DoctorAppointmentOption,
     PatientRegistrationRequest,
     PatientRegistrationResponse,
     PatientRegistrationSummary,
@@ -45,6 +46,8 @@ from .models import (
     PasswordPwnedCheckResponse,
     RegisterAgentRequest,
     RegisterAgentResponse,
+    SummaryNoteRequest,
+    SummaryNoteResponse,
     ValidateRequest,
     ValidateResponse,
 )
@@ -53,16 +56,21 @@ from .servicenow import (
     BookingConflictError,
     BookingPatientNotFoundError,
     ServiceNowError,
+    SummaryNoteAppointmentNotFoundError,
     create_agent,
     create_patient_booking_appointment,
     create_patient_registration,
+    create_summary_note,
     execute_agent,
     fetch_agents,
     fetch_ai_decision_log,
+    fetch_appointment_option,
+    fetch_doctor_appointment_options,
     fetch_managed_ai_assets,
     fetch_patient_booking_availability,
     fetch_patient_profile,
     fetch_patient_registrations,
+    fetch_summary_notes,
     fetch_unmanaged_ai_assets,
     test_service_account_acl,
     validate_user,
@@ -274,6 +282,62 @@ async def get_patient_registrations(
 ) -> list[PatientRegistrationSummary]:
     try:
         return await fetch_patient_registrations(settings, status=status, limit=limit)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/staff/appointment-options", response_model=list[DoctorAppointmentOption])
+async def get_doctor_appointment_options(
+    doctor_sys_id: str,
+    settings: Settings = Depends(get_settings),
+) -> list[DoctorAppointmentOption]:
+    try:
+        return await fetch_doctor_appointment_options(settings, doctor_sys_id=doctor_sys_id)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/staff/appointment", response_model=DoctorAppointmentOption)
+async def get_appointment(
+    record_id: str,
+    settings: Settings = Depends(get_settings),
+) -> DoctorAppointmentOption:
+    try:
+        appointment = await fetch_appointment_option(settings, appointment_record_id=record_id)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    if appointment is None:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    return appointment
+
+
+@api.get("/staff/summary-notes", response_model=list[SummaryNoteResponse])
+async def get_summary_notes(
+    doctor_sys_id: str | None = None,
+    appointment_record_id: str | None = None,
+    limit: int = 200,
+    settings: Settings = Depends(get_settings),
+) -> list[SummaryNoteResponse]:
+    try:
+        return await fetch_summary_notes(
+            settings,
+            doctor_sys_id=doctor_sys_id,
+            appointment_record_id=appointment_record_id,
+            limit=limit,
+        )
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.post("/staff/summary-notes", response_model=SummaryNoteResponse)
+async def post_summary_note(
+    body: SummaryNoteRequest,
+    settings: Settings = Depends(get_settings),
+) -> SummaryNoteResponse:
+    try:
+        return await create_summary_note(settings, body)
+    except SummaryNoteAppointmentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

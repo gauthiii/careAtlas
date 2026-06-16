@@ -1,4 +1,5 @@
 import { AlertTriangle, LoaderCircle, RefreshCw } from 'lucide-react'
+import { useState } from 'react'
 import { DoctorPage } from '../../components/staff/DoctorShell'
 import { useClinicianSchedule } from '../../hooks/useClinicianSchedule'
 import { cn } from '../../lib/cn'
@@ -18,11 +19,14 @@ import {
   isSpecialAppointment,
   timeRangeForHour,
 } from '../../lib/scheduling'
+import { WeekNav } from '../../components/staff/WeekNav'
 import type { BookingAppointment, BookingDoctor } from '../../services/serviceNow'
 
 export function AvailabilityPage() {
   const { appointments, doctor, error, isLoading, refetch, today } = useClinicianSchedule()
-  const days = Array.from({ length: WEEK_LENGTH }, (_, index) => addDays(today, index))
+  const [weekOffset, setWeekOffset] = useState(0)
+  const weekStart = addDays(today, weekOffset * WEEK_LENGTH)
+  const days = Array.from({ length: WEEK_LENGTH }, (_, index) => addDays(weekStart, index))
   const schedule = doctor ? getScheduleForDoctor(doctor) : null
   const activeDoctorAppointments = doctor ? activeAppointmentsForDoctor(appointments, doctor) : []
 
@@ -31,7 +35,8 @@ export function AvailabilityPage() {
       title="Scheduling availability"
       intro="Review this clinician's weekly schedule, open time, and booked appointments."
     >
-      <div className="-mt-3 mb-4 flex justify-end">
+      <div className="-mt-3 mb-4 flex flex-wrap items-center justify-between gap-3">
+        <WeekNav weekOffset={weekOffset} onChange={setWeekOffset} weekStart={weekStart} />
         <button
           type="button"
           onClick={refetch}
