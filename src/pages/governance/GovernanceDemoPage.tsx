@@ -101,7 +101,7 @@ export function GovernanceDemoPage() {
             <CalendarDays size={28} />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-lg font-bold text-[#102033]">Agenda &mdash; Jun 14</div>
+            <div className="text-lg font-bold text-[#102033]">Agenda &mdash; Jun 19</div>
             <p className="mt-0.5 text-sm leading-snug text-[#53687b]">
               Full walkthrough of everything built: portals, auth, tables, agent pipeline, A2A, ACL, shadow discovery, and AI Control Tower lifecycle.
             </p>

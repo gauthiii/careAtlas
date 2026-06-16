@@ -229,7 +229,7 @@ export function GovernanceAgendaPage() {
     if (exporting) return
     setExporting(true)
     try {
-      const pdf = new jsPDF({ orientation, unit: 'pt', format: 'a4' })
+      const pdf = new jsPDF({ orientation, unit: 'pt', format: 'a4', compress: true })
       const pageW = pdf.internal.pageSize.getWidth()
       const pageH = pdf.internal.pageSize.getHeight()
       const margin = 28
@@ -242,14 +242,16 @@ export function GovernanceAgendaPage() {
           useCORS: true,
           logging: false,
         })
-        const img = canvas.toDataURL('image/png')
+        // JPEG (lossy) instead of PNG (lossless) keeps the file a few MB rather
+        // than ~100 MB; 0.85 is visually lossless for slide-style content.
+        const img = canvas.toDataURL('image/jpeg', 0.85)
         const availW = pageW - margin * 2
         const availH = pageH - margin * 2
         const ratio = Math.min(availW / canvas.width, availH / canvas.height)
         const w = canvas.width * ratio
         const h = canvas.height * ratio
         if (i > 0) pdf.addPage()
-        pdf.addImage(img, 'PNG', (pageW - w) / 2, margin, w, h)
+        pdf.addImage(img, 'JPEG', (pageW - w) / 2, margin, w, h)
       }
 
       pdf.save(`careatlas-agenda-${orientation}.pdf`)
@@ -263,8 +265,8 @@ export function GovernanceAgendaPage() {
   return (
     <PortalPage
       label="AI Governance Officer"
-      title="Agenda — June 14"
-      intro="A scrollable walkthrough of everything built and configured for the June 14 demo. Each section maps to a live area of the application."
+      title="Agenda — June 19"
+      intro="A scrollable walkthrough of everything built and configured for the June 19 demo. Each section maps to a live area of the application."
     >
       <section className="min-w-0 px-6 pb-10">
         {/* Export toolbar */}
@@ -272,7 +274,7 @@ export function GovernanceAgendaPage() {
           <div className="min-w-0">
             <div className="text-sm font-black text-[#102033]">Export agenda</div>
             <div className="text-xs text-[#53687b]">
-              Saves the title page plus all {SECTIONS.length} sections as a {SECTIONS.length + 1}-page PDF.
+              Saves all {SECTIONS.length} sections as a {SECTIONS.length}-page PDF — the title and agenda nav share the first page.
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -317,52 +319,59 @@ export function GovernanceAgendaPage() {
           </div>
         </div>
 
-        {/* Date banner */}
+        {/* Page 1 of the export: title banner + agenda nav + first section */}
         <div
           ref={(el) => { pageRefs.current[0] = el }}
-          className="mb-8 flex items-center gap-4 rounded-2xl border border-[#cfe0ea] bg-gradient-to-r from-[#143A57] to-[#1d5c87] p-5 text-white shadow-[0_8px_24px_rgba(20,58,87,0.25)]">
-          <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-white/15 text-white">
-            <Sparkles size={28} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[0.72rem] font-bold uppercase tracking-widest text-white/60">Demo day</div>
-            <div className="text-2xl font-black tracking-tight">June 14, 2026</div>
-            <div className="mt-0.5 text-sm text-white/70">
-              CareAtlas &mdash; AI-Native Healthcare Platform on ServiceNow
+          className="mb-10 space-y-8"
+        >
+          {/* Date banner */}
+          <div className="flex items-center gap-4 rounded-2xl border border-[#cfe0ea] bg-gradient-to-r from-[#143A57] to-[#1d5c87] p-5 text-white shadow-[0_8px_24px_rgba(20,58,87,0.25)]">
+            <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-white/15 text-white">
+              <Sparkles size={28} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[0.72rem] font-bold uppercase tracking-widest text-white/60">Demo day</div>
+              <div className="text-2xl font-black tracking-tight">June 19, 2026</div>
+              <div className="mt-0.5 text-sm text-white/70">
+                CareAtlas &mdash; AI-Native Healthcare Platform on ServiceNow
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-1 text-right">
+              <div className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold">
+                {SECTIONS.length} sections
+              </div>
+              <div className="rounded-full bg-emerald-400/30 px-3 py-1 text-xs font-bold text-emerald-200">
+                All complete
+              </div>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-1 text-right">
-            <div className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold">
-              {SECTIONS.length} sections
-            </div>
-            <div className="rounded-full bg-emerald-400/30 px-3 py-1 text-xs font-bold text-emerald-200">
-              All complete
-            </div>
+
+          {/* Agenda nav — squared boxes for every section */}
+          <div className="flex flex-wrap gap-1.5">
+            {SECTIONS.map((s) => (
+              <a
+                key={s.id}
+                href={`#${s.id}`}
+                className="flex flex-shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-2 text-center transition hover:shadow-md"
+                style={{ borderColor: s.border, backgroundColor: s.bg }}
+              >
+                <span className="text-[0.6rem] font-black tracking-widest" style={{ color: s.color }}>
+                  {s.number}
+                </span>
+                <span className="text-[0.65rem] font-bold leading-tight" style={{ color: s.color, maxWidth: 72 }}>
+                  {s.title}
+                </span>
+              </a>
+            ))}
           </div>
+
+          {/* First section shares the title page */}
+          <AgendaCard section={SECTIONS[0]} />
         </div>
 
-        {/* Progress strip */}
-        <div className="mb-8 flex gap-1.5 overflow-x-auto pb-1">
-          {SECTIONS.map((s) => (
-            <a
-              key={s.id}
-              href={`#${s.id}`}
-              className="flex flex-shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-2 text-center transition hover:shadow-md"
-              style={{ borderColor: s.border, backgroundColor: s.bg }}
-            >
-              <span className="text-[0.6rem] font-black tracking-widest" style={{ color: s.color }}>
-                {s.number}
-              </span>
-              <span className="text-[0.65rem] font-bold leading-tight" style={{ color: s.color, maxWidth: 72 }}>
-                {s.title}
-              </span>
-            </a>
-          ))}
-        </div>
-
-        {/* Sections */}
+        {/* Remaining sections — one export page each */}
         <div className="space-y-10">
-          {SECTIONS.map((section, i) => (
+          {SECTIONS.slice(1).map((section, i) => (
             <AgendaCard
               key={section.id}
               section={section}
