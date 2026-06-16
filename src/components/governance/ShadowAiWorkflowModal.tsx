@@ -771,15 +771,15 @@ const TABS: Tab[] = [
   {
     key: 'p0',
     num: '0',
-    short: 'Shadow AI',
-    heading: 'Phase 0 · Shadow AI Discovery',
+    short: 'Discovery',
+    heading: 'Phase 0 · Discovery Scan',
     sub: 'Unmanaged AI surfaced by discovery — 293 ungoverned assets in limbo.',
     flow: FLOW_P0,
   },
   {
     key: 'p1',
     num: '1',
-    short: 'Move to Managed',
+    short: 'Manage',
     heading: 'Phase 1 · Move to Managed',
     sub: 'AI Steward promotes the asset — Unmanaged → Managed triggers the onboarding playbook.',
     flow: FLOW_P1,
