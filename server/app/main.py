@@ -11,6 +11,7 @@ from datetime import date
 from secrets import compare_digest
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,6 +38,8 @@ from .models import (
     BookingAvailabilityResponse,
     ExecuteAgentRequest,
     ExecuteAgentResponse,
+    NotificationListResponse,
+    NotificationReadRequest,
     PatientProfileResponse,
     AppointmentUpdateRequest,
     ClinicianAppointmentCreateRequest,
@@ -57,6 +60,7 @@ from .models import (
     ValidateRequest,
     ValidateResponse,
 )
+from .notifications import fetch_notifications, mark_notification_read
 from .pwned_passwords import PwnedPasswordsError, check_pwned_password
 from .servicenow import (
     BookingConflictError,
@@ -379,6 +383,40 @@ async def remove_summary_note(
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return {"status": "deleted", "sys_id": sys_id}
+
+
+@api.get("/notifications", response_model=NotificationListResponse)
+async def get_notifications(
+    audience: str,
+    patient_id: str | None = None,
+    doctor_id: str | None = None,
+    settings: Settings = Depends(get_settings),
+) -> NotificationListResponse:
+    if audience not in ("patient", "staff"):
+        raise HTTPException(status_code=400, detail="audience must be 'patient' or 'staff'")
+    try:
+        items = await fetch_notifications(
+            settings,
+            audience=audience,  # type: ignore[arg-type]
+            patient_sys_id=patient_id,
+            doctor_sys_id=doctor_id,
+        )
+    except (ServiceNowError, httpx.HTTPError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return NotificationListResponse(items=items)
+
+
+@api.patch("/notifications/{sys_id}/read")
+async def patch_notification_read(
+    sys_id: str,
+    body: NotificationReadRequest,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    try:
+        await mark_notification_read(settings, sys_id, body.audience)
+    except (ServiceNowError, httpx.HTTPError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"status": "read", "sys_id": sys_id}
 
 
 @api.post("/staff/appointments", response_model=DoctorAppointmentOption)

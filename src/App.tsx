@@ -13,6 +13,7 @@ import { PatientAppointmentDetailPage } from './pages/patient/AppointmentDetailP
 import { BookAppointmentPage } from './pages/patient/BookAppointmentPage'
 import { ContactPage } from './pages/patient/ContactPage'
 import { DashboardPage } from './pages/patient/DashboardPage'
+import { NotificationsPage as PatientNotificationsPage } from './pages/patient/NotificationsPage'
 import { EmailVerificationPage } from './pages/patient/EmailVerificationPage'
 import { LandingPage } from './pages/patient/LandingPage'
 import { ProfilePage } from './pages/patient/ProfilePage'
@@ -25,6 +26,7 @@ import { DoctorAnalyticsPage } from './pages/staff/DoctorAnalyticsPage'
 import { DoctorAppointmentsPage } from './pages/staff/DoctorAppointmentsPage'
 import { DoctorDashboardPage } from './pages/staff/DoctorDashboardPage'
 import { DoctorNotesPage } from './pages/staff/DoctorNotesPage'
+import { NotificationsPage as StaffNotificationsPage } from './pages/staff/NotificationsPage'
 import { DoctorQueuePage } from './pages/staff/DoctorQueuePage'
 import { DoctorProfilePage } from './pages/staff/DoctorProfilePage'
 import { PatientRecordPage } from './pages/staff/PatientRecordPage'
@@ -152,6 +154,18 @@ function App() {
           }
         />
         <Route
+          path="/patient/notifications"
+          element={
+            <GovernanceRoleBlocker>
+              <ClinicianRoleBlocker>
+                <PatientProtectedRoute>
+                  <PatientNotificationsPage />
+                </PatientProtectedRoute>
+              </ClinicianRoleBlocker>
+            </GovernanceRoleBlocker>
+          }
+        />
+        <Route
           path="/staff/sign-in"
           element={
             <GovernanceRoleBlocker>
@@ -206,6 +220,18 @@ function App() {
               <PatientRoleBlocker>
                 <ClinicianProtectedRoute>
                   <DoctorNotesPage />
+                </ClinicianProtectedRoute>
+              </PatientRoleBlocker>
+            </GovernanceRoleBlocker>
+          }
+        />
+        <Route
+          path="/staff/notifications"
+          element={
+            <GovernanceRoleBlocker>
+              <PatientRoleBlocker>
+                <ClinicianProtectedRoute>
+                  <StaffNotificationsPage />
                 </ClinicianProtectedRoute>
               </PatientRoleBlocker>
             </GovernanceRoleBlocker>

@@ -698,3 +698,62 @@ export async function testServiceAccountAcl(serviceAccount: string): Promise<Acl
 
   return (await res.json()) as AclTestResponse
 }
+
+// ---------------------------------------------------------------------------
+// Notification reminders
+// ---------------------------------------------------------------------------
+
+export type NotificationAudience = 'patient' | 'staff'
+
+export interface NotificationItem {
+  sys_id: string
+  notification_id: string
+  audience: string
+  notification_type: string
+  message: string
+  patient_sys_id: string
+  patient_name: string
+  doctor_sys_id: string
+  doctor_name: string
+  appointment_sys_id: string
+  summary_note_sys_id: string
+  patient_read: boolean
+  staff_read: boolean
+  event_time: string
+  created_on: string
+}
+
+interface NotificationListResponse {
+  items: NotificationItem[]
+}
+
+/** Fetch notifications for a patient (by patient sys_id) or a doctor (by doctor sys_id). */
+export async function fetchNotifications(params: {
+  audience: NotificationAudience
+  patientId?: string | null
+  doctorId?: string | null
+}): Promise<NotificationItem[]> {
+  const search = new URLSearchParams({ audience: params.audience })
+  if (params.audience === 'patient' && params.patientId) search.set('patient_id', params.patientId)
+  if (params.audience === 'staff' && params.doctorId) search.set('doctor_id', params.doctorId)
+
+  const res = await fetch(`${API_BASE}/notifications?${search.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  const body = (await res.json()) as NotificationListResponse
+  return body.items ?? []
+}
+
+/** Mark a single notification read for the given audience. */
+export async function markNotificationRead(
+  sysId: string,
+  audience: NotificationAudience,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/notifications/${encodeURIComponent(sysId)}/read`, {
+    method: 'PATCH',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ audience }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+}

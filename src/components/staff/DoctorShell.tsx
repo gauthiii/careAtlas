@@ -27,6 +27,7 @@ import { hospital } from '../../data/patientPortalData'
 import { useClinicianAuth } from '../../contexts/ClinicianAuthContext'
 import { usePatientAuth } from '../../contexts/PatientAuthContext'
 import { OverrideSignInNavLink } from '../auth/OverrideSignInNavLink'
+import { ClinicianNotificationBell } from '../NotificationBell'
 
 const signedOutClinicianNav = [
   { label: 'Sign in', to: '/staff/sign-in', icon: LockKeyhole, end: true },
@@ -117,8 +118,10 @@ export function DoctorShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <nav
-          className="min-w-0 justify-self-end flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto"
+        <div className="min-w-0 justify-self-end flex items-center gap-2 max-[1100px]:justify-self-stretch max-[1100px]:justify-between">
+          {isClinicianAuthenticated && <ClinicianNotificationBell />}
+          <nav
+          className="min-w-0 flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:overflow-x-auto"
           aria-label="Switch portal view"
         >
           <NavLink
@@ -139,7 +142,8 @@ export function DoctorShell({ children }: { children: React.ReactNode }) {
           >
             <ShieldCheck size={15} /> AI Governance
           </NavLink>
-        </nav>
+          </nav>
+        </div>
       </header>
       {children}
     </div>

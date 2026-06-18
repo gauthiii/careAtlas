@@ -15,6 +15,7 @@ from uuid import uuid4
 import httpx
 
 from .config import Settings
+from .notifications import create_notification
 from .models import (
     AIAsset,
     AISystem,
@@ -706,6 +707,18 @@ async def create_patient_registration(
     if not isinstance(result, dict):
         raise ServiceNowError("ServiceNow patient registration response did not include a result object")
 
+    patient_sys_id = _field_value(result.get("sys_id"))
+    patient_name = " ".join(
+        p for p in (_display_val(result.get("u_first_name")), _display_val(result.get("u_last_name"))) if p
+    ).strip()
+    await create_notification(
+        settings,
+        audience="both",
+        notification_type="registration_complete",
+        message=f"Registration completed for {patient_name or 'a new patient'}. Awaiting staff review.",
+        patient_sys_id=patient_sys_id,
+    )
+
     return PatientRegistrationResponse(
         message="Patient registration created in ServiceNow.",
         sys_id=_display_val(result.get("sys_id")),
@@ -1241,6 +1254,20 @@ async def create_patient_booking_appointment(
         appointment = _map_booking_appointment(record, {doctor.doctor_record_id: doctor})
         if appointment.doctor_name == "Unknown doctor":
             appointment.doctor_name = doctor.name
+
+        await create_notification(
+            settings,
+            audience="both",
+            notification_type="appointment_created",
+            message=(
+                f"Appointment booked with {appointment.doctor_name} on "
+                f"{appointment.date} at {appointment.start_time}."
+            ),
+            patient_sys_id=profile.sys_id,
+            doctor_sys_id=booking.doctor_record_id,
+            appointment_sys_id=_field_value(record.get("sys_id")),
+            http_client=client,
+        )
         return appointment
 
     if http_client is not None:
@@ -1584,7 +1611,22 @@ async def create_summary_note(
         record = create_response.json().get("result", {})
         if not isinstance(record, dict):
             raise ServiceNowError("ServiceNow summary note create response did not include a result object")
-        return _map_summary_note(record)
+        summary = _map_summary_note(record)
+        await create_notification(
+            settings,
+            audience="both",
+            notification_type="summary_note_added",
+            message=(
+                f"A summary note was added for the appointment on "
+                f"{summary.date or '—'} at {summary.start_time or '—'}."
+            ),
+            patient_sys_id=_field_value(appt.get("u_patient")),
+            doctor_sys_id=_field_value(appt.get("u_doctor")),
+            appointment_sys_id=_field_value(appt.get("sys_id")) or note.appointment_record_id,
+            summary_note_sys_id=_field_value(record.get("sys_id")),
+            http_client=client,
+        )
+        return summary
 
     if http_client is not None:
         return await run(http_client)
@@ -1668,7 +1710,35 @@ async def update_appointment(
         if not response.is_success:
             _raise_snow_error(response)
         record = response.json().get("result", {})
-        return _map_doctor_appointment_option(record)
+        option = _map_doctor_appointment_option(record)
+
+        if status is not None:
+            type_map = {
+                "confirmed": "appointment_confirmed",
+                "cancelled": "appointment_cancelled",
+                "completed": "appointment_completed",
+            }
+            notif_type = type_map.get(status.strip().lower())
+            if notif_type:
+                verb = {
+                    "appointment_confirmed": "confirmed",
+                    "appointment_cancelled": "cancelled",
+                    "appointment_completed": "marked complete",
+                }[notif_type]
+                await create_notification(
+                    settings,
+                    audience="both",
+                    notification_type=notif_type,
+                    message=(
+                        f"Appointment on {option.date or '—'} at {option.start_time or '—'} "
+                        f"was {verb}."
+                    ),
+                    patient_sys_id=_field_value(record.get("u_patient")) or option.patient_sys_id,
+                    doctor_sys_id=doctor_record_id,
+                    appointment_sys_id=record_id,
+                    http_client=client,
+                )
+        return option
 
     if http_client is not None:
         return await run(http_client)
@@ -1715,7 +1785,22 @@ async def create_clinician_appointment(
         )
         if not response.is_success:
             _raise_snow_error(response)
-        return _map_doctor_appointment_option(response.json().get("result", {}))
+        record = response.json().get("result", {})
+        option = _map_doctor_appointment_option(record)
+        await create_notification(
+            settings,
+            audience="both",
+            notification_type="appointment_created",
+            message=(
+                f"Appointment scheduled on {option.date or req.date} at "
+                f"{option.start_time or req.start_time}."
+            ),
+            patient_sys_id=req.patient_sys_id,
+            doctor_sys_id=req.doctor_record_id,
+            appointment_sys_id=_field_value(record.get("sys_id")),
+            http_client=client,
+        )
+        return option
 
     if http_client is not None:
         return await run(http_client)
@@ -1743,7 +1828,23 @@ async def update_summary_note(
             raise SummaryNoteAppointmentNotFoundError("Summary note not found.")
         if not response.is_success:
             _raise_snow_error(response)
-        return _map_summary_note(response.json().get("result", {}))
+        record = response.json().get("result", {})
+        summary = _map_summary_note(record)
+        await create_notification(
+            settings,
+            audience="both",
+            notification_type="summary_note_updated",
+            message=(
+                f"A summary note was updated for the appointment on "
+                f"{summary.date or '—'} at {summary.start_time or '—'}."
+            ),
+            patient_sys_id=_field_value(record.get("u_patient")) or summary.patient_sys_id,
+            doctor_sys_id=_field_value(record.get("u_doctor")) or summary.doctor_record_id,
+            appointment_sys_id=_field_value(record.get("u_appointment")) or summary.appointment_record_id,
+            summary_note_sys_id=sys_id,
+            http_client=client,
+        )
+        return summary
 
     if http_client is not None:
         return await run(http_client)
@@ -1793,7 +1894,28 @@ async def update_registration_status(
             raise BookingPatientNotFoundError("Patient registration not found.")
         if not response.is_success:
             _raise_snow_error(response)
-        return _map_registration_summary(response.json().get("result", {}))
+        summary = _map_registration_summary(response.json().get("result", {}))
+
+        status_norm = (registration_status or "").strip().lower()
+        notif_type = (
+            "registration_approved"
+            if status_norm in {"approved", "active"}
+            else "registration_rejected"
+            if status_norm in {"rejected", "denied"}
+            else None
+        )
+        if notif_type:
+            name = " ".join(p for p in (summary.first_name, summary.last_name) if p).strip()
+            verb = "approved" if notif_type == "registration_approved" else "rejected"
+            await create_notification(
+                settings,
+                audience="patient",
+                notification_type=notif_type,
+                message=f"Your registration{f' for {name}' if name else ''} was {verb}.",
+                patient_sys_id=summary.sys_id or sys_id,
+                http_client=client,
+            )
+        return summary
 
     if http_client is not None:
         return await run(http_client)

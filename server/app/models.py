@@ -430,6 +430,32 @@ class AiDecisionLogEntry(BaseModel):
     appointment: str = ""
 
 
+class NotificationItem(BaseModel):
+    sys_id: str = ""
+    notification_id: str = ""
+    audience: str = ""
+    notification_type: str = ""
+    message: str = ""
+    patient_sys_id: str = ""
+    patient_name: str = ""
+    doctor_sys_id: str = ""
+    doctor_name: str = ""
+    appointment_sys_id: str = ""
+    summary_note_sys_id: str = ""
+    patient_read: bool = False
+    staff_read: bool = False
+    event_time: str = ""
+    created_on: str = ""
+
+
+class NotificationListResponse(BaseModel):
+    items: list[NotificationItem] = []
+
+
+class NotificationReadRequest(BaseModel):
+    audience: Literal["patient", "staff"]
+
+
 class AclTestRequest(BaseModel):
     service_account: str
 
