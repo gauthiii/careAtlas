@@ -627,11 +627,22 @@ function Shell() {
 
   const assistantAgentConfig = getAssistantAgentConfig(pathname, user)
 
+  // Portal routes own a full-height sidebar layout, so they render edge-to-edge.
+  // The role picker and other standalone screens stay in the centered container.
+  const isPortalRoute =
+    pathname.startsWith('/patient') ||
+    pathname.startsWith('/staff') ||
+    pathname.startsWith('/governance')
+
   return (
     <div className="min-h-screen">
-      <div className="mx-auto flex min-h-screen w-[min(1760px,calc(100%-28px))] flex-col pt-3.5 max-[720px]:w-[min(calc(100%-18px),1760px)] max-[720px]:pt-3.5">
+      {isPortalRoute ? (
         <Outlet />
-      </div>
+      ) : (
+        <div className="mx-auto flex min-h-screen w-[min(1760px,calc(100%-28px))] flex-col pt-3.5 max-[720px]:w-[min(calc(100%-18px),1760px)] max-[720px]:pt-3.5">
+          <Outlet />
+        </div>
+      )}
       <AiAssistantWidget agentConfig={assistantAgentConfig} />
     </div>
   )

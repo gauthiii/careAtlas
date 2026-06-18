@@ -10,11 +10,9 @@ import {
   Plus,
   ChartBar,
   LoaderCircle,
-  LogOut,
   RefreshCw,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 import {
   PortalPage,
@@ -43,8 +41,7 @@ function arrayCount(value: string): number {
 }
 
 export function GovernanceDashboardPage() {
-  const navigate = useNavigate()
-  const { logout, user } = useGovernanceAuth()
+  const { user } = useGovernanceAuth()
   const displayName = governanceDisplayName(user)
   const { systems, state: agentsState, refetch: refetchAgents } = useUnmanagedAISystems()
   const [decisionLog, setDecisionLog] = useState<AiDecisionLogEntry[]>([])
@@ -78,11 +75,6 @@ export function GovernanceDashboardPage() {
 
   const registeredAgents = agentsState === 'ok' ? systems.length : null
 
-  async function handleLogout() {
-    await logout()
-    navigate('/governance/sign-in', { replace: true })
-  }
-
   const fairnessData = [
     { group: 'Asian', value: 32, expected: '+22%' },
     { group: 'Black', value: 20, expected: '+2%' },
@@ -105,14 +97,6 @@ export function GovernanceDashboardPage() {
         >
           <RefreshCw size={15} />
           Refresh
-        </button>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
-        >
-          <LogOut size={17} />
-          Logout
         </button>
       </div>
 

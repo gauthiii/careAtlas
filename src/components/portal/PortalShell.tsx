@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { Bot, CalendarDays, HeartPulse, Home, Hospital, LockKeyhole, Presentation, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/cn'
+import { SidebarLayout, sidebarItemClass } from './SidebarLayout'
 import {
   isClinicianPortalPath,
   isGovernancePortalPath,
@@ -41,16 +42,14 @@ const signedOutGovernanceNav = [
 export function PortalHeader({ label }: { label: string }) {
   const location = useLocation()
   const { isAuthenticated: isClinicianAuthenticated } = useClinicianAuth()
-  const { isAuthenticated: isGovernanceAuthenticated, overrideLogin } = useGovernanceAuth()
+  const { isAuthenticated: isGovernanceAuthenticated } = useGovernanceAuth()
   const { isAuthenticated: isPatientAuthenticated } = usePatientAuth()
-  const showGovernanceNav = isGovernancePortalPath(location.pathname)
-  const visibleGovernanceNav = isGovernanceAuthenticated ? governanceNav : signedOutGovernanceNav
   const patientPortalHome = isPatientAuthenticated ? '/patient/dashboard' : '/patient/home'
   const clinicianPortalHome = isClinicianAuthenticated ? '/staff/doctor' : '/staff/sign-in'
   const governancePortalHome = isGovernanceAuthenticated ? '/governance' : '/governance/sign-in'
 
   return (
-    <header className="sticky top-0 z-[18] grid grid-cols-[auto_1fr_auto] items-center gap-3 border border-[#d7e5ec] rounded-[14px] bg-white/96 px-[clamp(14px,3vw,28px)] py-3.5 shadow-[0_10px_26px_rgba(25,64,93,0.08)] backdrop-blur-[14px] max-[1100px]:grid-cols-1 max-[720px]:static max-[720px]:p-2.5">
+    <header className="sticky top-0 z-[18] flex flex-wrap items-center justify-between gap-3 border border-[#d7e5ec] rounded-[14px] bg-white/96 px-[clamp(14px,3vw,28px)] py-3.5 shadow-[0_10px_26px_rgba(25,64,93,0.08)] backdrop-blur-[14px] max-[720px]:static max-[720px]:p-2.5">
       <NavLink className="flex items-center gap-3" to="/">
         <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#143A57] text-white"><Hospital size={24} /></span>
         <span>
@@ -59,51 +58,7 @@ export function PortalHeader({ label }: { label: string }) {
         </span>
       </NavLink>
 
-      {showGovernanceNav && (
-        <nav
-          className="min-w-0 justify-self-center flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-[#f7fbfd] p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto"
-          aria-label="AI governance navigation"
-        >
-          {visibleGovernanceNav.map((item) => {
-            const Icon = item.icon
-            const navClassName = ({ isActive }: { isActive: boolean }) =>
-              cn(
-                'inline-flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
-                isActive && 'bg-[#143A57] !text-white',
-              )
-
-            if (!isGovernanceAuthenticated && item.to === '/governance/sign-in') {
-              return (
-                <OverrideSignInNavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  label={item.label}
-                  icon={Icon}
-                  className={navClassName}
-                  portalLabel="AI Governance"
-                  redirectTo="/governance"
-                  onOverrideLogin={overrideLogin}
-                />
-              )
-            }
-
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={navClassName}
-              >
-                <Icon size={15} />
-                {item.label}
-              </NavLink>
-            )
-          })}
-        </nav>
-      )}
-
-      <nav className="min-w-0 justify-self-end flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto" aria-label="Switch portal view">
+      <nav className="min-w-0 flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[720px]:w-full max-[720px]:overflow-x-auto" aria-label="Switch portal view">
         <NavLink
           to={patientPortalHome}
           className={cn(portalSwitcherLink, isPatientPortalPath(location.pathname) && portalSwitcherActive)}
@@ -127,6 +82,31 @@ export function PortalHeader({ label }: { label: string }) {
   )
 }
 
+/** Portal switcher used in the content-pane top bar. */
+function PortalSwitcher() {
+  const location = useLocation()
+  const { isAuthenticated: isClinicianAuthenticated } = useClinicianAuth()
+  const { isAuthenticated: isGovernanceAuthenticated } = useGovernanceAuth()
+  const { isAuthenticated: isPatientAuthenticated } = usePatientAuth()
+  const patientPortalHome = isPatientAuthenticated ? '/patient/dashboard' : '/patient/home'
+  const clinicianPortalHome = isClinicianAuthenticated ? '/staff/doctor' : '/staff/sign-in'
+  const governancePortalHome = isGovernanceAuthenticated ? '/governance' : '/governance/sign-in'
+
+  return (
+    <nav className="min-w-0 flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[720px]:overflow-x-auto" aria-label="Switch portal view">
+      <NavLink to={patientPortalHome} className={cn(portalSwitcherLink, isPatientPortalPath(location.pathname) && portalSwitcherActive)}>
+        <HeartPulse size={15} /> Patient Portal
+      </NavLink>
+      <NavLink to={clinicianPortalHome} className={cn(portalSwitcherLink, isClinicianPortalPath(location.pathname) && portalSwitcherActive)}>
+        <Stethoscope size={15} /> Clinician Portal
+      </NavLink>
+      <NavLink to={governancePortalHome} className={cn(portalSwitcherLink, isGovernancePortalPath(location.pathname) && portalSwitcherActive)}>
+        <ShieldCheck size={15} /> AI Governance
+      </NavLink>
+    </nav>
+  )
+}
+
 export function PortalPage({
   label,
   title,
@@ -138,17 +118,57 @@ export function PortalPage({
   intro?: string
   children: ReactNode
 }) {
+  const navigate = useNavigate()
+  const { isAuthenticated: isGovernanceAuthenticated, overrideLogin, logout } = useGovernanceAuth()
+  const visibleGovernanceNav = isGovernanceAuthenticated ? governanceNav : signedOutGovernanceNav
+
+  async function handleSignOut() {
+    await logout()
+    navigate('/governance/sign-in', { replace: true })
+  }
+
+  const nav = visibleGovernanceNav.map((item) => {
+    const Icon = item.icon
+    if (!isGovernanceAuthenticated && item.to === '/governance/sign-in') {
+      return (
+        <OverrideSignInNavLink
+          key={item.to}
+          to={item.to}
+          end={item.end}
+          label={item.label}
+          icon={Icon}
+          className={({ isActive }: { isActive: boolean }) => sidebarItemClass(isActive)}
+          portalLabel="AI Governance"
+          redirectTo="/governance"
+          onOverrideLogin={overrideLogin}
+        />
+      )
+    }
+    return (
+      <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => sidebarItemClass(isActive)}>
+        <Icon size={17} />
+        {item.label}
+      </NavLink>
+    )
+  })
+
   return (
-    <div className="min-h-[calc(100vh-30px)]">
-      <PortalHeader label={label} />
+    <SidebarLayout
+      portalLabel={label}
+      portalLabelIcon={<ShieldCheck size={13} />}
+      nav={nav}
+      navAriaLabel="AI governance navigation"
+      headerRight={<PortalSwitcher />}
+      signOut={isGovernanceAuthenticated ? { onSignOut: handleSignOut, label: 'Sign out' } : null}
+    >
       <main className="grid gap-5 px-0 py-5 max-[720px]:pt-3">
         <section className="px-6 pt-6">
-        <h1 className="text-3xl font-bold">{title}</h1>
+          <h1 className="text-3xl font-bold">{title}</h1>
           {intro && <p className="mt-3 max-w-[760px] text-[1.02rem] font-semibold leading-[1.55] text-[#53687b]">{intro}</p>}
         </section>
         {children}
       </main>
-    </div>
+    </SidebarLayout>
   )
 }
 

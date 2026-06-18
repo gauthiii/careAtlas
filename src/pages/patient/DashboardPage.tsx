@@ -3,13 +3,12 @@ import {
   CalendarCheck,
   ClipboardList,
   LoaderCircle,
-  LogOut,
   RefreshCw,
   UserRound,
   Pill,
   Activity,
 } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   PatientPanel,
   StatusBadge,
@@ -52,15 +51,9 @@ function statusTone(status: string): 'success' | 'warning' | 'info' {
 }
 
 export function DashboardPage() {
-  const navigate = useNavigate()
-  const { user, logout } = usePatientAuth()
+  const { user } = usePatientAuth()
   const displayName = patientDisplayName(user)
   const { profile, upcoming, past, nextAppointment, isLoading, error, refetch } = usePatientSchedule()
-
-  async function handleLogout() {
-    await logout()
-    navigate('/patient/sign-in', { replace: true })
-  }
 
   const totalVisits = past.length
   const profileStatus = profile
@@ -82,14 +75,6 @@ export function DashboardPage() {
         >
           <RefreshCw size={15} />
           Refresh
-        </button>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
-        >
-          <LogOut size={17} />
-          Logout
         </button>
       </div>
 

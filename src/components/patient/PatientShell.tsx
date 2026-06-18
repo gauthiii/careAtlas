@@ -1,6 +1,6 @@
-import { HeartPulse, Hospital, LockKeyhole, ShieldCheck, Stethoscope, Home, UserPlus, LayoutDashboard, CalendarCheck, CalendarDays, User, MessageCircle } from 'lucide-react'
+import { HeartPulse, ShieldCheck, Stethoscope, Home, UserPlus, LockKeyhole, LayoutDashboard, CalendarCheck, CalendarDays, User, MessageCircle } from 'lucide-react'
 import type React from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import {
   isClinicianPortalPath,
@@ -9,10 +9,10 @@ import {
   portalSwitcherActive,
   portalSwitcherLink,
 } from '../../lib/portalNav'
-import { hospital } from '../../data/patientPortalData'
 import { usePatientAuth } from '../../contexts/PatientAuthContext'
 import { OverrideSignInNavLink } from '../auth/OverrideSignInNavLink'
 import { PatientNotificationBell } from '../NotificationBell'
+import { SidebarLayout, sidebarItemClass } from '../portal/SidebarLayout'
 
 
 const loggedOutPatientNav = [
@@ -31,77 +31,67 @@ const loggedInPatientNav = [
 
 export function PatientShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
-  const { isAuthenticated, overrideLogin } = usePatientAuth()
+  const navigate = useNavigate()
+  const { isAuthenticated, overrideLogin, logout } = usePatientAuth()
   const patientNav = isAuthenticated ? loggedInPatientNav : loggedOutPatientNav
   const patientPortalHome = isAuthenticated ? '/patient/dashboard' : '/patient/home'
 
-  return (
-    <div className="flex w-full min-h-0 flex-1 flex-col">
-      <header className="sticky top-0 z-30 shrink-0 grid grid-cols-[auto_1fr_auto] items-center gap-3 border border-[#d7e5ec] rounded-[14px] bg-white px-[clamp(14px,3vw,28px)] py-3.5 shadow-[0_10px_26px_rgba(25,64,93,0.08)] backdrop-blur-[14px] max-[1100px]:grid-cols-1 max-[720px]:p-2.5">
-        <NavLink className="flex items-center gap-3" to="/">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#143A57] text-white"><Hospital size={24} /></span>
-          <span>
-            <strong className="block text-[1.02rem] tracking-normal text-[#102033] max-[720px]:text-[0.94rem]">{hospital.name}</strong>
-            <small className="mt-0.5 flex items-center gap-[5px] text-[0.78rem] font-[750] text-[#607487]"><HeartPulse size={13} /> {hospital.portalName}</small>
-          </span>
+  async function handleSignOut() {
+    await logout()
+    navigate('/patient/sign-in', { replace: true })
+  }
+
+  const nav = patientNav.map((item) => {
+    if (!isAuthenticated && item.to === '/patient/sign-in') {
+      return (
+        <OverrideSignInNavLink
+          key={item.to}
+          to={item.to}
+          end
+          label={item.label}
+          icon={item.icon}
+          className={({ isActive }: { isActive: boolean }) => sidebarItemClass(isActive)}
+          portalLabel="Patient Portal"
+          redirectTo="/patient/dashboard"
+          onOverrideLogin={overrideLogin}
+        />
+      )
+    }
+    return (
+      <NavLink key={item.to} to={item.to} end className={({ isActive }) => sidebarItemClass(isActive)}>
+        {item.icon && <item.icon size={17} />} {item.label}
+      </NavLink>
+    )
+  })
+
+  const headerRight = (
+    <>
+      {isAuthenticated && <PatientNotificationBell />}
+      <nav className="min-w-0 flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[720px]:overflow-x-auto" aria-label="Switch portal view">
+        <NavLink to={patientPortalHome} className={cn(portalSwitcherLink, isPatientPortalPath(location.pathname) && portalSwitcherActive)}>
+          <HeartPulse size={15} /> Patient Portal
         </NavLink>
-        <nav className="min-w-0 justify-self-center flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-[#f7fbfd] p-1 max-[1100px]:justify-self-stretch max-[1100px]:overflow-x-auto" aria-label="Patient portal navigation">
-          {patientNav.map((item) => {
-            const navClassName = ({ isActive }: { isActive: boolean }) =>
-              cn(
-                'inline-flex min-h-[34px] items-center gap-1.5 rounded-[9px] px-2.5 text-[0.82rem] font-bold text-[#53687b] max-[720px]:whitespace-nowrap',
-                isActive && 'bg-[#143A57] !text-white',
-              )
+        <NavLink to="/staff/doctor" className={cn(portalSwitcherLink, isClinicianPortalPath(location.pathname) && portalSwitcherActive)}>
+          <Stethoscope size={15} /> Clinician Portal
+        </NavLink>
+        <NavLink to="/governance" className={cn(portalSwitcherLink, isGovernancePortalPath(location.pathname) && portalSwitcherActive)}>
+          <ShieldCheck size={15} /> AI Governance
+        </NavLink>
+      </nav>
+    </>
+  )
 
-            if (!isAuthenticated && item.to === '/patient/sign-in') {
-              return (
-                <OverrideSignInNavLink
-                  key={item.to}
-                  to={item.to}
-                  end
-                  label={item.label}
-                  icon={item.icon}
-                  className={navClassName}
-                  portalLabel="Patient Portal"
-                  redirectTo="/patient/dashboard"
-                  onOverrideLogin={overrideLogin}
-                />
-              )
-            }
-
-            return (
-              <NavLink key={item.to} to={item.to} end className={navClassName}>
-                {item.icon && <item.icon size={15} />} {item.label}
-              </NavLink>
-            )
-          })}
-        </nav>
-        <div className="min-w-0 justify-self-end flex items-center gap-2 max-[1100px]:justify-self-stretch max-[1100px]:justify-between">
-          {isAuthenticated && <PatientNotificationBell />}
-          <nav className="min-w-0 flex items-center gap-1 rounded-xl border border-[#d7e5ec] bg-white p-1 max-[1100px]:overflow-x-auto" aria-label="Switch portal view">
-          <NavLink
-            to={patientPortalHome}
-            className={cn(portalSwitcherLink, isPatientPortalPath(location.pathname) && portalSwitcherActive)}
-          >
-            <HeartPulse size={15} /> Patient Portal
-          </NavLink>
-          <NavLink
-            to="/staff/doctor"
-            className={cn(portalSwitcherLink, isClinicianPortalPath(location.pathname) && portalSwitcherActive)}
-          >
-            <Stethoscope size={15} /> Clinician Portal
-          </NavLink>
-          <NavLink
-            to="/governance"
-            className={cn(portalSwitcherLink, isGovernancePortalPath(location.pathname) && portalSwitcherActive)}
-          >
-            <ShieldCheck size={15} /> AI Governance
-          </NavLink>
-          </nav>
-        </div>
-      </header>
+  return (
+    <SidebarLayout
+      portalLabel="Patient Portal"
+      portalLabelIcon={<HeartPulse size={13} />}
+      nav={nav}
+      navAriaLabel="Patient portal navigation"
+      headerRight={headerRight}
+      signOut={isAuthenticated ? { onSignOut: handleSignOut, label: 'Sign out' } : null}
+    >
       {children}
-    </div>
+    </SidebarLayout>
   )
 }
 

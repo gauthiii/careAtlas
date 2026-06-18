@@ -6,13 +6,12 @@ import {
   Clock3,
   FileText,
   LoaderCircle,
-  LogOut,
   RefreshCw,
   RotateCcw,
   UserCheck,
 } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { DoctorPage } from '../../components/staff/DoctorShell'
 import { WeekNav } from '../../components/staff/WeekNav'
 import { clinicianDisplayName, useClinicianAuth } from '../../contexts/ClinicianAuthContext'
@@ -76,8 +75,7 @@ function statusCount(appointments: BookingAppointment[], status: string) {
 }
 
 export function DoctorDashboardPage() {
-  const navigate = useNavigate()
-  const { logout, user } = useClinicianAuth()
+  const { user } = useClinicianAuth()
   const { doctor, doctorAppointments, error, isLoading, refetch, today } = useClinicianSchedule()
   const displayName = doctor?.name || clinicianDisplayName(user)
   const [selectedDate, setSelectedDate] = useState(today)
@@ -103,10 +101,6 @@ export function DoctorDashboardPage() {
     }
   })
 
-  async function handleLogout() {
-    await logout()
-    navigate('/staff/sign-in', { replace: true })
-  }
 
   return (
     <DoctorPage
@@ -136,14 +130,6 @@ export function DoctorDashboardPage() {
           >
             <RefreshCw size={15} />
             Refresh
-          </button>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
-          >
-            <LogOut size={17} />
-            Logout
           </button>
         </div>
       </div>
