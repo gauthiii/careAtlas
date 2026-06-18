@@ -1,4 +1,6 @@
 import {
+  Bell,
+  BellRing,
   Bot,
   Brain,
   CheckCircle2,
@@ -9,7 +11,9 @@ import {
   KeyRound,
   LayoutDashboard,
   Lock,
+  LogOut,
   Network,
+  PanelLeft,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -107,6 +111,8 @@ const SECTIONS: AgendaSection[] = [
       { label: 'u_careatlas_patient', detail: 'Patient registration records — demographics, health condition, insurance, consent', done: true },
       { label: 'u_careatlas_doctor', detail: 'Clinician roster — speciality, department, availability slots', done: true },
       { label: 'u_careatlas_appointment', detail: 'Booking records — patient ↔ doctor mapping, date/time, visit type, status', done: true },
+      { label: 'u_summary_notes', detail: 'Clinician summary notes per appointment — patient ↔ doctor ↔ appointment, note text, logged-by', done: true },
+      { label: 'u_notification_reminders', detail: 'Activity notifications for patients & clinicians, created via the metadata API (see section 10)', done: true },
       { label: 'u_ai_decision_log', detail: 'Audit trail of every AI scheduling decision — confidence score, model version, slots considered', done: true },
       { label: 'sn_aia_agent (built-in)', detail: 'AI Agent Studio registry — all agents inventory via AI Control Tower', done: true },
       { label: 'alm_ai_system_digital_asset', detail: 'Managed vs unmanaged AI asset lifecycle tracking', done: true },
@@ -213,6 +219,39 @@ const SECTIONS: AgendaSection[] = [
       { label: 'Live chat from inventory', detail: 'Every agent in the inventory has a Chat button that opens a real A2A conversation drawer', done: true },
     ],
   },
+  {
+    id: 'notifications',
+    number: '10',
+    title: 'Notification Reminders',
+    subtitle: 'Activity feed for patients & clinicians — new ServiceNow table',
+    icon: BellRing,
+    color: '#0f6b4f',
+    bg: '#e8f7ef',
+    border: '#a7dfbf',
+    items: [
+      { label: 'u_notification_reminders table', detail: 'New table created live via the metadata API (sys_db_object + sys_dictionary) — audience, type, message, patient/doctor/appointment/summary-note references, per-audience read flags and event time', done: true },
+      { label: 'Backend event logging', detail: 'Every operation logs a notification — registration complete/approved/rejected, appointment created/confirmed/cancelled/completed, summary note added/updated — best-effort so it never breaks the primary write', done: true },
+      { label: 'Scoped feeds + API', detail: 'GET /api/notifications and PATCH /…/read; patient sees their own, clinician sees their appointments/notes plus unassigned staff events, with an "All / Only mine" tab', done: true },
+      { label: 'Bell widget + pages', detail: 'Header bell with unread badge and dropdown on patient & clinician portals, plus a dedicated notifications page with expandable rows and mark-as-read', done: true },
+      { label: 'History backfill', detail: '257 notifications backfilled from existing appointments, summary notes and registrations so the feeds are populated on first login', done: true },
+    ],
+  },
+  {
+    id: 'ux-sidebar',
+    number: '11',
+    title: 'Sidebar Navigation & UX',
+    subtitle: 'Full-height left sidebar across all three portals',
+    icon: PanelLeft,
+    color: '#143A57',
+    bg: '#e7f3f8',
+    border: '#cfe0ea',
+    items: [
+      { label: 'Two-pane app layout', detail: 'Center top-nav replaced with a fixed full-height left sidebar (brand on top, nav in the middle, sign-out at the bottom) via a shared SidebarLayout used by all three portals', done: true },
+      { label: 'Sign-out relocated', detail: 'Sign-out moved into the sidebar footer and removed from every dashboard header — one consistent place to log out', done: true },
+      { label: 'Persistent top bar', detail: 'Slim content-pane top bar keeps the portal switcher and the notification bell reachable from every page', done: true },
+      { label: 'Responsive', detail: 'Below 860px the sidebar collapses into a horizontal scroll strip so navigation is preserved on tablet and mobile', done: true },
+    ],
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -265,8 +304,8 @@ export function GovernanceAgendaPage() {
   return (
     <PortalPage
       label="AI Governance Officer"
-      title="Agenda — June 19"
-      intro="A scrollable walkthrough of everything built and configured for the June 19 demo. Each section maps to a live area of the application."
+      title="Agenda — June 20"
+      intro="A scrollable walkthrough of everything built and configured for the June 20 demo. Each section maps to a live area of the application."
     >
       <section className="min-w-0 px-6 pb-10">
         {/* Export toolbar */}
@@ -331,7 +370,7 @@ export function GovernanceAgendaPage() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="text-[0.72rem] font-bold uppercase tracking-widest text-white/60">Demo day</div>
-              <div className="text-2xl font-black tracking-tight">June 19, 2026</div>
+              <div className="text-2xl font-black tracking-tight">June 20, 2026</div>
               <div className="mt-0.5 text-sm text-white/70">
                 CareAtlas &mdash; AI-Native Healthcare Platform on ServiceNow
               </div>
@@ -479,6 +518,8 @@ function MockUiStrip({ section }: { section: AgendaSection }) {
     case 'acl-test': return <AclTestMock />
     case 'shadow': return <ShadowMock />
     case 'lifecycle': return <LifecycleMock />
+    case 'notifications': return <NotificationsMock />
+    case 'ux-sidebar': return <SidebarMock />
     default: return null
   }
 }
@@ -863,6 +904,111 @@ function LifecycleMock() {
         <div className="flex items-center gap-1.5 rounded-lg border border-[#a7dfbf] bg-[#f0fbf5] px-3 py-2">
           <Users size={12} className="text-[#0f6b4f]" />
           <span className="text-[0.65rem] font-bold text-[#40566b]">Steward assigned · Review cadence set · Policy attached</span>
+        </div>
+      </div>
+    </MockShell>
+  )
+}
+
+// 10 — Notifications
+function NotificationsMock() {
+  const feed = [
+    { type: 'Appointment booked', detail: 'with Dr. Lucas Walker on 06-23 at 08:30', unread: true, color: '#1f5f9c', bg: '#e7f0fb' },
+    { type: 'Appointment confirmed', detail: 'visit on 06-20 confirmed', unread: true, color: '#1d7a45', bg: '#e6f6ec' },
+    { type: 'Summary note added', detail: 'note logged for your 05-25 appointment', unread: false, color: '#6b3fb0', bg: '#f0eafc' },
+    { type: 'Registration approved', detail: 'your registration was approved', unread: false, color: '#1d7a45', bg: '#e6f6ec' },
+  ]
+  return (
+    <MockShell label="Notifications — bell widget & feed">
+      <div className="flex items-stretch gap-4 max-[640px]:flex-col">
+        {/* Bell + badge */}
+        <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-[#dbe6ee] bg-[#f8fbfc] px-4 py-3">
+          <span className="relative grid h-10 w-10 place-items-center rounded-[10px] border border-[#d7e5ec] bg-white text-[#143A57]">
+            <Bell size={18} />
+            <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#d92d20] px-1 text-[0.6rem] font-black text-white">2</span>
+          </span>
+          <span className="text-[0.58rem] font-bold text-[#8aa0b3]">2 unread</span>
+        </div>
+        {/* Feed */}
+        <div className="min-w-0 flex-1 space-y-1.5">
+          {feed.map((n) => (
+            <div
+              key={n.type}
+              className={cn(
+                'flex items-start gap-2 rounded-lg border px-2.5 py-1.5',
+                n.unread ? 'border-[#bcd9f0] bg-[#f6fbff]' : 'border-[#eef3f7] bg-white',
+              )}
+            >
+              <span className="mt-0.5 grid h-5 w-5 flex-shrink-0 place-items-center rounded" style={{ backgroundColor: n.bg, color: n.color }}>
+                <BellRing size={11} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  {n.unread && <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#1f7af0]" />}
+                  <span className="truncate text-[0.64rem] font-bold text-[#102033]">{n.type}</span>
+                </div>
+                <div className="truncate text-[0.58rem] text-[#53687b]">{n.detail}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <Pill label="u_notification_reminders" color="#0f6b4f" bg="#e8f7ef" />
+        <Pill label="audience: patient · staff · both" color="#1f5f9c" bg="#e7f0fb" />
+        <Pill label="per-audience read flags" color="#6b3fb0" bg="#f0eafc" />
+        <Pill label="257 backfilled" color="#b45309" bg="#fef3c7" />
+      </div>
+    </MockShell>
+  )
+}
+
+// 11 — Sidebar UX
+function SidebarMock() {
+  const nav = ['Dashboard', 'Book', 'Appointments', 'Notifications', 'Profile']
+  return (
+    <MockShell label="Two-pane layout — full-height sidebar">
+      <div className="flex h-[150px] overflow-hidden rounded-lg border border-[#dbe6ee]">
+        {/* Sidebar */}
+        <div className="flex w-[120px] flex-shrink-0 flex-col border-r border-[#eef3f7] bg-[#f8fbfc]">
+          <div className="flex items-center gap-1.5 border-b border-[#eef3f7] px-2.5 py-2">
+            <span className="grid h-5 w-5 place-items-center rounded bg-[#143A57] text-white"><Globe size={11} /></span>
+            <span className="text-[0.56rem] font-black text-[#102033]">CareAtlas</span>
+          </div>
+          <div className="flex-1 space-y-1 p-2">
+            {nav.map((n, i) => (
+              <div
+                key={n}
+                className={cn(
+                  'rounded px-2 py-1 text-[0.56rem] font-bold',
+                  i === 0 ? 'bg-[#143A57] text-white' : 'text-[#53687b]',
+                )}
+              >
+                {n}
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-[#eef3f7] p-2">
+            <div className="flex items-center gap-1 rounded border border-[#e0ebf1] px-2 py-1 text-[0.56rem] font-bold text-[#a22828]">
+              <LogOut size={10} /> Sign out
+            </div>
+          </div>
+        </div>
+        {/* Content pane */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center justify-end gap-1.5 border-b border-[#eef3f7] bg-white px-2.5 py-1.5">
+            <span className="grid h-5 w-5 place-items-center rounded border border-[#d7e5ec] text-[#143A57]"><Bell size={11} /></span>
+            <span className="rounded border border-[#d7e5ec] px-1.5 py-0.5 text-[0.52rem] font-bold text-[#53687b]">Switch portal</span>
+          </div>
+          <div className="flex-1 space-y-1.5 bg-[#f4f8fb] p-2.5">
+            <div className="h-3 w-1/2 rounded bg-[#dbe6ee]" />
+            <div className="grid grid-cols-3 gap-1.5">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-9 rounded border border-[#e6eef4] bg-white" />
+              ))}
+            </div>
+            <div className="h-10 rounded border border-[#e6eef4] bg-white" />
+          </div>
         </div>
       </div>
     </MockShell>
