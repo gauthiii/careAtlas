@@ -74,6 +74,20 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return (await res.json()) as T
 }
 
+export interface ProvisionSampleDoctorResponse {
+  status: 'DOCTOR_PROVISIONED'
+  name: string
+  email: string
+  temporary_password: string
+  department: string
+  speciality: string
+  doctor_sys_id: string
+}
+
+export function provisionSampleDoctor() {
+  return postJson<ProvisionSampleDoctorResponse>('/doctors/provision-sample', {})
+}
+
 export function registerAwsPatient(name: string, email: string, password: string) {
   return postJson<AwsRegisterResponse>('/aws/register', { name, email, password })
 }

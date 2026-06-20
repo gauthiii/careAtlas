@@ -643,7 +643,10 @@ function Shell() {
           <Outlet />
         </div>
       )}
-      <AiAssistantWidget agentConfig={assistantAgentConfig} />
+      <AiAssistantWidget
+        agentConfig={assistantAgentConfig}
+        doctorRegisterMode={pathname === '/staff/sign-in'}
+      />
     </div>
   )
 }

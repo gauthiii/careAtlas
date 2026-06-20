@@ -8,7 +8,7 @@ calls `/api/*` here. Run locally with:
 
 import logging
 from datetime import date
-from secrets import compare_digest
+from secrets import compare_digest, token_hex
 from typing import Any
 
 import httpx
@@ -19,7 +19,13 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import Settings, get_settings
-from .aws_auth import router as aws_auth_router
+from .aws_auth import (
+    DEFAULT_DOCTOR_TEMP_PASSWORD,
+    create_force_change_user,
+    router as aws_auth_router,
+    _client as _cognito_client,
+    _require_cognito,
+)
 from .a2a_callbacks import (
     AgentExecutionRecord,
     create_pending_execution,
@@ -69,6 +75,7 @@ from .servicenow import (
     SummaryNoteAppointmentNotFoundError,
     create_agent,
     create_clinician_appointment,
+    create_doctor,
     create_patient_booking_appointment,
     create_patient_registration,
     create_summary_note,
@@ -244,6 +251,74 @@ async def post_patient_registration(
         return await create_patient_registration(settings, body)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+_SAMPLE_DOCTORS = [
+    ("Maya", "Okonkwo", "Cardiology", "Interventional Cardiology"),
+    ("Daniel", "Asante", "Neurology", "Stroke Medicine"),
+    ("Priya", "Mensah", "Paediatrics", "Neonatology"),
+    ("Samuel", "Boateng", "Orthopaedics", "Sports Medicine"),
+    ("Aisha", "Adjei", "Oncology", "Medical Oncology"),
+]
+
+DOCTOR_EMAIL_DOMAIN = "northstargh.com"
+
+
+@api.post("/doctors/provision-sample")
+async def post_provision_sample_doctor(
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    """Provision a sample clinician end-to-end for the doctor sign-in assistant.
+
+    Creates a u_doctor record in ServiceNow and a force-change Cognito credential
+    (temporary password ``WelcomeToNGH@123``), then returns the email + temporary
+    password so the assistant can show the new sign-in details.
+    """
+    _require_cognito(settings)
+
+    first_name, last_name, department, speciality = _SAMPLE_DOCTORS[
+        int(token_hex(2), 16) % len(_SAMPLE_DOCTORS)
+    ]
+    # Unique each call so repeated provisioning never collides in Cognito.
+    suffix = token_hex(3)
+    email = f"dr.{first_name}.{last_name}.{suffix}@{DOCTOR_EMAIL_DOMAIN}".lower()
+    full_name = f"Dr. {first_name} {last_name}"
+
+    cognito = _cognito_client(settings.cognito_region)
+    try:
+        create_force_change_user(
+            cognito,
+            settings,
+            name=full_name,
+            email=email,
+            temporary_password=DEFAULT_DOCTOR_TEMP_PASSWORD,
+        )
+    except cognito.exceptions.UsernameExistsException:
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Cognito provisioning failed: {exc}")
+
+    try:
+        doctor = await create_doctor(
+            settings,
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            department=department,
+            speciality=speciality,
+        )
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "status": "DOCTOR_PROVISIONED",
+        "name": full_name,
+        "email": email,
+        "temporary_password": DEFAULT_DOCTOR_TEMP_PASSWORD,
+        "department": department,
+        "speciality": speciality,
+        "doctor_sys_id": doctor.get("sys_id", ""),
+    }
 
 
 @api.get("/patients/profile", response_model=PatientProfileResponse)

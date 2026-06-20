@@ -747,6 +747,66 @@ async def create_patient_registration(
     )
 
 
+async def create_doctor(
+    settings: Settings,
+    *,
+    first_name: str,
+    last_name: str,
+    email: str,
+    department: str,
+    speciality: str,
+    http_client: httpx.AsyncClient | None = None,
+) -> dict[str, str]:
+    """Create a clinician record in ServiceNow's u_doctor table."""
+    payload = {
+        "u_first_name": first_name,
+        "u_last_name": last_name,
+        "u_email": email,
+        "u_department": department,
+        "u_speciality": speciality,
+        "u_active": "true",
+    }
+
+    async def run(client: httpx.AsyncClient) -> httpx.Response:
+        return await client.post(
+            f"{settings.snow_base_url}/api/now/table/u_doctor",
+            json=payload,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            auth=(settings.snow_username, settings.snow_password),
+        )
+
+    if http_client is not None:
+        response = await run(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+            response = await run(client)
+
+    if not response.is_success:
+        _raise_snow_error(response)
+
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise ServiceNowError("ServiceNow doctor creation failed: invalid JSON response") from exc
+
+    result = body.get("result") if isinstance(body, dict) else None
+    if not isinstance(result, dict):
+        raise ServiceNowError("ServiceNow doctor creation response did not include a result object")
+
+    return {
+        "sys_id": _display_val(result.get("sys_id")),
+        "doctor_id": _display_val(result.get("u_doctor_id")),
+        "first_name": _display_val(result.get("u_first_name")) or first_name,
+        "last_name": _display_val(result.get("u_last_name")) or last_name,
+        "email": _display_val(result.get("u_email")) or email,
+        "department": _display_val(result.get("u_department")) or department,
+        "speciality": _display_val(result.get("u_speciality")) or speciality,
+    }
+
+
 def _patient_registration_payload(registration: PatientRegistrationRequest) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "u_first_name": registration.first_name,

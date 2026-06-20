@@ -1,6 +1,7 @@
 import { FormEvent, useRef, useState } from 'react'
-import { Send, Sparkles, X } from 'lucide-react'
+import { LoaderCircle, Send, Sparkles, X } from 'lucide-react'
 import { executeAgent, fetchAgentExecution, type ExecuteAgentResponse } from '../services/serviceNow'
+import { provisionSampleDoctor, type ProvisionSampleDoctorResponse } from '../services/awsAuth'
 
 type ChatMessage = {
   id: string
@@ -41,8 +42,19 @@ function replaceMessage(messages: ChatMessage[], id: string, next: ChatMessage):
   return messages.map((message) => (message.id === id ? next : message))
 }
 
-export function AiAssistantWidget({ agentConfig }: { agentConfig?: AiAssistantAgentConfig | null }) {
+type DoctorRegStep = 'prompt' | 'creating' | 'done' | 'declined' | 'error'
+
+export function AiAssistantWidget({
+  agentConfig,
+  doctorRegisterMode = false,
+}: {
+  agentConfig?: AiAssistantAgentConfig | null
+  doctorRegisterMode?: boolean
+}) {
   const [isOpen, setIsOpen] = useState(false)
+  const [drStep, setDrStep] = useState<DoctorRegStep>('prompt')
+  const [drResult, setDrResult] = useState<ProvisionSampleDoctorResponse | null>(null)
+  const [drError, setDrError] = useState('')
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [pending, setPending] = useState(false)
@@ -62,6 +74,22 @@ export function AiAssistantWidget({ agentConfig }: { agentConfig?: AiAssistantAg
     setPending(false)
     setContextId(null)
     setTaskId(null)
+    setDrStep('prompt')
+    setDrResult(null)
+    setDrError('')
+  }
+
+  async function handleProvisionDoctor() {
+    setDrStep('creating')
+    setDrError('')
+    try {
+      const result = await provisionSampleDoctor()
+      setDrResult(result)
+      setDrStep('done')
+    } catch (error) {
+      setDrError(error instanceof Error ? error.message : 'Failed to create the doctor account.')
+      setDrStep('error')
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -218,6 +246,17 @@ export function AiAssistantWidget({ agentConfig }: { agentConfig?: AiAssistantAg
               </button>
             </header>
 
+            {doctorRegisterMode ? (
+              <DoctorRegisterPanel
+                step={drStep}
+                result={drResult}
+                error={drError}
+                onYes={handleProvisionDoctor}
+                onNo={() => setDrStep('declined')}
+                onRetry={() => setDrStep('prompt')}
+              />
+            ) : (
+            <>
             <div className="flex-1 overflow-y-auto px-5 py-5">
               {messages.length === 0 ? (
                 <div className="rounded-[8px] border border-[#d7e5ec] bg-[#f8fbfc] p-4 text-sm font-semibold leading-6 text-[#53687b]">
@@ -270,9 +309,108 @@ export function AiAssistantWidget({ agentConfig }: { agentConfig?: AiAssistantAg
                 </button>
               </div>
             </form>
+            </>
+            )}
           </aside>
         </div>
       )}
     </>
+  )
+}
+
+function DoctorRegisterPanel({
+  step,
+  result,
+  error,
+  onYes,
+  onNo,
+  onRetry,
+}: {
+  step: DoctorRegStep
+  result: ProvisionSampleDoctorResponse | null
+  error: string
+  onYes: () => void
+  onNo: () => void
+  onRetry: () => void
+}) {
+  return (
+    <div className="flex-1 overflow-y-auto px-5 py-5">
+      <div className="grid gap-3">
+        {/* Assistant question bubble */}
+        <div className="mr-auto max-w-[86%] rounded-[12px] border border-[#d7e5ec] bg-[#f8fbfc] px-4 py-3 text-sm font-semibold leading-6 text-[#102033]">
+          Do you want a doctor registered?
+        </div>
+
+        {step === 'prompt' && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onYes}
+              className="inline-flex min-h-[40px] cursor-pointer items-center justify-center rounded-[9px] bg-[#0f5f8c] px-5 font-bold text-white transition hover:bg-[#143A57]"
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              onClick={onNo}
+              className="inline-flex min-h-[40px] cursor-pointer items-center justify-center rounded-[9px] border border-[#b7ceda] bg-white px-5 font-bold text-[#0f5f8c] transition hover:border-[#0f5f8c]"
+            >
+              No
+            </button>
+          </div>
+        )}
+
+        {step === 'creating' && (
+          <div className="mr-auto flex items-center gap-2 rounded-[12px] border border-[#cbdde6] bg-[#f8fbfc] px-4 py-3 text-sm font-semibold text-[#53687b]">
+            <LoaderCircle size={16} className="animate-spin" />
+            Creating your doctor account...
+          </div>
+        )}
+
+        {step === 'declined' && (
+          <div className="mr-auto max-w-[86%] rounded-[12px] border border-[#d7e5ec] bg-[#f8fbfc] px-4 py-3 text-sm font-semibold leading-6 text-[#102033]">
+            No problem — let me know if you change your mind.
+          </div>
+        )}
+
+        {step === 'done' && result && (
+          <div className="mr-auto max-w-[92%] rounded-[12px] border border-[#bfe3d2] bg-[#f3fbf6] px-4 py-3 text-sm font-semibold leading-6 text-[#102033]">
+            <p className="m-0 mb-2 font-black text-[#1f7a4d]">Your doctor account has been created.</p>
+            <div className="grid gap-1">
+              <div>
+                <span className="text-[#53687b]">Email:</span>{' '}
+                <code className="rounded-[6px] border border-[#d7e5ec] bg-white px-1.5 py-0.5 [overflow-wrap:anywhere]">
+                  {result.email}
+                </code>
+              </div>
+              <div>
+                <span className="text-[#53687b]">Temporary password:</span>{' '}
+                <code className="rounded-[6px] border border-[#d7e5ec] bg-white px-1.5 py-0.5 [overflow-wrap:anywhere]">
+                  {result.temporary_password}
+                </code>
+              </div>
+            </div>
+            <p className="m-0 mt-2 text-[#53687b]">Sign in and follow the next steps.</p>
+          </div>
+        )}
+
+        {step === 'error' && (
+          <>
+            <div className="mr-auto max-w-[86%] rounded-[12px] border border-[#f6c6c4] bg-[#fff4f3] px-4 py-3 text-sm font-semibold leading-6 text-[#a22828]">
+              {error || 'Failed to create the doctor account.'}
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={onRetry}
+                className="inline-flex min-h-[40px] cursor-pointer items-center justify-center rounded-[9px] border border-[#b7ceda] bg-white px-5 font-bold text-[#0f5f8c] transition hover:border-[#0f5f8c]"
+              >
+                Try again
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   )
 }

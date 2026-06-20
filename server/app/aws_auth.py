@@ -114,6 +114,16 @@ class RegisterRequest(BaseModel):
     password: str
 
 
+# Default temporary password for force-change doctor accounts.
+DEFAULT_DOCTOR_TEMP_PASSWORD = "WelcomeToNGH@123"
+
+
+class RegisterDoctorRequest(BaseModel):
+    name: str
+    email: EmailStr
+    temporary_password: str = DEFAULT_DOCTOR_TEMP_PASSWORD
+
+
 class LoginRequest(BaseModel):
     username: EmailStr  # email is the username
     password: str
@@ -202,6 +212,72 @@ def register(data: RegisterRequest, dep=Depends(cognito_dep)):
         )
 
         return {"status": "SIGNUP_AND_CONFIRMED", "user_sub": resp["UserSub"]}
+    except cognito.exceptions.UsernameExistsException:
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+    except cognito.exceptions.InvalidPasswordException as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+def create_force_change_user(
+    cognito,
+    settings: Settings,
+    *,
+    name: str,
+    email: str,
+    temporary_password: str = DEFAULT_DOCTOR_TEMP_PASSWORD,
+) -> str:
+    """Admin-create a Cognito user with a temporary password.
+
+    Unlike :func:`register`, the user lands in ``FORCE_CHANGE_PASSWORD`` state so
+    the next login raises ``NEW_PASSWORD_REQUIRED`` and forces a password change.
+    Email delivery is suppressed and the email is marked verified. Returns the
+    Cognito user sub.
+    """
+    resp = cognito.admin_create_user(
+        UserPoolId=settings.cognito_user_pool_id,
+        Username=email,
+        TemporaryPassword=temporary_password,
+        MessageAction="SUPPRESS",
+        UserAttributes=[
+            {"Name": "email", "Value": email},
+            {"Name": "email_verified", "Value": "true"},
+            {"Name": "name", "Value": name},
+        ],
+    )
+    user = resp.get("User", {})
+    sub = ""
+    for attr in user.get("Attributes", []):
+        if attr.get("Name") == "sub":
+            sub = attr.get("Value", "")
+            break
+    return sub
+
+
+@router.post("/register-doctor")
+def register_doctor(data: RegisterDoctorRequest, dep=Depends(cognito_dep)):
+    """Same as /register, but forces a password change on first sign-in.
+
+    Creates the clinical Cognito account with a temporary password; the user is
+    left in FORCE_CHANGE_PASSWORD state and must set a permanent password (via the
+    existing NEW_PASSWORD_REQUIRED flow) before they can use the account.
+    """
+    cognito, settings = dep
+    try:
+        sub = create_force_change_user(
+            cognito,
+            settings,
+            name=data.name,
+            email=data.email,
+            temporary_password=data.temporary_password,
+        )
+        return {
+            "status": "DOCTOR_CREATED_FORCE_CHANGE",
+            "email": data.email,
+            "temporary_password": data.temporary_password,
+            "user_sub": sub,
+        }
     except cognito.exceptions.UsernameExistsException:
         raise HTTPException(status_code=400, detail="An account with this email already exists")
     except cognito.exceptions.InvalidPasswordException as exc:
