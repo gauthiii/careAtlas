@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, CalendarDays, FileText, Flag, LoaderCircle, Search, UserRound } from 'lucide-react'
+import { AlertTriangle, Bot, CalendarDays, FileText, Flag, LoaderCircle, Lock, Search, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { DoctorPage } from '../../components/staff/DoctorShell'
@@ -149,19 +149,19 @@ export function PatientRecordPage() {
               <div className="grid grid-cols-2 gap-3.5 max-[720px]:grid-cols-1">
                 <RecordField label="Patient ID" value={patientProfile.patient_id} />
                 <RecordField label="ServiceNow sys_id" value={patientProfile.sys_id} />
-                <RecordField label="Date of birth" value={patientProfile.date_of_birth} />
-                <RecordField label="Gender" value={patientProfile.gender} />
-                <RecordField label="Ethnicity" value={patientProfile.ethnicity} />
+                <RecordField label="Date of birth" value={patientProfile.date_of_birth} pii />
+                <RecordField label="Gender" value={patientProfile.gender} pii />
+                <RecordField label="Ethnicity" value={patientProfile.ethnicity} pii />
                 <RecordField label="Language" value={patientProfile.primary_language} />
-                <RecordField label="Phone" value={patientProfile.phone} />
-                <RecordField label="Email" value={patientProfile.email} />
-                <RecordField label="Address" value={[patientProfile.address_line1, patientProfile.city, patientProfile.postcode, patientProfile.state_region].filter(Boolean).join(', ')} />
-                <RecordField label="Condition" value={patientProfile.health_condition} />
-                <RecordField label="Blood type" value={patientProfile.blood_type} />
-                <RecordField label="Known allergies" value={patientProfile.known_allergies} />
-                <RecordField label="Accessibility" value={patientProfile.accessibility} />
-                <RecordField label="Insurance" value={patientProfile.insurance_provider || patientProfile.insurance_id} />
-                <RecordField label="Emergency contact" value={[patientProfile.emergency_name, patientProfile.emergency_phone, patientProfile.emergency_relationship].filter(Boolean).join(' · ')} />
+                <RecordField label="Phone" value={patientProfile.phone} pii />
+                <RecordField label="Email" value={patientProfile.email} pii />
+                <RecordField label="Address" value={[patientProfile.address_line1, patientProfile.city, patientProfile.postcode, patientProfile.state_region].filter(Boolean).join(', ')} pii />
+                <RecordField label="Condition" value={patientProfile.health_condition} pii />
+                <RecordField label="Blood type" value={patientProfile.blood_type} pii />
+                <RecordField label="Known allergies" value={patientProfile.known_allergies} pii />
+                <RecordField label="Accessibility" value={patientProfile.accessibility} pii />
+                <RecordField label="Insurance" value={patientProfile.insurance_provider || patientProfile.insurance_id} pii />
+                <RecordField label="Emergency contact" value={[patientProfile.emergency_name, patientProfile.emergency_phone, patientProfile.emergency_relationship].filter(Boolean).join(' · ')} pii />
                 <RecordField label="Profile status" value={patientProfile.profile_complete ? 'Complete' : 'Incomplete'} />
               </div>
             </PortalPanel>
@@ -245,11 +245,22 @@ export function PatientRecordPage() {
   )
 }
 
-function RecordField({ label, value }: { label: string; value?: string | null }) {
+function RecordField({ label, value, pii = false }: { label: string; value?: string | null; pii?: boolean }) {
   return (
     <div className="grid gap-[5px] rounded-[10px] border border-[#e5eef3] bg-white p-3">
-      <span className="text-[0.74rem] font-black uppercase tracking-[0.06em] text-[#607487]">{label}</span>
-      <strong className="[overflow-wrap:anywhere] text-[#102033]">{value || 'Not provided'}</strong>
+      <span className="flex flex-wrap items-center gap-1.5 text-[0.74rem] font-black uppercase tracking-[0.06em] text-[#607487]">
+        {label}
+        {pii && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-[#f0c36b] bg-[#fff5e0] px-2 py-0.5 text-[0.62rem] font-black tracking-[0.04em] text-[#9a6b12]">
+            <Lock size={10} /> PII data
+          </span>
+        )}
+      </span>
+      {pii ? (
+        <strong className="[overflow-wrap:anywhere] text-[#94a3b1]">Hidden — not shown to the public</strong>
+      ) : (
+        <strong className="[overflow-wrap:anywhere] text-[#102033]">{value || 'Not provided'}</strong>
+      )}
     </div>
   )
 }
