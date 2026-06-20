@@ -632,12 +632,26 @@ async def _fetch_governance_details(
     return out
 
 
+# Display rule: any asset whose name contains this fragment is always shown in the
+# Unmanaged AI Assets table on the governance page, regardless of its managed_by owner.
+DEMO_AGENT_NAME_FRAGMENT = "demo agent"
+
+
+def _record_is_managed(record: dict[str, Any]) -> bool:
+    """An asset counts as managed when it has an owner (managed_by) — except demo
+    agents, which are always surfaced as unmanaged for the governance demo."""
+    name = (_field_best(record.get("display_name")) or "").lower()
+    if DEMO_AGENT_NAME_FRAGMENT in name:
+        return False
+    return bool((_field_best(record.get("managed_by")) or "").strip())
+
+
 async def _fetch_ai_assets(settings: Settings, *, managed: bool) -> list[AIAsset]:
-    owner_clause = "^managed_byISNOTEMPTY" if managed else "^managed_byISEMPTY"
+    # Fetch all post-cutoff assets, then bucket managed vs unmanaged in code so the
+    # demo-agent override above can move owned demo agents into the unmanaged table.
     params = {
         "sysparm_query": (
             f"sys_created_on>={settings.agents_created_since}"
-            f"{owner_clause}"
             "^ORDERBYDESCsys_created_on"
         ),
         "sysparm_fields": ",".join(ASSET_FIELDS),
@@ -652,7 +666,10 @@ async def _fetch_ai_assets(settings: Settings, *, managed: bool) -> list[AIAsset
         )
         if not response.is_success:
             _raise_snow_error(response)
-        records = response.json().get("result", [])
+        records = [
+            r for r in response.json().get("result", [])
+            if _record_is_managed(r) == managed
+        ]
 
         sys_ids = [sid for r in records if (sid := _field_best(r.get("sys_id")))]
         gov_map = await _fetch_governance_details(client, settings, sys_ids)
