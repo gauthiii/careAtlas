@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Bot, CalendarDays, HeartPulse, Home, Hospital, LockKeyhole, Presentation, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
+import { Bot, CalendarDays, HeartPulse, Home, Hospital, LockKeyhole, Presentation, ServerCog, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import { SidebarLayout, sidebarItemClass } from './SidebarLayout'
@@ -33,6 +33,7 @@ const governanceNav = [
   { label: 'ACL', to: '/governance/acl', icon: UserCog, end: true },
   { label: 'Demo', to: '/governance/demo', icon: Presentation, end: true },
   { label: 'Agenda', to: '/governance/agenda', icon: CalendarDays, end: true },
+  { label: 'Additional Work', to: '/governance/additional-work', icon: ServerCog, end: true },
 ] as const
 
 const signedOutGovernanceNav = [
