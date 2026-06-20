@@ -6,6 +6,7 @@ import { GovernanceAiAgentsPage } from './pages/governance/GovernanceAiAgentsPag
 import { GovernanceDashboardPage } from './pages/governance/GovernanceDashboardPage'
 import { GovernanceAgendaPage } from './pages/governance/GovernanceAgendaPage'
 import { GovernanceAdditionalWorkPage } from './pages/governance/GovernanceAdditionalWorkPage'
+import { GovernanceLlm02AuditPage } from './pages/governance/GovernanceLlm02AuditPage'
 import { GovernanceDemoPage } from './pages/governance/GovernanceDemoPage'
 import { GovernanceSignInPage } from './pages/governance/GovernanceSignInPage'
 import { ViewChooserPage } from './pages/home/ViewChooserPage'
@@ -394,6 +395,18 @@ function App() {
             </PatientRoleBlocker>
           }
         />
+        <Route
+          path="/governance/llm02-audit"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernanceLlm02AuditPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
@@ -659,6 +672,7 @@ function Shell() {
       <AiAssistantWidget
         agentConfig={assistantAgentConfig}
         doctorRegisterMode={pathname === '/staff/sign-in'}
+        guardrailMode={pathname === '/governance/ai-agents'}
       />
     </div>
   )

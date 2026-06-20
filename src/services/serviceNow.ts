@@ -296,6 +296,37 @@ export interface RegisterAgentResult {
   name: string
 }
 
+export interface Llm02AuditEntry {
+  sys_id: string
+  log_id: string
+  timestamp: string
+  agent_identity: string
+  action_type: string
+  final_action: string
+  rejection_reason: string
+  patient_id_anon: string
+  agent_authorised: boolean
+  created_by: string
+}
+
+export async function flagLlm02Event(requestText: string): Promise<Llm02AuditEntry> {
+  const res = await fetch(`${API_BASE}/governance/llm02/flag`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_text: requestText }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as Llm02AuditEntry
+}
+
+export async function fetchLlm02AuditLog(): Promise<Llm02AuditEntry[]> {
+  const res = await fetch(`${API_BASE}/governance/llm02/audit-log`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as Llm02AuditEntry[]
+}
+
 export async function registerAgent(payload: RegisterAgentPayload): Promise<RegisterAgentResult> {
   const res = await fetch(`${API_BASE}/agents/register`, {
     method: 'POST',

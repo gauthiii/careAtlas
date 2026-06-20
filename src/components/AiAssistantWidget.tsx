@@ -2,6 +2,7 @@ import { FormEvent, useRef, useState } from 'react'
 import { LoaderCircle, Send, Sparkles, X } from 'lucide-react'
 import { executeAgent, fetchAgentExecution, type ExecuteAgentResponse } from '../services/serviceNow'
 import { provisionSampleDoctor, type ProvisionSampleDoctorResponse } from '../services/awsAuth'
+import { flagLlm02Event } from '../services/serviceNow'
 
 type ChatMessage = {
   id: string
@@ -44,12 +45,17 @@ function replaceMessage(messages: ChatMessage[], id: string, next: ChatMessage):
 
 type DoctorRegStep = 'prompt' | 'creating' | 'done' | 'declined' | 'error'
 
+const GUARDRAIL_REFUSAL =
+  'I’m unable to share or disclose any patient PII. Doing so would breach our LLM02 — Sensitive Information Disclosure controls, so the request has been blocked. This event has been flagged and recorded in the governance audit log.'
+
 export function AiAssistantWidget({
   agentConfig,
   doctorRegisterMode = false,
+  guardrailMode = false,
 }: {
   agentConfig?: AiAssistantAgentConfig | null
   doctorRegisterMode?: boolean
+  guardrailMode?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [drStep, setDrStep] = useState<DoctorRegStep>('prompt')
@@ -105,6 +111,36 @@ export function AiAssistantWidget({
     }
 
     setInput('')
+
+    // Governance guardrail: on the AI Agents page, every request is treated as a
+    // potential sensitive-information-disclosure attempt — analyze, then block + flag.
+    if (guardrailMode) {
+      const pendingMessage: ChatMessage = {
+        id: newId(),
+        role: 'pending',
+        content: 'Analyzing request against governance policies…',
+      }
+      const sessionVersion = sessionVersionRef.current
+      setMessages((currentMessages) => [...currentMessages, userMessage, pendingMessage])
+      setPending(true)
+
+      // Fire the audit-log write while the 5s "analysis" plays out.
+      const flagPromise = flagLlm02Event(trimmedInput).catch(() => null)
+      await sleep(5000)
+      await flagPromise
+
+      if (sessionVersion !== sessionVersionRef.current) return
+
+      setMessages((currentMessages) =>
+        replaceMessage(currentMessages, pendingMessage.id, {
+          id: pendingMessage.id,
+          role: 'error',
+          content: GUARDRAIL_REFUSAL,
+        }),
+      )
+      setPending(false)
+      return
+    }
 
     if (!agentConfig) {
       setMessages((currentMessages) => [
@@ -261,9 +297,11 @@ export function AiAssistantWidget({
               {messages.length === 0 ? (
                 <div className="rounded-[8px] border border-[#d7e5ec] bg-[#f8fbfc] p-4 text-sm font-semibold leading-6 text-[#53687b]">
                   {/* Start a chat and I will route it to the assistant once the backend is connected. */}
-                  {agentConfig
-                    ? `How can I help with ${agentConfig.pageName.toLowerCase()} today?`
-                    : "How can I help you today? Ask me anything about CareAtlas, and I'll do my best to assist you!"}
+                  {guardrailMode
+                    ? 'How can I help you?'
+                    : agentConfig
+                      ? `How can I help with ${agentConfig.pageName.toLowerCase()} today?`
+                      : "How can I help you today? Ask me anything about CareAtlas, and I'll do my best to assist you!"}
                 </div>
               ) : (
                 <div className="grid gap-3">

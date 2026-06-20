@@ -807,6 +807,127 @@ async def create_doctor(
     }
 
 
+# ---------------------------------------------------------------------------
+# LLM02 — Sensitive Information Disclosure guardrail audit log
+# (table: u_ai_action_audit_log)
+# ---------------------------------------------------------------------------
+
+GUARDRAIL_AGENT_IDENTITY = "governance_user_identity"
+GUARDRAIL_FINAL_ACTION = "blocked"
+GUARDRAIL_REJECTION_REASON = (
+    "Blocked under LLM02 — Sensitive Information Disclosure. The request sought "
+    "patient PII, which the governance guardrail prohibits. Event flagged for review."
+)
+
+
+def _map_audit_log(record: dict[str, Any]) -> dict[str, str]:
+    """Normalize a u_ai_action_audit_log row for the frontend."""
+    return {
+        "sys_id": _field_value(record.get("sys_id")),
+        "log_id": _field_best(record.get("u_log_id")),
+        "timestamp": _field_best(record.get("u_timestamp")) or _field_best(record.get("sys_created_on")),
+        "agent_identity": _field_best(record.get("u_agent_identity")),
+        "action_type": _field_best(record.get("u_action_type")),
+        "final_action": _field_best(record.get("u_final_action")),
+        "rejection_reason": _field_best(record.get("u_rejection_reason")),
+        "patient_id_anon": _field_best(record.get("u_patient_id_anon")),
+        "agent_authorised": _truthy_snow(record.get("u_val_agent_auth")),
+        "created_by": _field_best(record.get("sys_created_by")),
+    }
+
+
+async def create_guardrail_audit_log(
+    settings: Settings,
+    *,
+    request_text: str,
+    http_client: httpx.AsyncClient | None = None,
+) -> dict[str, str]:
+    """Record an LLM02 sensitive-information-disclosure block in the audit table."""
+    # Note: u_action_type is a restricted choice list with no PII-read value, so we
+    # intentionally don't set it (it would be rejected/blanked). The LLM02 page shows
+    # a meaningful action label, and u_rejection_reason carries the full context.
+    payload = {
+        "u_agent_identity": GUARDRAIL_AGENT_IDENTITY,
+        "u_final_action": GUARDRAIL_FINAL_ACTION,
+        "u_rejection_reason": GUARDRAIL_REJECTION_REASON,
+        "u_patient_id_anon": "REDACTED",
+        "u_val_agent_auth": "false",
+        "u_val_patient_ok": "false",
+        "u_val_slot_avail": "false",
+        "u_val_specialty": "false",
+        "u_val_no_dup": "false",
+    }
+
+    async def run(client: httpx.AsyncClient) -> httpx.Response:
+        return await client.post(
+            f"{settings.snow_base_url}/api/now/table/u_ai_action_audit_log",
+            json=payload,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+
+    if http_client is not None:
+        response = await run(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+            response = await run(client)
+
+    if not response.is_success:
+        _raise_snow_error(response)
+
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise ServiceNowError("ServiceNow audit-log creation failed: invalid JSON response") from exc
+
+    result = body.get("result") if isinstance(body, dict) else None
+    if not isinstance(result, dict):
+        raise ServiceNowError("ServiceNow audit-log creation response did not include a result object")
+
+    return _map_audit_log(result)
+
+
+async def fetch_guardrail_audit_logs(
+    settings: Settings,
+    *,
+    limit: int = 200,
+    http_client: httpx.AsyncClient | None = None,
+) -> list[dict[str, str]]:
+    """Return the LLM02 guardrail rows (blocked, governance_user_identity), newest first."""
+    params = {
+        "sysparm_query": (
+            f"u_agent_identity={GUARDRAIL_AGENT_IDENTITY}"
+            f"^u_final_action={GUARDRAIL_FINAL_ACTION}"
+            "^ORDERBYDESCsys_created_on"
+        ),
+        "sysparm_display_value": "all",
+        "sysparm_limit": str(limit),
+    }
+
+    async def run(client: httpx.AsyncClient) -> httpx.Response:
+        return await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_ai_action_audit_log",
+            params=params,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+
+    if http_client is not None:
+        response = await run(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+            response = await run(client)
+
+    if not response.is_success:
+        _raise_snow_error(response)
+
+    body = response.json()
+    result = body.get("result") if isinstance(body, dict) else None
+    if not isinstance(result, list):
+        return []
+    return [_map_audit_log(row) for row in result if isinstance(row, dict)]
+
+
 def _patient_registration_payload(registration: PatientRegistrationRequest) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "u_first_name": registration.first_name,

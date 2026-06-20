@@ -76,6 +76,7 @@ from .servicenow import (
     create_agent,
     create_clinician_appointment,
     create_doctor,
+    create_guardrail_audit_log,
     create_patient_booking_appointment,
     create_patient_registration,
     create_summary_note,
@@ -85,6 +86,7 @@ from .servicenow import (
     fetch_ai_decision_log,
     fetch_appointment_option,
     fetch_doctor_appointment_options,
+    fetch_guardrail_audit_logs,
     fetch_managed_ai_assets,
     fetch_patient_booking_availability,
     fetch_patient_profile,
@@ -319,6 +321,32 @@ async def post_provision_sample_doctor(
         "speciality": speciality,
         "doctor_sys_id": doctor.get("sys_id", ""),
     }
+
+
+@api.post("/governance/llm02/flag")
+async def post_flag_llm02_event(
+    body: dict[str, Any] | None = None,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    """Log an LLM02 sensitive-information-disclosure block to u_ai_action_audit_log."""
+    request_text = ""
+    if isinstance(body, dict):
+        request_text = str(body.get("request_text") or "")
+    try:
+        return await create_guardrail_audit_log(settings, request_text=request_text)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/llm02/audit-log")
+async def get_llm02_audit_log(
+    settings: Settings = Depends(get_settings),
+) -> list[dict[str, Any]]:
+    """Return the LLM02 guardrail audit-log entries, newest first."""
+    try:
+        return await fetch_guardrail_audit_logs(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @api.get("/patients/profile", response_model=PatientProfileResponse)
