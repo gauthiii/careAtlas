@@ -54,6 +54,10 @@ interface AgendaSection {
   bg: string
   border: string
   items: AgendaItem[]
+  // 'planned' shows an amber "Planned" badge instead of the green "Done" badge.
+  status?: 'done' | 'planned'
+  // Optional lead paragraph rendered above the item rows.
+  lead?: string
 }
 
 interface AgendaItem {
@@ -251,6 +255,65 @@ const SECTIONS: AgendaSection[] = [
       { label: 'Persistent top bar', detail: 'Slim content-pane top bar keeps the portal switcher and the notification bell reachable from every page', done: true },
       { label: 'Responsive', detail: 'Below 860px the sidebar collapses into a horizontal scroll strip so navigation is preserved on tablet and mobile', done: true },
     ],
+  },
+  {
+    id: 'demo-plan',
+    number: '12',
+    title: 'What Needs To Be Done',
+    subtitle: 'Three distinct OWASP LLM Top-10 (2025) risks — detected, prevented, governed',
+    icon: ShieldAlert,
+    color: '#b42318',
+    bg: '#fdeceb',
+    border: '#f4c7c4',
+    status: 'planned',
+    lead:
+      'Demonstrate three distinct OWASP LLM Top-10 (2025) risks against the CareAtlas healthcare workflow and show each one being detected, prevented, and governed using AI Control Tower (AICT) and AI Risk and Compliance (AIRC), with the before/after evidence surfaced live in the existing AI Governance portal. The three risks are locked — each maps to a different ServiceNow mechanism, so the demo shows three genuinely different controls, not one control three times.',
+    items: [
+      { label: 'Three genuinely different controls', detail: 'Each risk maps to a separate ServiceNow mechanism — Gen AI Guardian guardrails, least-privilege non-human identity + ACLs, and field-level PII denial — never one control reused three times.' },
+      { label: 'Detect → prevent → govern', detail: 'Each risk is caught and blocked at runtime, then wrapped in an AIRC governance artefact (risk statement, AI Case, or AI impact assessment).' },
+      { label: 'Live before/after evidence', detail: 'Proof is surfaced in the existing AI Governance portal — e.g. the LLM02 audit log already wired to u_ai_action_audit_log.' },
+    ],
+  },
+]
+
+// The three locked OWASP risks for section 12 — rendered as a 4-column table.
+interface DemoRisk {
+  ref: string
+  risk: string
+  accent: string
+  bg: string
+  surface: string
+  mechanism: string
+  airc: string
+}
+
+const DEMO_RISKS: DemoRisk[] = [
+  {
+    ref: 'A',
+    risk: 'LLM01 — Prompt Injection',
+    accent: '#0f5f8c',
+    bg: '#e7f3f8',
+    surface: 'Patient-supplied free text (u_reason_text, booking “concern”, contact message) consumed by the triage / summary agents',
+    mechanism: 'Now Assist / Gen AI Guardian controls (sys_gen_ai_control, sys_gen_ai_guardian_provider, sn_ai_governance_automation_rule)',
+    airc: 'AIRC risk statement “Adversarial Attacks”; AI Case on trigger',
+  },
+  {
+    ref: 'B',
+    risk: 'LLM06 — Excessive Agency',
+    accent: '#6d28d9',
+    bg: '#f0ebff',
+    surface: 'A2A agents acting on u_patient / u_appointment beyond their job (e.g. scheduling agent reading PII or writing clinical notes)',
+    mechanism: 'Non-human identity least-privilege: scoped service accounts + ACLs + human-approval gate on /agents/execute',
+    airc: 'AIRC risk “Unauthorized Access to AI Models”; control attestation',
+  },
+  {
+    ref: 'C',
+    risk: 'LLM02 — Sensitive Information Disclosure',
+    accent: '#b42318',
+    bg: '#fdeceb',
+    surface: 'Agents / decision-log leaking patient PII (name, DOB, email, phone, insurance)',
+    mechanism: 'Field-level ACL denial of PII + data-privacy guardrail + anonymized audit (u_ai_decision_log.u_patient_id_anon)',
+    airc: 'AIRC risk “Privacy Violations / Inadequate Data Protection”; FRIA / AI impact assessment',
   },
 ]
 
@@ -463,11 +526,21 @@ function AgendaCard({
               {section.number}
             </span>
             <h2 className="text-base font-black text-[#102033]">{section.title}</h2>
-            <CheckBadge />
+            {section.status === 'planned' ? <PlannedBadge /> : <CheckBadge />}
           </div>
           <p className="text-xs text-[#53687b]">{section.subtitle}</p>
         </div>
       </div>
+
+      {/* Optional lead paragraph (e.g. the demo objective) */}
+      {section.lead && (
+        <div className="border-b border-[#f0f5f8] px-6 py-4">
+          <div className="mb-1 text-[0.62rem] font-black uppercase tracking-widest" style={{ color: section.color }}>
+            Objective
+          </div>
+          <p className="text-sm leading-relaxed text-[#3c4f60]">{section.lead}</p>
+        </div>
+      )}
 
       {/* Items */}
       <div className="divide-y divide-[#f0f5f8]">
@@ -487,6 +560,15 @@ function CheckBadge() {
     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[0.62rem] font-bold text-emerald-700">
       <CheckCircle2 size={10} />
       Done
+    </span>
+  )
+}
+
+function PlannedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[0.62rem] font-bold text-amber-700">
+      <Workflow size={10} />
+      Planned
     </span>
   )
 }
@@ -520,8 +602,54 @@ function MockUiStrip({ section }: { section: AgendaSection }) {
     case 'lifecycle': return <LifecycleMock />
     case 'notifications': return <NotificationsMock />
     case 'ux-sidebar': return <SidebarMock />
+    case 'demo-plan': return <RiskPlanMock />
     default: return null
   }
+}
+
+function RiskPlanMock() {
+  return (
+    <MockShell label="Three-risk demo plan — OWASP LLM Top-10 (2025)">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-left text-[0.7rem]">
+          <thead>
+            <tr className="border-b border-[#e3edf3] text-[0.6rem] font-black uppercase tracking-[0.05em] text-[#607487]">
+              <th className="px-2 py-2 align-bottom">#</th>
+              <th className="px-2 py-2 align-bottom">OWASP risk</th>
+              <th className="px-2 py-2 align-bottom">CareAtlas attack surface</th>
+              <th className="px-2 py-2 align-bottom">Primary ServiceNow mechanism</th>
+              <th className="px-2 py-2 align-bottom">AIRC governance wrapper</th>
+            </tr>
+          </thead>
+          <tbody>
+            {DEMO_RISKS.map((r) => (
+              <tr key={r.ref} className="border-b border-[#f0f5f8] align-top last:border-b-0">
+                <td className="px-2 py-3">
+                  <span
+                    className="grid h-6 w-6 place-items-center rounded-md text-[0.7rem] font-black text-white"
+                    style={{ backgroundColor: r.accent }}
+                  >
+                    {r.ref}
+                  </span>
+                </td>
+                <td className="px-2 py-3">
+                  <span
+                    className="inline-block rounded-md px-2 py-1 text-[0.68rem] font-black [overflow-wrap:anywhere]"
+                    style={{ color: r.accent, backgroundColor: r.bg }}
+                  >
+                    {r.risk}
+                  </span>
+                </td>
+                <td className="px-2 py-3 font-semibold leading-relaxed text-[#3c4f60] [overflow-wrap:anywhere]">{r.surface}</td>
+                <td className="px-2 py-3 leading-relaxed text-[#53687b] [overflow-wrap:anywhere]">{r.mechanism}</td>
+                <td className="px-2 py-3 leading-relaxed text-[#53687b] [overflow-wrap:anywhere]">{r.airc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </MockShell>
+  )
 }
 
 function MockShell({ children, label }: { children: ReactNode; label: string }) {
