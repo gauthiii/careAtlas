@@ -1,4 +1,6 @@
-# Use Case 3 — Demonstrating & Mitigating OWASP LLM/AI Risks with ServiceNow AI Control Tower + AI Risk and Compliance
+# Demonstrating & Mitigating OWASP LLM/AI Risks with ServiceNow AI Control Tower + AI Risk and Compliance
+
+Note: Initialy this was Use Case 3
 
 **Status:** Plan only (no changes made yet). Review, then execution proceeds in the order in §8.
 **Instance:** `ven04690.service-now.com` · **App:** CareAtlas (React/Vite + FastAPI, `server/app/*`)
