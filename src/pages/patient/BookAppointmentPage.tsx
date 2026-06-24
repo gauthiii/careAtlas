@@ -10,6 +10,8 @@ import {
   FileText,
   LoaderCircle,
   RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { PatientPanel } from '../../components/patient/PatientPanel'
@@ -54,6 +56,8 @@ import {
   type BookingDoctor,
   type PatientProfile,
 } from '../../services/serviceNow'
+import { scanGuardrail } from '../../data/useCaseDemoData'
+import { DemoTag } from '../../components/governance/DemoTag'
 
 const STEPS = [
   { number: 1, title: 'Reason for visit' },
@@ -271,6 +275,8 @@ export function BookAppointmentPage() {
 
   const canGoPreviousWeek = weekStart > today
   const canGoNextWeek = weekStart < maxWeekStart
+  const guardrail = useMemo(() => scanGuardrail(concern), [concern])
+  const guardrailBlocked = guardrail.verdict === 'blocked'
   const canGoNext = step === 1 || (step === 2 && selectedSlot !== null)
 
   function selectCalendarSlot(doctor: BookingDoctor, date: string, hour: number, selected: boolean) {
@@ -319,6 +325,10 @@ export function BookAppointmentPage() {
 
   async function confirmBooking() {
     if (!selectedBookingCell || isBooking) return
+    if (guardrail.verdict === 'blocked') {
+      setBookingError('This booking was blocked by the prompt-injection guardrail. Edit your concern note to continue.')
+      return
+    }
 
     const email = user?.attributes.email?.trim() || ''
     const username = user?.username?.trim() || ''
@@ -583,6 +593,23 @@ export function BookAppointmentPage() {
                 <div className="text-right text-[0.72rem] font-semibold text-[#7c8fa1]">
                   {concern.length} / 200
                 </div>
+                {guardrail.verdict !== 'clean' && (
+                  <div
+                    className={cn(
+                      'flex items-start gap-2 rounded-[9px] border px-3 py-2 text-[0.78rem] font-semibold',
+                      guardrailBlocked
+                        ? 'border-[#f3a19c] bg-[#fff4f3] text-[#a22828]'
+                        : 'border-amber-300 bg-amber-50 text-amber-700',
+                    )}
+                  >
+                    <ShieldAlert size={15} className="mt-0.5 shrink-0" />
+                    <span>
+                      Guardrail {guardrailBlocked ? 'blocked' : 'flagged'} this note —{' '}
+                      {guardrail.matchedPatterns.map((m) => m.name).join(', ')}. Remove the flagged text to continue.
+                      <DemoTag className="ml-2 align-middle" />
+                    </span>
+                  </div>
+                )}
               </div>
             </label>
 
@@ -700,6 +727,25 @@ export function BookAppointmentPage() {
                         <strong>Concern:</strong> {concern}
                       </div>
                     )}
+                    {concern && (
+                      <div className="flex items-center gap-2">
+                        <strong>Guardrail:</strong>
+                        {guardrailBlocked ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[#f3a19c] bg-[#feeceb] px-2 py-0.5 text-[0.72rem] font-bold text-[#a22828]">
+                            <ShieldAlert size={12} /> Blocked
+                          </span>
+                        ) : guardrail.verdict === 'flagged' ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[0.72rem] font-bold text-amber-700">
+                            <ShieldAlert size={12} /> Flagged
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[#a7dfbf] bg-[#f0fbf5] px-2 py-0.5 text-[0.72rem] font-bold text-[#0f6b4f]">
+                            <ShieldCheck size={12} /> Passed
+                          </span>
+                        )}
+                        <DemoTag />
+                      </div>
+                    )}
                     <div>
                       <strong>Insurance Provider:</strong> {provider || 'Not provided'}
                     </div>
@@ -749,7 +795,8 @@ export function BookAppointmentPage() {
           <button
             type="button"
             onClick={confirmBooking}
-            disabled={!selectedBookingCell || isBooking}
+            disabled={!selectedBookingCell || isBooking || guardrailBlocked}
+            title={guardrailBlocked ? 'Booking blocked by the prompt-injection guardrail.' : undefined}
             className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#143A57] px-[15px] !font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 max-[720px]:flex-1"
           >
             {isBooking ? (
@@ -757,6 +804,8 @@ export function BookAppointmentPage() {
                 <LoaderCircle size={18} className="animate-spin" />
                 Confirming
               </>
+            ) : guardrailBlocked ? (
+              'Blocked by guardrail'
             ) : (
               'Confirm booking'
             )}

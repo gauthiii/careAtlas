@@ -3,10 +3,11 @@ import { LoaderCircle, Send, Sparkles, X } from 'lucide-react'
 import { executeAgent, fetchAgentExecution, type ExecuteAgentResponse } from '../services/serviceNow'
 import { provisionSampleDoctor, type ProvisionSampleDoctorResponse } from '../services/awsAuth'
 import { flagLlm02Event } from '../services/serviceNow'
+import { isHighImpactIntent } from '../data/useCaseDemoData'
 
 type ChatMessage = {
   id: string
-  role: 'user' | 'assistant' | 'pending' | 'error'
+  role: 'user' | 'assistant' | 'pending' | 'error' | 'approval'
   content: string
 }
 
@@ -52,12 +53,17 @@ export function AiAssistantWidget({
   agentConfig,
   doctorRegisterMode = false,
   guardrailMode = false,
+  approvalMode = false,
 }: {
   agentConfig?: AiAssistantAgentConfig | null
   doctorRegisterMode?: boolean
   guardrailMode?: boolean
+  /** UC2 — high-impact intents stop for a human Approve/Deny before acting. */
+  approvalMode?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [approvalId, setApprovalId] = useState<string | null>(null)
+  const [approvalIntent, setApprovalIntent] = useState('')
   const [drStep, setDrStep] = useState<DoctorRegStep>('prompt')
   const [drResult, setDrResult] = useState<ProvisionSampleDoctorResponse | null>(null)
   const [drError, setDrError] = useState('')
@@ -83,6 +89,26 @@ export function AiAssistantWidget({
     setDrStep('prompt')
     setDrResult(null)
     setDrError('')
+    setApprovalId(null)
+    setApprovalIntent('')
+  }
+
+  function resolveApproval(decision: 'approve' | 'deny') {
+    if (!approvalId) return
+    const id = approvalId
+    const intent = approvalIntent
+    setApprovalId(null)
+    setApprovalIntent('')
+    setMessages((current) =>
+      replaceMessage(current, id, {
+        id,
+        role: decision === 'approve' ? 'assistant' : 'error',
+        content:
+          decision === 'approve'
+            ? `Approved by governance officer. Action “${intent}” executed with a human in the loop — recorded in the decision log.`
+            : `Denied by governance officer. Action “${intent}” was never executed — blast radius contained.`,
+      }),
+    )
   }
 
   async function handleProvisionDoctor() {
@@ -111,6 +137,19 @@ export function AiAssistantWidget({
     }
 
     setInput('')
+
+    // UC2 — high-impact intents stop for a human Approve/Deny before the agent acts.
+    if (approvalMode && isHighImpactIntent(trimmedInput)) {
+      const approvalMessage: ChatMessage = {
+        id: newId(),
+        role: 'approval',
+        content: `High-impact intent detected — “${trimmedInput}”. status: pending_approval. A governance officer must approve before the agent acts.`,
+      }
+      setMessages((current) => [...current, userMessage, approvalMessage])
+      setApprovalId(approvalMessage.id)
+      setApprovalIntent(trimmedInput)
+      return
+    }
 
     // Governance guardrail: on the AI Agents page, every request is treated as a
     // potential sensitive-information-disclosure attempt — analyze, then block + flag.
@@ -305,23 +344,54 @@ export function AiAssistantWidget({
                 </div>
               ) : (
                 <div className="grid gap-3">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={[
-                        'max-w-[86%] rounded-[12px] px-4 py-3 text-sm font-semibold leading-6',
-                        message.role === 'user'
-                          ? 'ml-auto bg-[#143A57] text-white'
-                          : message.role === 'error'
-                            ? 'mr-auto border border-[#f6c6c4] bg-[#fff4f3] text-[#a22828]'
-                            : message.role === 'pending'
-                              ? 'mr-auto border border-[#cbdde6] bg-[#f8fbfc] text-[#53687b]'
-                              : 'mr-auto border border-[#d7e5ec] bg-[#f8fbfc] text-[#102033]',
-                      ].join(' ')}
-                    >
-                      {message.content}
-                    </div>
-                  ))}
+                  {messages.map((message) => {
+                    if (message.role === 'approval') {
+                      const isActive = message.id === approvalId
+                      return (
+                        <div
+                          key={message.id}
+                          className="mr-auto max-w-[92%] rounded-[12px] border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800"
+                        >
+                          {message.content}
+                          {isActive && (
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => resolveApproval('approve')}
+                                className="inline-flex items-center justify-center rounded-[8px] bg-[#0f6b4f] px-4 py-2 text-xs font-bold text-white hover:opacity-90"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => resolveApproval('deny')}
+                                className="inline-flex items-center justify-center rounded-[8px] border border-[#f3a19c] bg-white px-4 py-2 text-xs font-bold text-[#a22828] hover:bg-[#fff4f3]"
+                              >
+                                Deny
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+                    return (
+                      <div
+                        key={message.id}
+                        className={[
+                          'max-w-[86%] rounded-[12px] px-4 py-3 text-sm font-semibold leading-6',
+                          message.role === 'user'
+                            ? 'ml-auto bg-[#143A57] text-white'
+                            : message.role === 'error'
+                              ? 'mr-auto border border-[#f6c6c4] bg-[#fff4f3] text-[#a22828]'
+                              : message.role === 'pending'
+                                ? 'mr-auto border border-[#cbdde6] bg-[#f8fbfc] text-[#53687b]'
+                                : 'mr-auto border border-[#d7e5ec] bg-[#f8fbfc] text-[#102033]',
+                        ].join(' ')}
+                      >
+                        {message.content}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>

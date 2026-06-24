@@ -21,6 +21,9 @@ import {
 import { governanceDisplayName, useGovernanceAuth } from '../../contexts/GovernanceAuthContext'
 import { useUnmanagedAISystems } from '../../hooks/useUnmanagedAISystems'
 import { fetchAiDecisionLog, type AiDecisionLogEntry } from '../../services/serviceNow'
+import { PrivacyControlsPanel } from '../../components/governance/PrivacyControlsPanel'
+import { RegulatoryClassificationBadge } from '../../components/governance/RegulatoryClassificationBadge'
+import { DemoTag } from '../../components/governance/DemoTag'
 
 function decisionCategory(entry: AiDecisionLogEntry): string {
   try {
@@ -189,6 +192,7 @@ export function GovernanceDashboardPage() {
                   <th>Status</th>
                   <th>Identity</th>
                   <th>Risk</th>
+                  <th>EU AI Act</th>
                 </tr>
               </thead>
 
@@ -202,6 +206,9 @@ export function GovernanceDashboardPage() {
                   <td>
                     <Badge success>Low</Badge>
                   </td>
+                  <td>
+                    <RegulatoryClassificationBadge agentName="Scheduling Ranker" compact />
+                  </td>
                 </tr>
 
                 <tr>
@@ -212,6 +219,9 @@ export function GovernanceDashboardPage() {
                   <td>nih-verify-02</td>
                   <td>
                     <Badge warning>Medium</Badge>
+                  </td>
+                  <td>
+                    <RegulatoryClassificationBadge agentName="Identity Verifier" compact />
                   </td>
                 </tr>
 
@@ -224,6 +234,9 @@ export function GovernanceDashboardPage() {
                   <td>
                     <Badge warning>Medium</Badge>
                   </td>
+                  <td>
+                    <RegulatoryClassificationBadge agentName="Appointment Summarizer" compact />
+                  </td>
                 </tr>
 
                 <tr>
@@ -234,6 +247,9 @@ export function GovernanceDashboardPage() {
                   <td>Unknown</td>
                   <td>
                     <Badge danger>High</Badge>
+                  </td>
+                  <td>
+                    <RegulatoryClassificationBadge agentName="Legacy Slot Optimizer" compact />
                   </td>
                 </tr>
               </tbody>
@@ -255,6 +271,9 @@ export function GovernanceDashboardPage() {
             title="Scheduling Fairness Monitor"
             icon={<Activity size={18} />}
           >
+            <div className="mb-3 flex justify-end">
+              <DemoTag />
+            </div>
             <div className="space-y-3">
               {fairnessData.map((item) => (
                 <div key={item.group}>
@@ -287,6 +306,9 @@ export function GovernanceDashboardPage() {
             title="Prompt Injection Alerts"
             icon={<ShieldAlert size={18} />}
           >
+            <div className="mb-3 flex justify-end">
+              <DemoTag />
+            </div>
              <table className="w-full border-separate border-spacing-y-3 text-sm text-left">
               <thead>
                 <tr>
@@ -335,6 +357,9 @@ export function GovernanceDashboardPage() {
 
         {/* RIGHT COLUMN */}
         <div className="space-y-8">
+          {/* DATA PRIVACY & PII PROTECTION (UC1) */}
+          <PrivacyControlsPanel />
+
           {/* SHADOW AI */}
           <PortalPanel
             title="Shadow AI Detection"
@@ -413,6 +438,9 @@ export function GovernanceDashboardPage() {
             title="Agent Access Violations"
             icon={<Lock size={18} />}
           >
+            <div className="mb-3 flex justify-end">
+              <DemoTag />
+            </div>
             <table className="w-full border-separate border-spacing-y-3 text-sm text-left">
               <thead>
                 <tr>

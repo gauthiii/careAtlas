@@ -6,6 +6,10 @@ import { Link } from 'react-router-dom'
 import { PortalPage } from '../../components/portal/PortalShell'
 import { PatientLifecycleModal } from '../../components/governance/PatientLifecycleModal'
 import { UseCaseWorkflowsModal } from '../../components/governance/UseCaseWorkflowsModal'
+import { PiiRedactionDemo } from '../../components/governance/PiiRedactionDemo'
+import { InjectionTesterDemo } from '../../components/governance/InjectionTesterDemo'
+import { ApprovalGateDemo } from '../../components/governance/ApprovalGateDemo'
+import { FairnessDebiasDemo } from '../../components/governance/FairnessDebiasDemo'
 
 const SNOW_BASE = 'https://ven04690.service-now.com'
 
@@ -139,6 +143,23 @@ export function GovernanceDemoPage() {
           {demoLinks.map((link) => (
             <DemoCard key={link.label} link={link} />
           ))}
+        </div>
+
+        {/* Focus Five — interactive use-case demos */}
+        <div className="mt-10">
+          <div className="mb-4">
+            <h2 className="m-0 text-lg font-bold text-[#102033]">Focus Five — interactive demos</h2>
+            <p className="m-0 mt-0.5 text-sm leading-snug text-[#53687b]">
+              Run each guardrail live in the browser. These drive the same evidence the Control Tower panels report —
+              Privacy, Risk, Security and Fairness, one box each.
+            </p>
+          </div>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <PiiRedactionDemo />
+            <InjectionTesterDemo />
+            <ApprovalGateDemo />
+            <FairnessDebiasDemo />
+          </div>
         </div>
       </section>
 

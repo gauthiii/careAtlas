@@ -19,6 +19,8 @@ import {
   PortalPage,
 } from '../../components/portal/PortalShell'
 import { SchedulingAgentCompareModal } from '../../components/governance/SchedulingAgentCompareModal'
+import { DemoTag } from '../../components/governance/DemoTag'
+import { DENIED_WRITE_PROBES } from '../../data/useCaseDemoData'
 
 import {
   nonHumanIdentities,
@@ -55,6 +57,44 @@ export function GovernanceAclPage() {
             <GitCompareArrows size={15} />
             Compare agents
           </button>
+        </div>
+
+        {/* UC2 · Deny-WRITE probes — excessive-agency blast radius */}
+        <div className="mb-5 rounded-xl border border-[#d7e5ec] bg-white p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-[#feeceb] text-[#a22828]">
+                <XCircle size={18} />
+              </span>
+              <div>
+                <div className="text-sm font-bold text-[#102033]">Denied-write probes — least privilege enforced</div>
+                <p className="m-0 text-[11px] font-semibold text-[#53687b]">
+                  UC2 · Risk · OWASP LLM06 — agents physically cannot write beyond their job or self-approve.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-[#feeceb] px-2.5 py-1 text-[0.68rem] font-bold text-[#a22828]">
+                {DENIED_WRITE_PROBES.length} access violations blocked
+              </span>
+              <DemoTag />
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {DENIED_WRITE_PROBES.map((probe) => (
+              <div
+                key={`${probe.account}-${probe.target}`}
+                className="rounded-lg border border-[#f3a19c] bg-[#fff4f3] p-3"
+              >
+                <div className="flex items-center gap-1.5">
+                  <XCircle size={14} className="shrink-0 text-[#a22828]" />
+                  <code className="break-all font-mono text-[0.67rem] text-[#a22828]">{probe.target}</code>
+                </div>
+                <div className="mt-1 font-mono text-[0.65rem] text-[#7a1f1f]">{probe.account}</div>
+                <p className="m-0 mt-1 text-[0.72rem] font-semibold text-[#7a1f1f]">{probe.detail}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">

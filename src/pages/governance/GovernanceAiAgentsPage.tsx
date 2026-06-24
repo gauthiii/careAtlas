@@ -34,6 +34,7 @@ import {
 import { PortalPage, PortalPanel } from '../../components/portal/PortalShell'
 import { ShadowAiWorkflowModal } from '../../components/governance/ShadowAiWorkflowModal'
 import { RegisterAgentModal } from '../../components/governance/RegisterAgentModal'
+import { RegulatoryClassificationBadge } from '../../components/governance/RegulatoryClassificationBadge'
 import { cn } from '../../lib/cn'
 import { useUnmanagedAISystems } from '../../hooks/useUnmanagedAISystems'
 import {
@@ -775,6 +776,7 @@ function AgentCard({ agent, open, onToggle, onChat }: {
                   <Workflow size={11} /> {agent.strategy}
                 </span>
               )}
+              <RegulatoryClassificationBadge agentName={agent.name || agent.display_name || ''} compact />
             </span>
             <span className="mt-0.5 block truncate text-xs text-[#6b7c8f]">
               {agent.description || agent.display_name || 'No description'}
