@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { ArrowRight, Bot, CalendarDays, ExternalLink, Hospital, HeartPulse, TowerControl, Users } from 'lucide-react'
+import { ArrowRight, Bot, CalendarDays, ExternalLink, Hospital, HeartPulse, Layers, TowerControl, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { PortalPage } from '../../components/portal/PortalShell'
 import { PatientLifecycleModal } from '../../components/governance/PatientLifecycleModal'
+import { UseCaseWorkflowsModal } from '../../components/governance/UseCaseWorkflowsModal'
 
 const SNOW_BASE = 'https://ven04690.service-now.com'
 
@@ -62,6 +63,7 @@ const demoLinks: DemoLink[] = [
 
 export function GovernanceDemoPage() {
   const [pipelineOpen, setPipelineOpen] = useState(false)
+  const [useCasesOpen, setUseCasesOpen] = useState(false)
 
   return (
     <PortalPage
@@ -92,6 +94,28 @@ export function GovernanceDemoPage() {
           </span>
         </button>
 
+        {/* Focus Five use-case workflows launcher */}
+        <button
+          type="button"
+          onClick={() => setUseCasesOpen(true)}
+          title="View the animated governance workflow for each of the Focus Five use cases"
+          className="group mb-5 flex w-full items-center gap-4 rounded-xl border border-[#cfe0ea] bg-gradient-to-r from-[#e7f6f0] to-white p-5 text-left transition hover:-translate-y-0.5 hover:border-[#12805c] hover:shadow-[0_14px_30px_rgba(18,128,92,0.12)]"
+        >
+          <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-[#12805c] text-white">
+            <Layers size={28} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-lg font-bold text-[#102033]">Focus Five — Use-Case Workflows</div>
+            <p className="mt-0.5 text-sm leading-snug text-[#53687b]">
+              Animated end-to-end flow for each Focus Five use case — Privacy, Risk, Regulation, Security,
+              Fairness — along one governance spine: Intake → Assess → Enforce → Monitor.
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-lg bg-[#12805c] px-4 py-2 text-sm font-bold text-white transition group-hover:bg-[#0f6a4c]">
+            View workflows <ArrowRight size={16} />
+          </span>
+        </button>
+
         {/* Agenda card */}
         <Link
           to="/governance/agenda"
@@ -119,6 +143,7 @@ export function GovernanceDemoPage() {
       </section>
 
       <PatientLifecycleModal open={pipelineOpen} onClose={() => setPipelineOpen(false)} />
+      <UseCaseWorkflowsModal open={useCasesOpen} onClose={() => setUseCasesOpen(false)} />
     </PortalPage>
   )
 }
