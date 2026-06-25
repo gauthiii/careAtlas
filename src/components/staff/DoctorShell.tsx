@@ -11,8 +11,10 @@ import {
   ShieldCheck,
   Stethoscope,
   UserRound,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
-import type React from 'react'
+import React, { useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import {
@@ -26,7 +28,8 @@ import { useClinicianAuth } from '../../contexts/ClinicianAuthContext'
 import { usePatientAuth } from '../../contexts/PatientAuthContext'
 import { OverrideSignInNavLink } from '../auth/OverrideSignInNavLink'
 import { ClinicianNotificationBell } from '../NotificationBell'
-import { SidebarLayout, sidebarItemClass } from '../portal/SidebarLayout'
+import { SidebarLayout, SidebarIcon, sidebarItemClass } from '../portal/SidebarLayout'
+import type { SidebarNavItem } from '../portal/SidebarLayout'
 
 const signedOutClinicianNav = [
   { label: 'Sign in', to: '/staff/sign-in', icon: LockKeyhole, end: true },
@@ -47,6 +50,8 @@ const signedInClinicianNav = [
 export function DoctorShell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const [collapsed, setCollapsed] = useState(false)
+  const toggleCollapsed = () => setCollapsed((c) => !c)
   const { isAuthenticated: isClinicianAuthenticated, overrideLogin, logout } = useClinicianAuth()
   const { isAuthenticated: isPatientAuthenticated } = usePatientAuth()
   const clinicianNav = isClinicianAuthenticated ? signedInClinicianNav : signedOutClinicianNav
@@ -58,34 +63,41 @@ export function DoctorShell({ children }: { children: React.ReactNode }) {
     navigate('/staff/sign-in', { replace: true })
   }
 
-  const nav = clinicianNav.map((item) => {
+  const nav: SidebarNavItem[] = clinicianNav.map((item) => {
     const Icon = item.icon
     const prefix = 'matchPrefix' in item ? item.matchPrefix : undefined
     const navClassName = ({ isActive }: { isActive: boolean }) =>
       sidebarItemClass(isActive || Boolean(prefix && location.pathname.startsWith(prefix)))
 
     if (!isClinicianAuthenticated && item.to === '/staff/sign-in') {
-      return (
-        <OverrideSignInNavLink
-          key={item.to}
-          to={item.to}
-          end={'end' in item ? item.end : false}
-          label={item.label}
-          icon={Icon}
-          className={navClassName}
-          portalLabel="Clinician Portal"
-          redirectTo="/staff/doctor"
-          onOverrideLogin={overrideLogin}
-        />
-      )
+      return {
+        label: item.label,
+        node: (collapsed: boolean) => (
+          <OverrideSignInNavLink
+            key={item.to}
+            to={item.to}
+            end={'end' in item ? item.end : false}
+            label={item.label}
+            icon={Icon}
+            collapsed={collapsed}
+            className={({ isActive }: { isActive: boolean }) => cn(navClassName({ isActive }), collapsed && 'justify-center gap-0 px-0 w-9 h-9 shrink-0')}
+            portalLabel="Clinician Portal"
+            redirectTo="/staff/doctor"
+            onOverrideLogin={overrideLogin}
+          />
+        )
+      }
     }
 
-    return (
-      <NavLink key={item.to} to={item.to} end={'end' in item ? item.end : false} className={navClassName}>
-        <Icon size={17} />
-        {item.label}
-      </NavLink>
-    )
+    return {
+      label: item.label,
+      node: (collapsed: boolean) => (
+        <NavLink key={item.to} to={item.to} end={'end' in item ? item.end : false} className={({ isActive }) => cn(navClassName({ isActive }), collapsed && 'justify-center gap-0 px-0 w-9 h-9 shrink-0')}>
+          <SidebarIcon collapsed={collapsed} icon={<Icon size={22} />} />
+          {!collapsed && <span>{item.label}</span>}
+        </NavLink>
+      )
+    }
   })
 
   const headerRight = (
@@ -111,6 +123,17 @@ export function DoctorShell({ children }: { children: React.ReactNode }) {
       portalLabelIcon={<Stethoscope size={13} />}
       nav={nav}
       navAriaLabel="Clinician portal navigation"
+      collapsed={collapsed}
+      headerLeft={
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#d7e5ec] bg-white transition-colors hover:bg-[#f4f8fb] min-[860px]:flex"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        </button>
+      }
       headerRight={headerRight}
       signOut={isClinicianAuthenticated ? { onSignOut: handleSignOut, label: 'Sign out' } : null}
     >

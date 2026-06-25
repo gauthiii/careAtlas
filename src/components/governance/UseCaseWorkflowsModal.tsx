@@ -103,20 +103,20 @@ const STAGE_LABEL: Record<Stage, string> = {
 
 const STAGE_STYLE: Record<Stage, { wrap: string; pill: string }> = {
   intake: {
-    wrap: 'border-amber-200 bg-amber-50/60',
-    pill: 'border-amber-300 bg-amber-100 text-amber-800',
+    wrap: 'border-[#0397AE]/20 bg-[#0397AE]/2',
+    pill: 'bg-[#0397AE] text-white',
   },
   assess: {
-    wrap: 'border-violet-200 bg-violet-50/60',
-    pill: 'border-violet-300 bg-violet-100 text-violet-800',
+    wrap: 'border-[#0397AE]/20 bg-[#0397AE]/2',
+    pill: 'bg-[#0397AE] text-white',
   },
   enforce: {
-    wrap: 'border-sky-200 bg-sky-50/60',
-    pill: 'border-sky-300 bg-sky-100 text-[#0f5f8c]',
+    wrap: 'border-[#0397AE]/20 bg-[#0397AE]/2',
+    pill: 'bg-[#0397AE] text-white',
   },
   monitor: {
-    wrap: 'border-emerald-200 bg-emerald-50/60',
-    pill: 'border-emerald-300 bg-emerald-100 text-[#12805c]',
+    wrap: 'border-[#0397AE]/20 bg-[#0397AE]/2',
+    pill: 'bg-[#0397AE] text-white',
   },
 }
 
@@ -633,74 +633,13 @@ export function UseCaseWorkflowsModal({ open, onClose, initialTab }: Props) {
   const activeTab = TABS.find((t) => t.key === activeKey) ?? TABS[0]
 
   if (!open) return null
-
   return (
     <div className="fixed inset-0 z-[100] bg-[#102033]/45 backdrop-blur-[1px]">
       <button type="button" aria-label="Close workflow" onClick={onClose} className="absolute inset-0" />
       <div className="pointer-events-none absolute inset-0 p-4 md:p-6">
         <div className="pointer-events-auto flex h-full w-full flex-col overflow-hidden rounded-xl border border-slate-300 bg-white shadow-2xl">
-          {/* Header */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3.5">
-            <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-[#143A57] text-white">
-                <Workflow className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-base font-bold text-[#102033]">
-                  Focus Five — AI Governance Use-Case Workflows
-                </h2>
-                <p className="text-[11px] font-medium text-slate-500">
-                  One governance spine — Intake → Assess → Enforce → Monitor — told across five live use cases.
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="grid h-8 w-8 place-items-center rounded-md bg-[#143A57] text-white hover:bg-[#1d4d73]"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2">
-            {TABS.map((tab) => {
-              const active = tab.key === activeKey
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveKey(tab.key)}
-                  title={tab.category}
-                  className={cn(
-                    'group inline-flex flex-shrink-0 items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors',
-                    active
-                      ? 'border-[#143A57] bg-[#143A57] text-white'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-[#cfe0ea] hover:bg-slate-50',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'grid h-5 w-5 flex-shrink-0 place-items-center rounded-full text-[10px] font-bold',
-                      active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500',
-                    )}
-                  >
-                    {tab.num}
-                  </span>
-                  <span className="whitespace-nowrap">{tab.short}</span>
-                  <span className="hidden text-[11px] font-semibold opacity-80 min-[1024px]:inline">
-                    · {tab.category}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-
           {/* Active flow (remounts on tab change to restart the run) */}
-          <FlowCanvas key={activeKey} flow={activeTab.flow} heading={activeTab.heading} sub={activeTab.sub} />
+          <FlowCanvas key={activeKey} flow={activeTab.flow} heading={activeTab.heading} sub={activeTab.sub} onClose={onClose} />
 
           {/* Legend */}
           <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-1 border-t border-slate-200 bg-slate-50 px-5 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
@@ -722,9 +661,10 @@ type FlowCanvasProps = {
   heading: string
   sub: string
   extraControls?: ReactNode
+  onClose: () => void
 }
 
-function FlowCanvas({ flow, heading, sub, extraControls }: FlowCanvasProps) {
+function FlowCanvas({ flow, heading, sub, extraControls, onClose }: FlowCanvasProps) {
   const [stepIndex, setStepIndex] = useState(0)
   const [isAuto, setIsAuto] = useState(true)
   const [edges, setEdges] = useState<DrawnEdge[]>([])
@@ -817,32 +757,37 @@ function FlowCanvas({ flow, heading, sub, extraControls }: FlowCanvasProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Control strip */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-2.5">
-        <div className="min-w-0">
-          <h3 className="truncate text-sm font-bold text-[#102033]">{heading}</h3>
-          <p className="truncate text-[11px] font-medium text-slate-500">{sub}</p>
+      {/* Header with Title + Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3.5">
+        <div className="flex items-center gap-3">
+          <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-[#143A57] text-white">
+            <Workflow className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-[#102033]">{heading}</h2>
+            <p className="text-[11px] font-medium text-slate-500">{sub}</p>
+          </div>
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-2.5">
           {extraControls}
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-bold text-slate-500">
+          <span className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-500">
             Step {Math.min(stepIndex + 1, flow.nodes.length)} / {flow.nodes.length}
           </span>
           <button
             type="button"
             onClick={() => setIsAuto((v) => !v)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-bold transition-colors',
+              'inline-flex items-center gap-1.5 rounded-md border !text-[12px] px-2 py-1.5 font-bold transition-colors',
               isAuto
-                ? 'border-[#0f5f8c] bg-[#e7f3f8] text-[#0f5f8c]'
+                ? 'border-[#0397ae] text-[#0397AE] !font-bold'
                 : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
             )}
           >
-            {isAuto ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            {isAuto ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
             {isAuto ? 'Auto' : 'Manual'}
           </button>
-          <span className="hidden items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-500 sm:inline-flex">
+          <span className="hidden items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-500 sm:inline-flex">
             <Keyboard className="h-3.5 w-3.5" /> Space / Enter
           </span>
           <button
@@ -851,9 +796,17 @@ function FlowCanvas({ flow, heading, sub, extraControls }: FlowCanvasProps) {
               setStepIndex(0)
               setIsAuto(true)
             }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[#0397AE] bg-white px-2.5 py-1.5 !text-[12px] !font-bold text-[#0397AE]"
           >
             <RotateCcw className="h-3.5 w-3.5" /> Reset
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="grid h-8 w-8 place-items-center rounded-md bg-[#143A57] text-white hover:bg-[#1d4d73]"
+          >
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -935,7 +888,7 @@ function FlowCanvas({ flow, heading, sub, extraControls }: FlowCanvasProps) {
                     nodeRefs.current[node.col] = el
                   }}
                   className={cn(
-                    'relative flex w-full max-w-[172px] flex-col items-center gap-1.5 rounded-xl border-2 px-2.5 py-3 text-center transition-all duration-300',
+                    'relative flex w-full max-w-[172px] h-[240px] flex-col items-center gap-1.5 rounded-xl border-2 px-2.5 py-3 text-center transition-all duration-300',
                     STATE_CARD[state],
                   )}
                 >
@@ -947,30 +900,30 @@ function FlowCanvas({ flow, heading, sub, extraControls }: FlowCanvasProps) {
                     <Icon className="h-4 w-4" />
                   </span>
 
-                  <p className="text-[11.5px] font-bold leading-tight text-[#102033]">{node.title}</p>
+                  <p className="text-[12px] font-bold leading-tight text-[#102033]">{node.title}</p>
 
-                  <span
+                  {/* <span
                     className={cn(
                       'rounded-full border px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wide',
                       pill,
                     )}
                   >
                     {node.badge}
-                  </span>
+                  </span> */}
 
-                  <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[8.5px] font-semibold text-slate-600">
+                  <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
                     <ActorIcon className="h-2.5 w-2.5 flex-shrink-0" />
-                    <span className="truncate">{node.actor}</span>
+                    <span className="text-wrap">{node.actor}</span>
                   </span>
 
                   {node.record && RecordIcon && (
-                    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[8.5px] font-semibold text-slate-500">
+                    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
                       <RecordIcon className="h-2.5 w-2.5 flex-shrink-0" />
                       <span className="truncate">{node.record}</span>
                     </span>
                   )}
 
-                  <p className="text-[9.5px] leading-snug text-slate-500">{node.desc}</p>
+                  <p className="text-[12px] leading-snug text-slate-500">{node.desc}</p>
                 </div>
               </div>
             )

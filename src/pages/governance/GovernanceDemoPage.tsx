@@ -1,15 +1,10 @@
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { ArrowRight, Bot, CalendarDays, ExternalLink, Hospital, HeartPulse, Layers, TowerControl, Users } from 'lucide-react'
+import { ArrowRight, Bot, CalendarDays, ExternalLink, Hospital, HeartPulse, TowerControl, Users, ScanSearch, ShieldAlert, Scale, Radar, Activity } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { PortalPage } from '../../components/portal/PortalShell'
 import { PatientLifecycleModal } from '../../components/governance/PatientLifecycleModal'
-import { UseCaseWorkflowsModal } from '../../components/governance/UseCaseWorkflowsModal'
-import { PiiRedactionDemo } from '../../components/governance/PiiRedactionDemo'
-import { InjectionTesterDemo } from '../../components/governance/InjectionTesterDemo'
-import { ApprovalGateDemo } from '../../components/governance/ApprovalGateDemo'
-import { FairnessDebiasDemo } from '../../components/governance/FairnessDebiasDemo'
 
 const SNOW_BASE = 'https://ven04690.service-now.com'
 
@@ -67,13 +62,12 @@ const demoLinks: DemoLink[] = [
 
 export function GovernanceDemoPage() {
   const [pipelineOpen, setPipelineOpen] = useState(false)
-  const [useCasesOpen, setUseCasesOpen] = useState(false)
 
   return (
     <PortalPage
       label="AI Governance Officer"
-      title="Demo"
-      intro="Launchpad for the live ServiceNow walkthrough. Each card opens its destination on the instance in a new tab."
+      title="Demo Hub"
+      intro="Launchpad for the live ServiceNow walkthrough. Explore the application pipeline, ServiceNow instances, and individual Use-Case pages below."
     >
       <section className="px-6 pb-6">
         {/* Application pipeline launcher */}
@@ -81,9 +75,9 @@ export function GovernanceDemoPage() {
           type="button"
           onClick={() => setPipelineOpen(true)}
           title="View the end-to-end secure patient lifecycle pipeline"
-          className="group mb-6 flex w-full items-center gap-4 rounded-xl border border-[#cfe0ea] bg-gradient-to-r from-[#e7f3f8] to-white p-5 text-left transition hover:-translate-y-0.5 hover:border-[#143A57] hover:shadow-[0_14px_30px_rgba(25,64,93,0.12)]"
+          className="group mb-6 flex w-full items-center gap-4 rounded-xl border border-[#cfe0ea] p-5 text-left transition hover:-translate-y-0.5 hover:border-[#143A57]"
         >
-          <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-[#143A57] text-white">
+          <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-[#0397AE] text-white">
             <HeartPulse size={28} />
           </span>
           <div className="min-w-0 flex-1">
@@ -98,34 +92,12 @@ export function GovernanceDemoPage() {
           </span>
         </button>
 
-        {/* Focus Five use-case workflows launcher */}
-        <button
-          type="button"
-          onClick={() => setUseCasesOpen(true)}
-          title="View the animated governance workflow for each of the Focus Five use cases"
-          className="group mb-5 flex w-full items-center gap-4 rounded-xl border border-[#cfe0ea] bg-gradient-to-r from-[#e7f6f0] to-white p-5 text-left transition hover:-translate-y-0.5 hover:border-[#12805c] hover:shadow-[0_14px_30px_rgba(18,128,92,0.12)]"
-        >
-          <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-[#12805c] text-white">
-            <Layers size={28} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-lg font-bold text-[#102033]">Focus Five — Use-Case Workflows</div>
-            <p className="mt-0.5 text-sm leading-snug text-[#53687b]">
-              Animated end-to-end flow for each Focus Five use case — Privacy, Risk, Regulation, Security,
-              Fairness — along one governance spine: Intake → Assess → Enforce → Monitor.
-            </p>
-          </div>
-          <span className="inline-flex items-center gap-2 rounded-lg bg-[#12805c] px-4 py-2 text-sm font-bold text-white transition group-hover:bg-[#0f6a4c]">
-            View workflows <ArrowRight size={16} />
-          </span>
-        </button>
-
         {/* Agenda card */}
         <Link
           to="/governance/agenda"
-          className="group mb-5 flex w-full items-center gap-4 rounded-xl border border-[#cfe0ea] bg-gradient-to-r from-[#f0ebff] to-white p-5 text-left transition hover:-translate-y-0.5 hover:border-[#6d28d9] hover:shadow-[0_14px_30px_rgba(109,40,217,0.10)]"
+          className="group mb-5 flex w-full items-center gap-4 rounded-xl border border-[#cfe0ea] p-5 text-left transition hover:-translate-y-0.5 hover:border-[#143A57]"
         >
-          <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-[#6d28d9] text-white">
+          <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-[#0397AE] text-white">
             <CalendarDays size={28} />
           </span>
           <div className="min-w-0 flex-1">
@@ -134,37 +106,85 @@ export function GovernanceDemoPage() {
               Full walkthrough of everything built: portals, auth, tables, agent pipeline, A2A, ACL, shadow discovery, and AI Control Tower lifecycle.
             </p>
           </div>
-          <span className="inline-flex items-center gap-2 rounded-lg bg-[#6d28d9] px-4 py-2 text-sm font-bold text-white transition group-hover:bg-[#5b21b6]">
+          <span className="inline-flex items-center gap-2 rounded-lg bg-[#143A57] px-4 py-2 text-sm font-bold text-white transition group-hover:bg-[#1d4d73]">
             View agenda <ArrowRight size={16} />
           </span>
         </Link>
-
+        <div className="mt-10 mb-4">
+            <h2 className="m-0 text-lg font-bold text-[#102033]">ServiceNow Instances</h2>
+            <p className="m-0 mt-0.5 text-sm leading-snug text-[#53687b]">
+              Quick links to tables and dashboards on the live instance.
+            </p>
+        </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {demoLinks.map((link) => (
             <DemoCard key={link.label} link={link} />
           ))}
         </div>
-
-        {/* Focus Five — interactive use-case demos */}
+        {/* Focus Five — Individual Use-Case Pages */}
         <div className="mt-10">
           <div className="mb-4">
-            <h2 className="m-0 text-lg font-bold text-[#102033]">Focus Five — interactive demos</h2>
+            <h2 className="m-0 text-lg font-bold text-[#102033]">Focus Five — Use Cases</h2>
             <p className="m-0 mt-0.5 text-sm leading-snug text-[#53687b]">
-              Run each guardrail live in the browser. These drive the same evidence the Control Tower panels report —
-              Privacy, Risk, Security and Fairness, one box each.
+              Explore the five core governance use cases. Each page contains its animated workflow and interactive guardrail demo.
             </p>
           </div>
-          <div className="grid gap-5 lg:grid-cols-2">
-            <PiiRedactionDemo />
-            <InjectionTesterDemo />
-            <ApprovalGateDemo />
-            <FairnessDebiasDemo />
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            <Link to="/governance/demo/privacy" className="group flex flex-col rounded-xl border border-[#cfe0ea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#143A57]">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-[#e7f3f8] text-[#0f5f8c]">
+                  <ScanSearch size={20} />
+                </span>
+                <span className="text-base font-bold text-[#102033]">Privacy</span>
+              </div>
+              <p className="text-sm text-[#53687b] flex-1">Sensitive Information Disclosure (OWASP LLM02)</p>
+            </Link>
+            
+            <Link to="/governance/demo/risk" className="group flex flex-col rounded-xl border border-[#cfe0ea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#143A57]">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-[#e7f3f8] text-[#0f5f8c]">
+                  <ShieldAlert size={20} />
+                </span>
+                <span className="text-base font-bold text-[#102033]">Risk</span>
+              </div>
+              <p className="text-sm text-[#53687b] flex-1">Excessive Agency via ACL Least-Privilege (OWASP LLM06)</p>
+            </Link>
+
+            <Link to="/governance/demo/regulation" className="group flex flex-col rounded-xl border border-[#cfe0ea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#143A57]">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-[#e7f3f8] text-[#0f5f8c]">
+                  <Scale size={20} />
+                </span>
+                <span className="text-base font-bold text-[#102033]">Regulation</span>
+              </div>
+              <p className="text-sm text-[#53687b] flex-1">EU AI Act Conformity + FRIA</p>
+            </Link>
+
+            <Link to="/governance/demo/security" className="group flex flex-col rounded-xl border border-[#cfe0ea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#143A57]">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-[#e7f3f8] text-[#0f5f8c]">
+                  <Radar size={20} />
+                </span>
+                <span className="text-base font-bold text-[#102033]">Security</span>
+              </div>
+              <p className="text-sm text-[#53687b] flex-1">Prompt-Injection Defense + Output Patterns (OWASP LLM01)</p>
+            </Link>
+
+            <Link to="/governance/demo/fairness" className="group flex flex-col rounded-xl border border-[#cfe0ea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#143A57]">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-[#e7f3f8] text-[#0f5f8c]">
+                  <Activity size={20} />
+                </span>
+                <span className="text-base font-bold text-[#102033]">Fairness</span>
+              </div>
+              <p className="text-sm text-[#53687b] flex-1">Non-Discriminatory Scheduling (EU AI Act Art. 10)</p>
+            </Link>
           </div>
         </div>
+
       </section>
 
       <PatientLifecycleModal open={pipelineOpen} onClose={() => setPipelineOpen(false)} />
-      <UseCaseWorkflowsModal open={useCasesOpen} onClose={() => setUseCasesOpen(false)} />
     </PortalPage>
   )
 }
@@ -177,15 +197,15 @@ function DemoCard({ link }: { link: DemoLink }) {
       href={link.href}
       target="_blank"
       rel="noopener noreferrer"
-      className="group relative flex aspect-square flex-col items-center justify-center gap-4 rounded-xl border border-[#d7e5ec] bg-white p-6 text-center transition hover:-translate-y-0.5 hover:border-[#143A57] hover:shadow-[0_14px_30px_rgba(25,64,93,0.12)]"
+      className="group relative flex min-h-[180px] flex-col items-center justify-center gap-4 rounded-xl border border-[#d7e5ec] bg-white p-6 text-center transition hover:-translate-y-0.5 hover:border-[#143A57] hover:shadow-[0_14px_30px_rgba(25,64,93,0.12)]"
     >
       <ExternalLink
         size={16}
         className="absolute right-4 top-4 text-[#9fb2c0] transition group-hover:text-[#143A57]"
       />
 
-      <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[#e7f3f8] text-[#0f5f8c]">
-        <Icon size={30} />
+      <span className="grid h-12 w-12 place-items-center rounded-lg bg-[#e7f3f8] text-[#0f5f8c]">
+        <Icon size={20} />
       </span>
 
       <div>

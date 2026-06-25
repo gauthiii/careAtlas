@@ -8,6 +8,11 @@ import { GovernanceAgendaPage } from './pages/governance/GovernanceAgendaPage'
 import { GovernanceAdditionalWorkPage } from './pages/governance/GovernanceAdditionalWorkPage'
 import { GovernanceLlm02AuditPage } from './pages/governance/GovernanceLlm02AuditPage'
 import { GovernanceDemoPage } from './pages/governance/GovernanceDemoPage'
+import { GovernancePrivacyPage } from './pages/governance/demo/PrivacyPage'
+import { GovernanceRiskPage } from './pages/governance/demo/RiskPage'
+import { GovernanceRegulationPage } from './pages/governance/demo/RegulationPage'
+import { GovernanceSecurityPage } from './pages/governance/demo/SecurityPage'
+import { GovernanceFairnessPage } from './pages/governance/demo/FairnessPage'
 import { GovernanceSignInPage } from './pages/governance/GovernanceSignInPage'
 import { ViewChooserPage } from './pages/home/ViewChooserPage'
 import { AppointmentsPage as PatientAppointmentsPage } from './pages/patient/AppointmentsPage'
@@ -366,6 +371,66 @@ function App() {
               <ClinicianRoleBlocker>
                 <GovernanceProtectedRoute>
                   <GovernanceDemoPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
+        <Route
+          path="/governance/demo/privacy"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernancePrivacyPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
+        <Route
+          path="/governance/demo/risk"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernanceRiskPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
+        <Route
+          path="/governance/demo/regulation"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernanceRegulationPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
+        <Route
+          path="/governance/demo/security"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernanceSecurityPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
+        <Route
+          path="/governance/demo/fairness"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernanceFairnessPage />
                 </GovernanceProtectedRoute>
               </ClinicianRoleBlocker>
             </PatientRoleBlocker>

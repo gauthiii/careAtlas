@@ -259,6 +259,7 @@ function AssetTable({ managed }: { managed: boolean }) {
   const orderedCols = ALL_COLUMNS.filter((c) => visibleCols.includes(c.key))
 
   const title = managed ? 'Managed AI Assets' : 'Unmanaged AI Assets'
+  const buttonTextColor = managed ? 'text-emerald-600' : 'text-amber-500'
   const Icon = managed ? ShieldCheck : ShieldOff
   const iconColor = managed ? 'text-emerald-600' : 'text-amber-500'
   const headerBg = managed ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
@@ -288,9 +289,10 @@ function AssetTable({ managed }: { managed: boolean }) {
           <button
             type="button"
             onClick={refetch}
-            className="inline-flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-[0.7rem] font-bold text-[#53687b] transition-colors hover:bg-white/60"
+            className={`inline-flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-[0.7rem] font-bold transition-colors ${managed ? 'text-emerald-600' : 'text-amber-500'
+              }`}
           >
-            <RefreshCw size={12} />
+            <RefreshCw size={12} className={buttonTextColor} />
             Refresh
           </button>
         </div>
@@ -666,7 +668,7 @@ function AgentInventory() {
         <button
           type="button"
           onClick={refetch}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[#cfe0ea] bg-[#f5f9fb] px-3 py-2 text-xs font-bold text-[#53687b] transition-colors hover:bg-[#e7f3f8]"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#0397AE] px-3 py-2 text-xs font-bold text-[#0397AE] transition-colors"
         >
           <RefreshCw size={14} />
           <span className="max-[640px]:hidden">Refresh</span>
@@ -674,7 +676,7 @@ function AgentInventory() {
         <button
           type="button"
           onClick={() => setWorkflowOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg border border-[#cfe0ea] bg-[#e7f3f8] px-3 py-2 text-xs font-bold text-[#0f5f8c] transition-colors hover:border-[#0f5f8c] hover:bg-[#d8edf5]"
+          className="inline-flex items-center gap-2 rounded-lg border border-[#0397AE] px-3 py-2 text-xs font-bold text-[#0397AE] transition-colors"
         >
           <Workflow size={16} />
           <span className="max-[640px]:hidden">End-to-End Workflow</span>
@@ -1064,7 +1066,7 @@ function AgentTypeBadge({ type }: { type: string }) {
   const n = type.toLowerCase()
   const styles = n === 'internal' ? 'bg-[#e7f3f8] text-[#0f5f8c]'
     : n === 'external' ? 'bg-purple-100 text-purple-700'
-    : 'bg-slate-100 text-slate-600'
+      : 'bg-slate-100 text-slate-600'
   return (
     <span className={cn('rounded-full px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-wide', styles)}>
       {type || 'unknown'}

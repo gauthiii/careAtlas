@@ -41,19 +41,19 @@ export function GovernanceLlm02AuditPage() {
     >
       <section className="min-w-0 px-6 pb-10">
         {/* Toolbar + summary */}
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#f1c4c4] bg-gradient-to-r from-[#7f1d1d] to-[#b42318] px-5 py-4 text-white shadow-[0_8px_24px_rgba(127,29,29,0.22)]">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#f1c4c4]  px-5 py-4 text-[#f1c4c4]">
           <div className="flex items-center gap-3">
-            <span className="grid h-12 w-12 flex-shrink-0 place-items-center rounded-2xl bg-white/15">
+            <span className="grid h-12 w-12 flex-shrink-0 place-items-center rounded-2xl">
               <ShieldAlert size={24} />
             </span>
             <div>
-              <div className="text-[0.72rem] font-bold uppercase tracking-widest text-white/60">
+              <div className="text-[0.72rem] font-bold uppercase tracking-widest">
                 LLM02 — Sensitive Information Disclosure
               </div>
               <div className="text-2xl font-black tracking-tight">
                 {loading ? '—' : entries.length} flagged {entries.length === 1 ? 'event' : 'events'}
               </div>
-              <div className="mt-0.5 text-sm text-white/70">
+              <div className="mt-0.5 text-sm">
                 Source table: u_ai_action_audit_log · identity: governance_user_identity
               </div>
             </div>
@@ -62,7 +62,7 @@ export function GovernanceLlm02AuditPage() {
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             Refresh

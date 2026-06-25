@@ -158,7 +158,7 @@ function NHICard({ nhi }: { nhi: NonHumanIdentity }) {
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5 mb-1">
-              <code className="rounded bg-[#eef3f7] px-2 py-0.5 font-mono text-[0.68rem] text-[#40566b] break-all">
+              <code className="rounded bg-[#eef3f7] px-2 py-0.5 font-mono text-[12px] text-[#40566b] break-all">
                 {nhi.userId}
               </code>
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide text-slate-500">
@@ -166,14 +166,14 @@ function NHICard({ nhi }: { nhi: NonHumanIdentity }) {
               </span>
             </div>
 
-            <div className="font-semibold text-[#102033]">
+            <div className="font-bold text-[#102033] text-[16px]">
               {nhi.firstName} {nhi.lastName}
             </div>
 
             <div className="mt-1.5">
               <span
                 className="rounded-full px-2.5 py-1 text-[0.7rem] font-semibold"
-                style={{ backgroundColor: `${nhi.accentColor}18`, color: nhi.accentColor }}
+                style={{ backgroundColor: '#eef3f7', color: '#40566b' }}
               >
                 {nhi.group}
               </span>
@@ -191,7 +191,7 @@ function NHICard({ nhi }: { nhi: NonHumanIdentity }) {
             type="button"
             onClick={handleTest}
             disabled={testing}
-            className="inline-flex h-9 items-center gap-2 rounded-md bg-[#143A57] px-3 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-7 items-center gap-2 rounded-md bg-[#143A57] px-3 !text-[15px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             title={`Test ACL access for ${nhi.userId}`}
           >
             {testing ? <Loader2 size={15} className="animate-spin" /> : <FlaskConical size={15} />}
@@ -312,7 +312,7 @@ function AclOverallBadge({
 
   if (!result) {
     return (
-      <span className="text-xs text-[#6b7c8f]">
+      <span className="text-[13px] text-[#53687b]">
         Ready to verify live ACLs
       </span>
     )

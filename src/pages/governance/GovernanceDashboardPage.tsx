@@ -96,7 +96,7 @@ export function GovernanceDashboardPage() {
         <button
           type="button"
           onClick={handleRefresh}
-          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
+          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#0397AE] px-[15px] font-bold text-[#0397AE] max-[720px]:w-full"
         >
           <RefreshCw size={15} />
           Refresh

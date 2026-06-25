@@ -56,7 +56,7 @@ export function ViewChooserPage() {
     <div className="min-h-[calc(100vh-30px)]">
       <PortalHeader label="CareAtlas" />
       <main className="grid gap-5 px-0 py-5 pb-[42px] max-[720px]:pt-3">
-        <section className="px-6 py-8">
+        <section className="px-6 py-4">
           <h1 className="text-3xl font-bold">Select your portal</h1>
           <p className="mt-3 text-lg font-semibold leading-[1.55] text-[#53687b]">
           Access the patient, clinician, or AI governance portal. Each portal is tailored to your role and provides secure, role-based access to relevant workflows.
