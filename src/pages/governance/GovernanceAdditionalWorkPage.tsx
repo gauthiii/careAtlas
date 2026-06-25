@@ -45,6 +45,7 @@ interface DeckSection {
   icon: typeof ServerCog
   items: DeckItem[]
   mock: ReactNode
+  color?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -474,7 +475,7 @@ function DeckCard({
       {/* Items */}
       <div className="">
         {section.items.map((item, i) => (
-          <DeckItemRow key={i} item={item} accent={section.color} />
+          <DeckItemRow key={i} item={item} accent={section.color ?? '#0f5f8c'} />
         ))}
       </div>
 
