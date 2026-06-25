@@ -713,6 +713,85 @@ export async function fetchAiDecisionLog(limit = 25): Promise<AiDecisionLogEntry
   return (await res.json()) as AiDecisionLogEntry[]
 }
 
+export interface PiiFieldAclStatus {
+  field: string
+  label: string
+  protected: boolean
+}
+
+export interface PrivacyControls {
+  pii_acl_status: 'enforced' | 'partial' | 'off'
+  protected_field_count: number
+  pii_fields: PiiFieldAclStatus[]
+  deny_probe_ran: boolean
+  deny_probe_passed: boolean
+  deny_probe_detail: string
+  visible_pii_fields: string[]
+  redaction_on: boolean
+  active_pii_filters: number
+  active_filter_total: number
+  pii_pattern_count: number
+  anonymization_rate: number
+  decision_log_rows: number
+  anonymized_rows: number
+}
+
+export async function fetchPrivacyControls(): Promise<PrivacyControls> {
+  const res = await fetch(`${API_BASE}/governance/privacy-controls`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as PrivacyControls
+}
+
+export interface AgentIdentity {
+  key: 'restricted' | 'privileged'
+  label: string
+  username: string
+  role: string
+  has_pii_role: boolean
+  served_by: string
+  reachable: boolean
+  note: string
+}
+
+export interface PatientFieldAccess {
+  key: string
+  label: string
+  category: 'pii' | 'safe'
+  privileged_value: string
+  restricted_value: string
+  redacted_for_restricted: boolean
+}
+
+export interface PatientAccessComparison {
+  patient_sys_id: string
+  patient_ref: string
+  restricted: AgentIdentity
+  privileged: AgentIdentity
+  fields: PatientFieldAccess[]
+  redacted_count: number
+}
+
+export async function fetchPatientAccessComparison(q?: string): Promise<PatientAccessComparison> {
+  const params = new URLSearchParams()
+  if (q && q.trim()) params.set('q', q.trim())
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  const res = await fetch(`${API_BASE}/governance/privacy/patient-lookup${suffix}`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as PatientAccessComparison
+}
+
 export async function testServiceAccountAcl(serviceAccount: string): Promise<AclTestResponse> {
   const res = await fetch(`${API_BASE}/acl/test`, {
     method: 'POST',

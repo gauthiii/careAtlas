@@ -430,6 +430,75 @@ class AiDecisionLogEntry(BaseModel):
     appointment: str = ""
 
 
+class PiiFieldAclStatus(BaseModel):
+    """One PII field on u_patient and whether a field-level read ACL guards it."""
+
+    field: str
+    label: str
+    protected: bool
+
+
+class PrivacyControlsResponse(BaseModel):
+    """UC1 Privacy — live evidence for the 'Data Privacy & PII Protection' panel."""
+
+    # Wall 1 — field-level ACL denial on u_patient PII columns.
+    pii_acl_status: Literal["enforced", "partial", "off"] = "off"
+    protected_field_count: int = 0
+    pii_fields: list[PiiFieldAclStatus] = []
+    # Live deny-probe: a non-human agent identity (lacks role_patient_pii) reading
+    # u_patient — proves PII columns are stripped while non-PII columns remain.
+    deny_probe_ran: bool = False
+    deny_probe_passed: bool = False
+    deny_probe_detail: str = ""
+    visible_pii_fields: list[str] = []
+    # Wall 2 — PII data-privacy guardrail on the agent output path.
+    redaction_on: bool = False
+    active_pii_filters: int = 0
+    active_filter_total: int = 0
+    pii_pattern_count: int = 0
+    # Wall 3 — anonymized audit log.
+    anonymization_rate: int = 0
+    decision_log_rows: int = 0
+    anonymized_rows: int = 0
+
+
+class AgentIdentity(BaseModel):
+    """One non-human agent identity used in the role-based redaction demo."""
+
+    key: Literal["restricted", "privileged"]
+    label: str
+    username: str
+    role: str
+    has_pii_role: bool
+    served_by: str = ""  # actual account that answered (fallback transparency)
+    reachable: bool = True
+    note: str = ""
+
+
+class PatientFieldAccess(BaseModel):
+    """One u_patient field and how each agent sees it."""
+
+    key: str
+    label: str
+    category: Literal["pii", "safe"]
+    # Value the privileged (authorized) agent sees.
+    privileged_value: str = ""
+    # Value the restricted agent sees ("" when redacted by the field-level ACL).
+    restricted_value: str = ""
+    redacted_for_restricted: bool = False
+
+
+class PatientAccessComparison(BaseModel):
+    """Live side-by-side of one patient record read by two differently-scoped agents."""
+
+    patient_sys_id: str = ""
+    patient_ref: str = ""  # non-PII u_patient_id, always safe to show
+    restricted: AgentIdentity
+    privileged: AgentIdentity
+    fields: list[PatientFieldAccess] = []
+    redacted_count: int = 0
+
+
 class NotificationItem(BaseModel):
     sys_id: str = ""
     notification_id: str = ""

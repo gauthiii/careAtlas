@@ -21,7 +21,10 @@ from .models import (
     AISystem,
     AclTestCheck,
     AclTestResponse,
+    AgentIdentity,
     AiDecisionLogEntry,
+    PatientAccessComparison,
+    PatientFieldAccess,
     BookingAppointment,
     BookingAppointmentRequest,
     BookingAvailabilityResponse,
@@ -34,6 +37,8 @@ from .models import (
     PatientRegistrationRequest,
     PatientRegistrationResponse,
     PatientRegistrationSummary,
+    PiiFieldAclStatus,
+    PrivacyControlsResponse,
     SummaryNoteRequest,
     SummaryNoteResponse,
 )
@@ -2569,3 +2574,417 @@ async def validate_user(settings: Settings, username: str, password: str) -> boo
         _raise_snow_error(response)
 
     return len(response.json().get("result", [])) > 0
+
+
+# ---------------------------------------------------------------------------
+# UC1 Privacy — Sensitive Information Disclosure (OWASP LLM02)
+# Live evidence for the "Data Privacy & PII Protection" panel: field-level PII
+# ACLs (Wall 1), the PII output guardrail (Wall 2), and the anonymized audit
+# log (Wall 3). Every value below is read live from ServiceNow — no demo data.
+# ---------------------------------------------------------------------------
+
+# PII columns on u_patient that must be denied to non-human agent identities.
+PII_PATIENT_FIELDS: tuple[tuple[str, str], ...] = (
+    ("u_first_name", "First name"),
+    ("u_last_name", "Last name"),
+    ("u_email", "Email"),
+    ("u_phone", "Phone"),
+    ("u_date_of_birth", "Date of birth"),
+    ("u_insurance_id", "Insurance ID"),
+)
+
+# Non-PII control field the deny-probe should always be able to read, proving the
+# agent can reach the table (so an absent PII field means field-deny, not table-deny).
+_PII_PROBE_CONTROL_FIELDS = ("sys_id", "u_patient_id")
+
+
+async def fetch_privacy_controls(
+    settings: Settings,
+    http_client: httpx.AsyncClient | None = None,
+) -> PrivacyControlsResponse:
+    """Assemble the live UC1 privacy posture from ServiceNow."""
+
+    async def run(client: httpx.AsyncClient) -> PrivacyControlsResponse:
+        pii_fields = await _privacy_acl_status(settings, client)
+        protected = [f for f in pii_fields if f.protected]
+        if not protected:
+            acl_status: Literal["enforced", "partial", "off"] = "off"
+        elif len(protected) == len(pii_fields):
+            acl_status = "enforced"
+        else:
+            acl_status = "partial"
+
+        probe = await _privacy_deny_probe(settings, client)
+        filters = await _privacy_filter_status(settings, client)
+        patterns = await _privacy_pii_pattern_count(settings, client)
+        log = await _privacy_anonymization(settings, client)
+
+        return PrivacyControlsResponse(
+            pii_acl_status=acl_status,
+            protected_field_count=len(protected),
+            pii_fields=pii_fields,
+            deny_probe_ran=probe["ran"],
+            deny_probe_passed=probe["passed"],
+            deny_probe_detail=probe["detail"],
+            visible_pii_fields=probe["visible"],
+            redaction_on=filters["active_pii"] > 0,
+            active_pii_filters=filters["active_pii"],
+            active_filter_total=filters["active_total"],
+            pii_pattern_count=patterns,
+            anonymization_rate=log["rate"],
+            decision_log_rows=log["total"],
+            anonymized_rows=log["anonymized"],
+        )
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+async def _privacy_acl_status(
+    settings: Settings, client: httpx.AsyncClient
+) -> list[PiiFieldAclStatus]:
+    """Which u_patient PII fields have an active field-level read ACL guarding them."""
+    names = ",".join(f"u_patient.{field}" for field, _ in PII_PATIENT_FIELDS)
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/table/sys_security_acl",
+        params={
+            "sysparm_query": f"operation=read^active=true^nameIN{names}",
+            "sysparm_fields": "name",
+            "sysparm_limit": "200",
+        },
+        headers={"Accept": "application/json"},
+        auth=(settings.snow_username, settings.snow_password),
+    )
+    guarded: set[str] = set()
+    if response.is_success:
+        for record in response.json().get("result", []):
+            guarded.add(_field_value(record.get("name")))
+    return [
+        PiiFieldAclStatus(
+            field=field,
+            label=label,
+            protected=f"u_patient.{field}" in guarded,
+        )
+        for field, label in PII_PATIENT_FIELDS
+    ]
+
+
+async def _privacy_deny_probe(
+    settings: Settings, client: httpx.AsyncClient
+) -> dict[str, Any]:
+    """Read u_patient as the non-human agent identity; PII columns should be stripped."""
+    username = settings.snow_pii_agent_username
+    password = settings.snow_pii_agent_password
+    if not username or not password:
+        return {
+            "ran": False,
+            "passed": False,
+            "detail": "No agent identity configured (SNOW_PII_AGENT_USERNAME).",
+            "visible": [],
+        }
+
+    pii_field_names = [field for field, _ in PII_PATIENT_FIELDS]
+    fields = list(_PII_PROBE_CONTROL_FIELDS) + pii_field_names
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/table/u_patient",
+        params={"sysparm_fields": ",".join(fields), "sysparm_limit": "1"},
+        headers={"Accept": "application/json"},
+        auth=(username, password),
+    )
+
+    if response.status_code in (401, 403):
+        # Whole table denied — still a deny, but not the field-level story we want.
+        return {
+            "ran": True,
+            "passed": True,
+            "detail": f"Agent denied at the table level (HTTP {response.status_code}).",
+            "visible": [],
+        }
+    if not response.is_success:
+        return {
+            "ran": True,
+            "passed": False,
+            "detail": _error_detail(response),
+            "visible": [],
+        }
+
+    records = response.json().get("result", [])
+    if not records:
+        return {
+            "ran": True,
+            "passed": False,
+            "detail": "No patient records returned to probe.",
+            "visible": [],
+        }
+
+    record = records[0] if isinstance(records[0], dict) else {}
+    visible = [name for name in pii_field_names if name in record]
+    reached_table = any(name in record for name in _PII_PROBE_CONTROL_FIELDS)
+    passed = reached_table and not visible
+    if passed:
+        detail = "Agent read non-PII columns; all PII columns stripped by field-level ACL."
+    elif visible:
+        detail = f"Leak — agent could read PII columns: {', '.join(visible)}."
+    else:
+        detail = "Agent could not reach the patient table to prove field-level denial."
+    return {"ran": True, "passed": passed, "detail": detail, "visible": visible}
+
+
+async def _privacy_filter_status(
+    settings: Settings, client: httpx.AsyncClient
+) -> dict[str, int]:
+    """Count active Gen AI content filters, and those scoped to PII redaction."""
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/table/sys_gen_ai_filter",
+        params={
+            "sysparm_query": "active=true",
+            "sysparm_fields": "filter_name,filter_type",
+            "sysparm_limit": "200",
+        },
+        headers={"Accept": "application/json"},
+        auth=(settings.snow_username, settings.snow_password),
+    )
+    active_total = 0
+    active_pii = 0
+    if response.is_success:
+        for record in response.json().get("result", []):
+            active_total += 1
+            name = _field_value(record.get("filter_name")).lower()
+            if "pii" in name or "privacy" in name:
+                active_pii += 1
+    return {"active_total": active_total, "active_pii": active_pii}
+
+
+async def _privacy_pii_pattern_count(settings: Settings, client: httpx.AsyncClient) -> int:
+    """Count deterministic PII data patterns (SSN, DOB, email, phone, card)."""
+    query = (
+        "nameLIKEsocial^ORnameLIKEbirth^ORnameLIKEemail"
+        "^ORnameLIKEphone^ORnameLIKEcredit card"
+    )
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/stats/sn_data_discovery_data_pattern",
+        params={"sysparm_query": query, "sysparm_count": "true"},
+        headers={"Accept": "application/json"},
+        auth=(settings.snow_username, settings.snow_password),
+    )
+    if not response.is_success:
+        return 0
+    try:
+        return int(response.json()["result"]["stats"]["count"])
+    except (KeyError, TypeError, ValueError):
+        return 0
+
+
+async def _privacy_anonymization(settings: Settings, client: httpx.AsyncClient) -> dict[str, int]:
+    """Share of u_ai_decision_log rows keyed on an anonymized token, not a raw id."""
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/table/u_ai_decision_log",
+        params={"sysparm_fields": "u_patient_id_anon", "sysparm_limit": "1000"},
+        headers={"Accept": "application/json"},
+        auth=(settings.snow_username, settings.snow_password),
+    )
+    if not response.is_success:
+        return {"total": 0, "anonymized": 0, "rate": 0}
+    rows = response.json().get("result", [])
+    total = len(rows)
+    anonymized = sum(1 for r in rows if _field_value(r.get("u_patient_id_anon")))
+    rate = round(anonymized / total * 100) if total else 0
+    return {"total": total, "anonymized": anonymized, "rate": rate}
+
+
+# ---------------------------------------------------------------------------
+# UC1 Privacy — live role-based redaction demo
+# Read ONE patient record as two differently-scoped non-human agents and show,
+# side by side, exactly which PII the field-level ACL strips for the agent that
+# lacks role_patient_pii. The redaction happens in ServiceNow, not here.
+# ---------------------------------------------------------------------------
+
+# (key, label, category) for the fields shown in the comparison.
+PATIENT_ACCESS_FIELDS: tuple[tuple[str, str, str], ...] = (
+    ("u_patient_id", "Patient ref ID", "safe"),
+    ("u_health_condition", "Health condition", "safe"),
+    ("u_account_status", "Account status", "safe"),
+    ("u_first_name", "First name", "pii"),
+    ("u_last_name", "Last name", "pii"),
+    ("u_date_of_birth", "Date of birth", "pii"),
+    ("u_email", "Email", "pii"),
+    ("u_phone", "Phone", "pii"),
+    ("u_gender", "Gender", "pii"),
+    ("u_ethnicity", "Ethnicity", "pii"),
+    ("u_insurance_id", "Insurance ID", "pii"),
+)
+
+_ACCESS_QUERY_FIELDS = ["sys_id"] + [key for key, _, _ in PATIENT_ACCESS_FIELDS]
+
+
+async def fetch_patient_access_comparison(
+    settings: Settings,
+    query: str | None = None,
+    http_client: httpx.AsyncClient | None = None,
+) -> PatientAccessComparison:
+    """Read one patient as the restricted and privileged agents; diff what each sees."""
+
+    async def run(client: httpx.AsyncClient) -> PatientAccessComparison:
+        sys_id, patient_ref = await _resolve_demo_patient(settings, client, query)
+        if not sys_id:
+            raise ServiceNowError("No patient record found to compare.")
+
+        restricted_record, restricted_meta = await _read_patient_as_agent(
+            settings,
+            client,
+            sys_id,
+            username=settings.snow_pii_agent_username,
+            password=settings.snow_pii_agent_password,
+            allow_main_fallback=False,
+        )
+        privileged_record, privileged_meta = await _read_patient_as_agent(
+            settings,
+            client,
+            sys_id,
+            username=settings.snow_clinical_agent_username,
+            password=settings.snow_clinical_agent_password,
+            allow_main_fallback=True,
+        )
+
+        fields: list[PatientFieldAccess] = []
+        redacted_count = 0
+        for key, label, category in PATIENT_ACCESS_FIELDS:
+            priv_val = _field_best(privileged_record.get(key)) if key in privileged_record else ""
+            present_for_restricted = key in restricted_record
+            rest_val = _field_best(restricted_record.get(key)) if present_for_restricted else ""
+            # PII fields are stripped from the restricted agent's response by the ACL.
+            redacted = category == "pii" and not present_for_restricted
+            if redacted:
+                redacted_count += 1
+            fields.append(
+                PatientFieldAccess(
+                    key=key,
+                    label=label,
+                    category=category,  # type: ignore[arg-type]
+                    privileged_value=priv_val,
+                    restricted_value=rest_val,
+                    redacted_for_restricted=redacted,
+                )
+            )
+
+        restricted_identity = AgentIdentity(
+            key="restricted",
+            label="Scheduling Agent",
+            username=settings.snow_pii_agent_username or "—",
+            role="u_patients_user (no role_patient_pii)",
+            has_pii_role=False,
+            served_by=restricted_meta["served_by"],
+            reachable=restricted_meta["reachable"],
+            note=restricted_meta["note"],
+        )
+        privileged_identity = AgentIdentity(
+            key="privileged",
+            label="Clinical Agent",
+            username=settings.snow_clinical_agent_username or settings.snow_username,
+            role="u_patients_user + role_patient_pii",
+            has_pii_role=True,
+            served_by=privileged_meta["served_by"],
+            reachable=privileged_meta["reachable"],
+            note=privileged_meta["note"],
+        )
+
+        return PatientAccessComparison(
+            patient_sys_id=sys_id,
+            patient_ref=patient_ref,
+            restricted=restricted_identity,
+            privileged=privileged_identity,
+            fields=fields,
+            redacted_count=redacted_count,
+        )
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
+async def _resolve_demo_patient(
+    settings: Settings, client: httpx.AsyncClient, query: str | None
+) -> tuple[str, str]:
+    """Find the patient to demo with, using the main account (always sees the record)."""
+    if query and query.strip():
+        q = query.strip().replace("^", " ")
+        snow_query = (
+            f"u_first_nameLIKE{q}^ORu_last_nameLIKE{q}"
+            f"^ORu_patient_id={q}^ORu_emailLIKE{q}"
+        )
+    else:
+        # Default: a record with rich PII (incl. insurance) so the contrast is obvious.
+        snow_query = (
+            "u_first_nameISNOTEMPTY^u_emailISNOTEMPTY^u_phoneISNOTEMPTY"
+            "^u_date_of_birthISNOTEMPTY^u_insurance_idISNOTEMPTY"
+        )
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/table/u_patient",
+        params={
+            "sysparm_query": snow_query,
+            "sysparm_fields": "sys_id,u_patient_id",
+            "sysparm_limit": "1",
+        },
+        headers={"Accept": "application/json"},
+        auth=(settings.snow_username, settings.snow_password),
+    )
+    if not response.is_success:
+        _raise_snow_error(response)
+    records = response.json().get("result", [])
+    if not records:
+        return "", ""
+    record = records[0]
+    return _field_value(record.get("sys_id")), _field_best(record.get("u_patient_id"))
+
+
+async def _read_patient_as_agent(
+    settings: Settings,
+    client: httpx.AsyncClient,
+    sys_id: str,
+    *,
+    username: str | None,
+    password: str | None,
+    allow_main_fallback: bool,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Read the patient as the given agent; optionally fall back to the main account."""
+    meta = {"served_by": "", "reachable": True, "note": ""}
+
+    async def read(user: str, pw: str) -> httpx.Response:
+        return await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_patient/{sys_id}",
+            params={
+                "sysparm_fields": ",".join(_ACCESS_QUERY_FIELDS),
+                "sysparm_display_value": "true",
+            },
+            headers={"Accept": "application/json"},
+            auth=(user, pw),
+        )
+
+    if username and password:
+        response = await read(username, password)
+        if response.is_success:
+            meta["served_by"] = username
+            record = response.json().get("result", {})
+            return (record if isinstance(record, dict) else {}), meta
+        if response.status_code in (401, 403):
+            meta["reachable"] = False
+            meta["note"] = f"{username} could not authenticate/authorize (HTTP {response.status_code})."
+        else:
+            meta["note"] = _error_detail(response)
+    else:
+        meta["reachable"] = False
+        meta["note"] = "Agent credentials not configured."
+
+    if allow_main_fallback:
+        response = await read(settings.snow_username, settings.snow_password)
+        if response.is_success:
+            meta["served_by"] = f"{settings.snow_username} (fallback)"
+            meta["reachable"] = True
+            record = response.json().get("result", {})
+            return (record if isinstance(record, dict) else {}), meta
+        _raise_snow_error(response)
+
+    return {}, meta

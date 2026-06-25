@@ -46,7 +46,9 @@ from .models import (
     ExecuteAgentResponse,
     NotificationListResponse,
     NotificationReadRequest,
+    PatientAccessComparison,
     PatientProfileResponse,
+    PrivacyControlsResponse,
     AppointmentUpdateRequest,
     ClinicianAppointmentCreateRequest,
     DoctorAppointmentOption,
@@ -84,6 +86,8 @@ from .servicenow import (
     execute_agent,
     fetch_agents,
     fetch_ai_decision_log,
+    fetch_patient_access_comparison,
+    fetch_privacy_controls,
     fetch_appointment_option,
     fetch_doctor_appointment_options,
     fetch_guardrail_audit_logs,
@@ -591,6 +595,29 @@ async def get_governance_decision_log(
 ) -> list[AiDecisionLogEntry]:
     try:
         return await fetch_ai_decision_log(settings, limit=limit)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/privacy-controls", response_model=PrivacyControlsResponse)
+async def get_governance_privacy_controls(
+    settings: Settings = Depends(get_settings),
+) -> PrivacyControlsResponse:
+    """UC1 Privacy — live PII-protection posture (ACLs, output guardrail, anonymized log)."""
+    try:
+        return await fetch_privacy_controls(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/privacy/patient-lookup", response_model=PatientAccessComparison)
+async def get_privacy_patient_lookup(
+    q: str | None = None,
+    settings: Settings = Depends(get_settings),
+) -> PatientAccessComparison:
+    """UC1 Privacy — read one patient as a restricted vs privileged agent (live redaction)."""
+    try:
+        return await fetch_patient_access_comparison(settings, query=q)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
