@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
@@ -38,3 +38,7 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           channelId: live
           projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+          # Pin the CLI to the stable 13.x line. firebase-tools@latest (15.x) on the
+          # GitHub runner throws gaxios "Premature close" while fetching the OAuth token,
+          # which surfaces as a misleading "Failed to authenticate" error.
+          firebaseToolsVersion: "13"
