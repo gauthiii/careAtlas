@@ -322,10 +322,12 @@ const DEMO_RISKS: DemoRisk[] = [
 // ---------------------------------------------------------------------------
 
 export function GovernanceAgendaPage() {
-  // One ref per exported PDF page: index 0 = title banner, 1..9 = agenda cards.
   const pageRefs = useRef<(HTMLDivElement | null)[]>([])
   const [orientation, setOrientation] = useState<Orientation>('portrait')
   const [exporting, setExporting] = useState(false)
+  const [activeTabId, setActiveTabId] = useState(SECTIONS[0].id)
+
+  const activeSection = SECTIONS.find((s) => s.id === activeTabId) || SECTIONS[0]
 
   async function handleExport() {
     if (exporting) return
@@ -344,8 +346,6 @@ export function GovernanceAgendaPage() {
           useCORS: true,
           logging: false,
         })
-        // JPEG (lossy) instead of PNG (lossless) keeps the file a few MB rather
-        // than ~100 MB; 0.85 is visually lossless for slide-style content.
         const img = canvas.toDataURL('image/jpeg', 0.85)
         const availW = pageW - margin * 2
         const availH = pageH - margin * 2
@@ -363,6 +363,29 @@ export function GovernanceAgendaPage() {
       setExporting(false)
     }
   }
+
+  const Banner = () => (
+    <div className="flex items-center gap-4 rounded-2xl border border-[#cfe0ea] bg-gradient-to-r from-[#143A57] to-[#1d5c87] p-5 text-white shadow-[0_8px_24px_rgba(20,58,87,0.25)]">
+      <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-white/15 text-white">
+        <Sparkles size={28} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[0.72rem] font-bold uppercase tracking-widest text-white/60">Demo day</div>
+        <div className="text-2xl font-black tracking-tight">June 20, 2026</div>
+        <div className="mt-0.5 text-sm text-white/70">
+          CareAtlas &mdash; AI-Native Healthcare Platform on ServiceNow
+        </div>
+      </div>
+      <div className="flex flex-col items-end gap-1 text-right">
+        <div className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold mb-3">
+          {SECTIONS.length} sections
+        </div>
+        <div className="rounded-full bg-emerald-400/30 px-3 py-1 text-xs font-bold text-emerald-200">
+          All complete
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <PortalPage
@@ -421,64 +444,52 @@ export function GovernanceAgendaPage() {
           </div>
         </div>
 
-        {/* Page 1 of the export: title banner + agenda nav + first section */}
-        <div
-          ref={(el) => { pageRefs.current[0] = el }}
-          className="mb-10 space-y-8"
-        >
-          {/* Date banner */}
-          <div className="flex items-center gap-4 rounded-2xl border border-[#cfe0ea] bg-gradient-to-r from-[#143A57] to-[#1d5c87] p-5 text-white shadow-[0_8px_24px_rgba(20,58,87,0.25)]">
-            <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-white/15 text-white">
-              <Sparkles size={28} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[0.72rem] font-bold uppercase tracking-widest text-white/60">Demo day</div>
-              <div className="text-2xl font-black tracking-tight">June 20, 2026</div>
-              <div className="mt-0.5 text-sm text-white/70">
-                CareAtlas &mdash; AI-Native Healthcare Platform on ServiceNow
-              </div>
-            </div>
-            <div className="flex flex-col items-end gap-1 text-right">
-              <div className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold">
-                {SECTIONS.length} sections
-              </div>
-              <div className="rounded-full bg-emerald-400/30 px-3 py-1 text-xs font-bold text-emerald-200">
-                All complete
-              </div>
-            </div>
-          </div>
-
-          {/* Agenda nav — squared boxes for every section */}
-          <div className="flex flex-wrap gap-1.5">
-            {SECTIONS.map((s) => (
-              <a
-                key={s.id}
-                href={`#${s.id}`}
-                className="flex flex-shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-2 text-center transition hover:shadow-md"
-                style={{ borderColor: s.border, backgroundColor: s.bg }}
-              >
-                <span className="text-[0.6rem] font-black tracking-widest" style={{ color: s.color }}>
-                  {s.number}
-                </span>
-                <span className="text-[0.65rem] font-bold leading-tight" style={{ color: s.color, maxWidth: 72 }}>
-                  {s.title}
-                </span>
-              </a>
-            ))}
-          </div>
-
-          {/* First section shares the title page */}
-          <AgendaCard section={SECTIONS[0]} />
+        {/* Display Banner */}
+        <div className="mb-8">
+          <Banner />
         </div>
 
-        {/* Remaining sections — one export page each */}
-        <div className="space-y-10">
+        {/* Agenda nav — Tabs */}
+        <div className="mb-8 flex flex-wrap gap-1.5">
+          {SECTIONS.map((s) => {
+            const isActive = activeTabId === s.id
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActiveTabId(s.id)}
+                className="flex flex-shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-2 text-center transition hover:-translate-y-0.5 hover:shadow-md"
+                style={{
+                  borderColor: isActive ? s.color : s.border,
+                  backgroundColor: isActive ? s.color : s.bg,
+                }}
+              >
+                <span className="text-[0.6rem] font-black tracking-widest opacity-90" style={{ color: isActive ? 'white' : s.color }}>
+                  {s.number}
+                </span>
+                <span className="text-[0.65rem] font-bold leading-tight" style={{ color: isActive ? 'white' : s.color, maxWidth: 72 }}>
+                  {s.title}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Active Tab Content */}
+        <div className="min-h-[400px]">
+          <AgendaCard section={activeSection} />
+        </div>
+
+        {/* Hidden Container for PDF Export */}
+        <div className="fixed left-[-9999px] top-0 w-[900px] pointer-events-none">
+          <div ref={(el) => { pageRefs.current[0] = el }} className="bg-white p-10 space-y-8">
+            <Banner />
+            <AgendaCard section={SECTIONS[0]} />
+          </div>
           {SECTIONS.slice(1).map((section, i) => (
-            <AgendaCard
-              key={section.id}
-              section={section}
-              cardRef={(el) => { pageRefs.current[i + 1] = el }}
-            />
+            <div key={section.id} ref={(el) => { pageRefs.current[i + 1] = el }} className="bg-white p-10">
+              <AgendaCard section={section} />
+            </div>
           ))}
         </div>
       </section>

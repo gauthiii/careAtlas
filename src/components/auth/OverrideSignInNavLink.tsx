@@ -26,7 +26,8 @@ export function OverrideSignInNavLink({
   className,
   end,
   onOverrideLogin,
-}: OverrideSignInNavLinkProps) {
+  collapsed,
+}: OverrideSignInNavLinkProps & { collapsed?: boolean }) {
   const navigate = useNavigate()
   const [isPromptOpen, setIsPromptOpen] = useState(false)
   const clickTimerRef = useRef<number | null>(null)
@@ -62,8 +63,8 @@ export function OverrideSignInNavLink({
   return (
     <>
       <NavLink to={to} end={end} className={className} onClick={handleClick}>
-        <Icon size={15} />
-        {label}
+        <span className="flex shrink-0 items-center justify-center transition-transform duration-300" style={{ transform: collapsed ? 'scale(1)' : 'scale(0.77)' }}><Icon size={17} /></span>
+        {!collapsed && <span>{label}</span>}
       </NavLink>
       <OverrideCodePrompt
         isOpen={isPromptOpen}

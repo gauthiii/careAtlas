@@ -43,9 +43,6 @@ interface DeckSection {
   title: string
   subtitle: string
   icon: typeof ServerCog
-  color: string
-  bg: string
-  border: string
   items: DeckItem[]
   mock: ReactNode
 }
@@ -61,9 +58,6 @@ const SECTIONS: DeckSection[] = [
     title: 'What We Are Building',
     subtitle: 'An MCP server over ServiceNow’s AI documentation',
     icon: ServerCog,
-    color: '#0f5f8c',
-    bg: '#e7f3f8',
-    border: '#cfe0ea',
     items: [
       {
         label: 'A Model Context Protocol (MCP) server',
@@ -89,9 +83,6 @@ const SECTIONS: DeckSection[] = [
     title: 'Why We Are Working On It',
     subtitle: 'The docs are too big and too fresh for any model to “just know”',
     icon: AlertTriangle,
-    color: '#b45309',
-    bg: '#fef3c7',
-    border: '#fcd34d',
     items: [
       {
         label: 'The docs were updated June 12, 2026',
@@ -122,9 +113,6 @@ const SECTIONS: DeckSection[] = [
     title: 'How We Are Doing It',
     subtitle: 'Split the context, then serve it as precise MCP tools',
     icon: Scissors,
-    color: '#6d28d9',
-    bg: '#f0ebff',
-    border: '#c4b5fd',
     items: [
       {
         label: 'Step 1 — Chunk the PDFs (split_pikepdf.py)',
@@ -155,9 +143,6 @@ const SECTIONS: DeckSection[] = [
     title: 'The Tools The LLM Calls',
     subtitle: '5 tools + a how_to_use prompt — search-then-fetch',
     icon: Search,
-    color: '#0f6b4f',
-    bg: '#e8f7ef',
-    border: '#a7dfbf',
     items: [
       {
         label: 'list_documents() → list_topics() → list_subtopics()',
@@ -188,9 +173,6 @@ const SECTIONS: DeckSection[] = [
     title: 'How It’s Accessed',
     subtitle: 'Local stdio today, remote connector for the browser',
     icon: Cloud,
-    color: '#1d5c87',
-    bg: '#e7f3f8',
-    border: '#cfe0ea',
     items: [
       {
         label: 'Local over stdio',
@@ -216,9 +198,6 @@ const SECTIONS: DeckSection[] = [
     title: 'How This Helps Us',
     subtitle: 'Accurate, current, traceable answers on AI governance',
     icon: TowerControl,
-    color: '#0f5f8c',
-    bg: '#e7f3f8',
-    border: '#cfe0ea',
     items: [
       {
         label: 'Always current, never truncated',
@@ -244,9 +223,6 @@ const SECTIONS: DeckSection[] = [
     title: 'The Commercial Opportunity',
     subtitle: 'We don’t own ServiceNow — so we can sell the access layer',
     icon: Handshake,
-    color: '#7c2d12',
-    bg: '#fdeadf',
-    border: '#f6c79f',
     items: [
       {
         label: 'Sell it as a product',
@@ -278,10 +254,12 @@ const SECTIONS: DeckSection[] = [
 // ---------------------------------------------------------------------------
 
 export function GovernanceAdditionalWorkPage() {
-  // One ref per exported PDF page: index 0 = title banner + first section, 1..n = cards.
   const pageRefs = useRef<(HTMLDivElement | null)[]>([])
   const [orientation, setOrientation] = useState<Orientation>('portrait')
   const [exporting, setExporting] = useState(false)
+  const [activeTabId, setActiveTabId] = useState(SECTIONS[0].id)
+
+  const activeSection = SECTIONS.find((s) => s.id === activeTabId) || SECTIONS[0]
 
   async function handleExport() {
     if (exporting) return
@@ -318,6 +296,29 @@ export function GovernanceAdditionalWorkPage() {
     }
   }
 
+  const Banner = () => (
+    <div className="flex items-center gap-4 rounded-2xl border border-[#0397AE] p-5 text-[#0397AE]">
+      <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-white/15">
+        <ServerCog size={28} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[0.72rem] font-bold uppercase tracking-widest">Additional work</div>
+        <div className="text-xl font-bold">ServiceNow AI Docs - MCP Server</div>
+        <div className="mt-0.5 text-sm">
+          AI Control Tower &amp; GRC knowledge, served as Model Context Protocol tools
+        </div>
+      </div>
+      <div className="flex flex-col items-end gap-1 text-right">
+        <div className="rounded-full px-3 py-1 text-xs font-bold mb-3 border border-[#0397AE] rounded-xl">
+          319 subtopics
+        </div>
+        <div className="rounded-full px-3 py-1 text-xs font-bold border border-[#0397AE] rounded-xl">
+          In progress
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <PortalPage
       label="AI Governance Officer"
@@ -328,7 +329,7 @@ export function GovernanceAdditionalWorkPage() {
         {/* Export toolbar */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#cfe0ea] bg-white px-4 py-3 shadow-[0_4px_16px_rgba(25,64,93,0.07)]">
           <div className="min-w-0">
-            <div className="text-sm font-black text-[#102033]">Export deck</div>
+            <div className="text-sm font-bold text-[#102033]">Export deck</div>
             <div className="text-xs text-[#53687b]">
               Saves all {SECTIONS.length} sections as a {SECTIONS.length}-page PDF — the title and section nav share the first page.
             </div>
@@ -350,7 +351,7 @@ export function GovernanceAdditionalWorkPage() {
                     type="button"
                     onClick={() => setOrientation(opt.value)}
                     className={cn(
-                      'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition',
+                      'flex items-center gap-1.5 rounded-lg px-3 py-1.5 !text-[14px] !font-bold transition',
                       active
                         ? 'bg-[#143A57] text-white shadow-sm'
                         : 'text-[#53687b] hover:text-[#102033]',
@@ -367,7 +368,7 @@ export function GovernanceAdditionalWorkPage() {
               type="button"
               onClick={handleExport}
               disabled={exporting}
-              className="flex items-center gap-2 rounded-xl bg-[#143A57] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#1d5c87] disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex items-center gap-2 rounded-xl px-4 py-2 !text-[14px] !font-bold text-[#143A57] border border-[#143A57] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
               {exporting ? 'Exporting…' : 'Export PDF'}
@@ -375,64 +376,53 @@ export function GovernanceAdditionalWorkPage() {
           </div>
         </div>
 
-        {/* Page 1 of the export: title banner + section nav + first section */}
-        <div
-          ref={(el) => { pageRefs.current[0] = el }}
-          className="mb-10 space-y-8"
-        >
-          {/* Banner */}
-          <div className="flex items-center gap-4 rounded-2xl border border-[#cfe0ea] bg-gradient-to-r from-[#143A57] to-[#1d5c87] p-5 text-white shadow-[0_8px_24px_rgba(20,58,87,0.25)]">
-            <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-white/15 text-white">
-              <ServerCog size={28} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[0.72rem] font-bold uppercase tracking-widest text-white/60">Additional work</div>
-              <div className="text-2xl font-black tracking-tight">ServiceNow AI Docs — MCP Server</div>
-              <div className="mt-0.5 text-sm text-white/70">
-                AI Control Tower &amp; GRC knowledge, served as Model Context Protocol tools
-              </div>
-            </div>
-            <div className="flex flex-col items-end gap-1 text-right">
-              <div className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold">
-                319 subtopics
-              </div>
-              <div className="rounded-full bg-amber-400/30 px-3 py-1 text-xs font-bold text-amber-100">
-                In progress
-              </div>
-            </div>
-          </div>
-
-          {/* Section nav — squared boxes */}
-          <div className="flex flex-wrap gap-1.5">
-            {SECTIONS.map((s) => (
-              <a
-                key={s.id}
-                href={`#${s.id}`}
-                className="flex flex-shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-2 text-center transition hover:shadow-md"
-                style={{ borderColor: s.border, backgroundColor: s.bg }}
-              >
-                <span className="text-[0.6rem] font-black tracking-widest" style={{ color: s.color }}>
-                  {s.number}
-                </span>
-                <span className="text-[0.65rem] font-bold leading-tight" style={{ color: s.color, maxWidth: 78 }}>
-                  {s.title}
-                </span>
-              </a>
-            ))}
-          </div>
-
-          {/* First section shares the title page */}
-          <DeckCard section={SECTIONS[0]} />
+        {/* Display Banner */}
+        <div className="mb-8">
+          <Banner />
         </div>
 
-        {/* Remaining sections — one export page each */}
-        <div className="space-y-10">
+        {/* Section nav — Tabs */}
+        <div className="mb-8 flex flex-wrap gap-3">
+          {SECTIONS.map((s) => {
+            const isActive = activeTabId === s.id
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActiveTabId(s.id)}
+                className={cn(
+                  'flex flex-shrink-0 flex-col w-[142px] h-[75px] items-center gap-1 rounded-xl border px-2 py-2 text-center transition hover:-translate-y-0.5 hover:shadow-md',
+                  isActive
+                    ? 'bg-[#143A57] text-white'
+                    : 'border-[#143A57] text-[#143A57]'
+                )}
+              >
+                <span className="text-[12px] font-black tracking-widest">
+                  {s.number}
+                </span>
+                <span className="text-[12px] font-bold leading-tight">
+                  {s.title}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Active Tab Content */}
+        <div className="min-h-[400px]">
+          <DeckCard section={activeSection} />
+        </div>
+
+        {/* Hidden Container for PDF Export */}
+        <div className="fixed left-[-9999px] top-0 w-[900px] pointer-events-none">
+          <div ref={(el) => { pageRefs.current[0] = el }} className="bg-white p-10 space-y-8">
+            <Banner />
+            <DeckCard section={SECTIONS[0]} />
+          </div>
           {SECTIONS.slice(1).map((section, i) => (
-            <DeckCard
-              key={section.id}
-              section={section}
-              cardRef={(el) => { pageRefs.current[i + 1] = el }}
-            />
+            <div key={section.id} ref={(el) => { pageRefs.current[i + 1] = el }} className="bg-white p-10">
+              <DeckCard section={section} />
+            </div>
           ))}
         </div>
       </section>
@@ -457,36 +447,32 @@ function DeckCard({
     <div
       ref={cardRef}
       id={section.id}
-      className="scroll-mt-24 overflow-hidden rounded-2xl border bg-white shadow-[0_4px_16px_rgba(25,64,93,0.07)]"
-      style={{ borderColor: section.border }}
+      className="scroll-mt-24 overflow-hidden rounded-2xl bg-white shadow-[0_4px_16px_rgba(25,64,93,0.07)] border border-[#cfe0ea]"
     >
       {/* Card header */}
       <div
-        className="flex items-center gap-4 border-b px-6 py-4"
-        style={{ backgroundColor: section.bg, borderColor: section.border }}
+        className="flex items-center gap-4 border-b border-[#cfe0ea] px-6 py-4"
       >
         <span
-          className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl text-white"
-          style={{ backgroundColor: section.color }}
+          className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl text-[#0397AE]"
         >
           <Icon size={20} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 text-[#0397AE]">
             <span
-              className="text-[0.62rem] font-black tracking-widest"
-              style={{ color: section.color }}
+              className="text-base font-bold tracking-widest"
             >
               {section.number}
             </span>
-            <h2 className="text-base font-black text-[#102033]">{section.title}</h2>
+            <h2 className="text-base font-bold">{section.title}</h2>
           </div>
           <p className="text-xs text-[#53687b]">{section.subtitle}</p>
         </div>
       </div>
 
       {/* Items */}
-      <div className="divide-y divide-[#f0f5f8]">
+      <div className="">
         {section.items.map((item, i) => (
           <DeckItemRow key={i} item={item} accent={section.color} />
         ))}
