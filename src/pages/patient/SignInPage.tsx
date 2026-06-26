@@ -188,7 +188,7 @@ export function SignInPage() {
           )}
 
           <div className="flex flex-wrap gap-3">
-            <button type="submit" disabled={isChecking} className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#143A57] px-[15px] font-bold !text-white disabled:cursor-not-allowed disabled:opacity-70 max-[720px]:w-full">
+            <button type="submit" disabled={isChecking} className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#143A57] px-[15px] !font-semibold !text-white disabled:cursor-not-allowed disabled:opacity-70 max-[720px]:w-full">
               {isChecking ? <LoaderCircle size={17} className="animate-spin" /> : mfaSession || newPasswordSession ? <KeyRound size={17} /> : <LockKeyhole size={17} />}
               {isChecking ? 'Checking...' : mfaSession ? 'Verify code' : newPasswordSession ? 'Set password' : 'Sign in'}
             </button>

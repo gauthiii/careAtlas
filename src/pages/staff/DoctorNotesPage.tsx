@@ -104,7 +104,7 @@ export function DoctorNotesPage() {
             type="button"
             onClick={() => void loadNotes()}
             disabled={!doctorSysId}
-            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] disabled:cursor-not-allowed disabled:opacity-60 max-[720px]:w-full"
+            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#0397AE] bg-white px-[15px] font-bold text-[#0397AE] disabled:cursor-not-allowed disabled:opacity-60 max-[720px]:w-full"
           >
             <RefreshCw size={15} />
             Refresh

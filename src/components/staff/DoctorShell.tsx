@@ -93,7 +93,7 @@ export function DoctorShell({ children }: { children: React.ReactNode }) {
       label: item.label,
       node: (collapsed: boolean) => (
         <NavLink key={item.to} to={item.to} end={'end' in item ? item.end : false} className={({ isActive }) => cn(navClassName({ isActive }), collapsed && 'justify-center gap-0 px-0 w-9 h-9 shrink-0')}>
-          <SidebarIcon collapsed={collapsed} icon={<Icon size={22} />} />
+          <SidebarIcon collapsed={collapsed} icon={<Icon size={17} />} />
           {!collapsed && <span>{item.label}</span>}
         </NavLink>
       )

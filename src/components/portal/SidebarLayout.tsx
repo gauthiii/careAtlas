@@ -159,7 +159,7 @@ export function SidebarLayout({
                 type="button"
                 onClick={signOut.onSignOut}
                 className={cn(
-                  'flex w-full items-center gap-2.5 rounded-[10px] border border-[#e0ebf1] bg-white px-3 py-2.5 text-[0.88rem] font-bold text-[#a22828] transition-colors hover:bg-[#fdf2f1]',
+                  'flex w-full items-center gap-2.5 rounded-[10px] border border-[#e0ebf1] bg-white px-3 py-2.5 text-[0.88rem] !font-semibold text-[#a22828] transition-colors hover:bg-[#fdf2f1]',
                   'max-[860px]:w-auto max-[860px]:whitespace-nowrap',
                 )}
               >
