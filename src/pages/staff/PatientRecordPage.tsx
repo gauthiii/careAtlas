@@ -1,5 +1,5 @@
 import { AlertTriangle, Bot, CalendarDays, FileText, Flag, LoaderCircle, Lock, Search, UserRound } from 'lucide-react'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { DoctorPage } from '../../components/staff/DoctorShell'
 import { PortalPanel, PortalTable } from '../../components/portal/PortalShell'
@@ -12,10 +12,26 @@ import {
   formatDate,
   formatTime,
 } from '../../lib/scheduling'
-import { fetchPatientProfile, fetchSummaryNotes, type PatientProfile, type SummaryNote } from '../../services/serviceNow'
+import {
+  fetchPatientProfile,
+  fetchSummaryNotes,
+  searchPatients,
+  type PatientProfile,
+  type PatientProfileLookup,
+  type PatientSearchResult,
+  type SummaryNote,
+} from '../../services/serviceNow'
+import { AiRedactionComparisonCard } from '../../components/governance/AiRedactionComparisonCard'
 
 const fieldClass =
   'w-full rounded-[9px] border border-[#cbdde6] bg-white px-3 py-[11px] text-inherit'
+
+/** Treat a free-text term containing "@" as an email lookup, otherwise a name. */
+function toLookup(term: string): PatientProfileLookup {
+  const value = term.trim()
+  if (!value) return {}
+  return value.includes('@') ? { email: value } : { name: value }
+}
 
 export function PatientRecordPage() {
   const { id } = useParams()
@@ -25,23 +41,34 @@ export function PatientRecordPage() {
     return routeValue
   }, [id])
   const [searchTerm, setSearchTerm] = useState(initialSearch)
-  const [searchedName, setSearchedName] = useState(initialSearch)
+  // The committed lookup that actually loads a profile (name or email).
+  const [searchedLookup, setSearchedLookup] = useState<PatientProfileLookup>(() =>
+    initialSearch ? toLookup(initialSearch) : {},
+  )
   const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const { appointments, error: scheduleError, isLoading: isScheduleLoading } = useClinicianSchedule()
 
+  // Typeahead suggestions.
+  const [suggestions, setSuggestions] = useState<PatientSearchResult[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isSuggesting, setIsSuggesting] = useState(false)
+  // Guards the suggestion fetch from firing right after a pick / commit.
+  const skipNextSuggest = useRef(false)
+
   useEffect(() => {
     if (!initialSearch) return
     setSearchTerm(initialSearch)
-    setSearchedName(initialSearch)
+    setSearchedLookup(toLookup(initialSearch))
   }, [initialSearch])
 
+  const lookupKey = `${searchedLookup.name ?? ''}|${searchedLookup.email ?? ''}`
   useEffect(() => {
     let active = true
-    const name = searchedName.trim()
+    const hasLookup = Boolean(searchedLookup.name || searchedLookup.email)
 
-    if (!name) {
+    if (!hasLookup) {
       setPatientProfile(null)
       setSearchError(null)
       setIsSearching(false)
@@ -54,7 +81,7 @@ export function PatientRecordPage() {
       setIsSearching(true)
       setSearchError(null)
       try {
-        const profile = await fetchPatientProfile({ name })
+        const profile = await fetchPatientProfile(searchedLookup)
         if (!active) return
         setPatientProfile(profile)
         if (!profile) setSearchError('Patient profile not found.')
@@ -72,7 +99,49 @@ export function PatientRecordPage() {
     return () => {
       active = false
     }
-  }, [searchedName])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookupKey])
+
+  // Debounced typeahead: fetch suggestions as the clinician types.
+  useEffect(() => {
+    const term = searchTerm.trim()
+    if (skipNextSuggest.current) {
+      skipNextSuggest.current = false
+      return
+    }
+    if (term.length < 2) {
+      setSuggestions([])
+      setIsSuggesting(false)
+      return
+    }
+    let active = true
+    setIsSuggesting(true)
+    const handle = window.setTimeout(async () => {
+      try {
+        const rows = await searchPatients(term)
+        if (active) {
+          setSuggestions(rows)
+          setShowSuggestions(true)
+        }
+      } catch {
+        if (active) setSuggestions([])
+      } finally {
+        if (active) setIsSuggesting(false)
+      }
+    }, 220)
+    return () => {
+      active = false
+      window.clearTimeout(handle)
+    }
+  }, [searchTerm])
+
+  function selectSuggestion(result: PatientSearchResult) {
+    skipNextSuggest.current = true
+    setSearchTerm(result.name || result.email)
+    setShowSuggestions(false)
+    setSuggestions([])
+    setSearchedLookup(result.email ? { email: result.email } : { name: result.name })
+  }
 
   const patientAppointments = useMemo(
     () => appointmentsForPatient(appointments, patientProfile).sort((a, b) => appointmentSortValue(b) - appointmentSortValue(a)),
@@ -95,7 +164,8 @@ export function PatientRecordPage() {
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setSearchedName(searchTerm.trim())
+    setShowSuggestions(false)
+    setSearchedLookup(toLookup(searchTerm))
   }
 
   return (
@@ -105,14 +175,47 @@ export function PatientRecordPage() {
     >
       <PortalPanel title="Find patient" icon={<Search size={21} />} tone="secure">
         <form className="grid grid-cols-[1fr_auto] gap-3 max-[720px]:grid-cols-1" onSubmit={handleSearch}>
-          <label className="grid gap-[7px] text-[0.84rem] font-extrabold text-[#40566b]">
-            Patient name
+          <label className="relative grid gap-[7px] text-[0.84rem] font-extrabold text-[#40566b]">
+            Patient name or email
             <input
               className={fieldClass}
-              placeholder="Search by first and last name"
+              placeholder="Start typing a name or email…"
               value={searchTerm}
+              autoComplete="off"
               onChange={(event) => setSearchTerm(event.target.value)}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              onBlur={() => window.setTimeout(() => setShowSuggestions(false), 150)}
             />
+            {showSuggestions && (suggestions.length > 0 || isSuggesting) && (
+              <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-[10px] border border-[#cbdde6] bg-white py-1 shadow-lg">
+                {isSuggesting && suggestions.length === 0 && (
+                  <li className="px-3 py-2 text-[0.8rem] font-semibold text-[#53687b]">Searching…</li>
+                )}
+                {suggestions.map((s) => (
+                  <li key={s.sys_id}>
+                    <button
+                      type="button"
+                      // onMouseDown beats the input's onBlur so the pick registers.
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        selectSuggestion(s)
+                      }}
+                      className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[#eef5fb]"
+                    >
+                      <UserRound size={16} className="shrink-0 text-[#0f5f8c]" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-[0.86rem] font-bold text-[#102033]">
+                          {s.name || '(no name)'}
+                        </span>
+                        <span className="block truncate text-[0.76rem] font-semibold text-[#53687b]">
+                          {s.email || s.patient_id}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </label>
           <button
             type="submit"
@@ -132,9 +235,9 @@ export function PatientRecordPage() {
         </div>
       )}
 
-      {!searchedName && !patientProfile && (
+      {!searchedLookup.name && !searchedLookup.email && !patientProfile && (
         <div className="mt-4 rounded-[10px] border border-dashed border-[#cbdde6] bg-[#f7fbfd] p-5 text-center text-sm font-bold text-[#53687b]">
-          Enter a patient name to load their record.
+          Enter a patient name or email to load their record.
         </div>
       )}
 
@@ -165,6 +268,16 @@ export function PatientRecordPage() {
                 <RecordField label="Profile status" value={patientProfile.profile_complete ? 'Complete' : 'Incomplete'} />
               </div>
             </PortalPanel>
+
+            {patientProfile.sys_id && (
+              <AiRedactionComparisonCard
+                lookup={{ sysId: patientProfile.sys_id }}
+                title="AI agent access to this record"
+                intro="UC1 · Privacy — you are an authorized clinician; the AI scheduling agent is not."
+                fullLabel="You (clinician)"
+                agentLabel="AI scheduling agent"
+              />
+            )}
 
             <PortalPanel title="Appointment history" icon={<CalendarDays size={21} />}>
               {isScheduleLoading && (

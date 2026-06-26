@@ -19,6 +19,7 @@ from .notifications import create_notification
 from .models import (
     AIAsset,
     AISystem,
+    AclSummaryResponse,
     AclTestCheck,
     AclTestResponse,
     AgentIdentity,
@@ -37,8 +38,11 @@ from .models import (
     PatientRegistrationRequest,
     PatientRegistrationResponse,
     PatientRegistrationSummary,
+    PatientSearchResult,
     PiiFieldAclStatus,
     PrivacyControlsResponse,
+    ScopedAgentAnswer,
+    ScopedFieldValue,
     SummaryNoteRequest,
     SummaryNoteResponse,
 )
@@ -214,9 +218,36 @@ class AclProbe:
     table: str
     fields: tuple[str, ...]
     inspect_denied_fields: bool = False
+    # "read" probes GET the table; "write" probes attempt a POST (create) and expect
+    # it to be denied, proving the agent cannot act beyond its job (OWASP LLM06).
+    operation: Literal["read", "write"] = "read"
+    # Minimal payload for a write probe (kept harmless; the record is deleted if it
+    # is unexpectedly created, which would indicate an excessive-agency leak).
+    write_payload: tuple[tuple[str, str], ...] = ()
 
 
-ACL_TEST_PROBES: dict[str, tuple[AclProbe, AclProbe]] = {
+# Reusable PII read-deny probe (the field-level ACL strips these for non-PII agents).
+def _pii_deny_probe(fields: tuple[str, ...]) -> AclProbe:
+    return AclProbe(
+        label="Denied patient PII fields",
+        expected="denied",
+        table="u_patient",
+        fields=fields,
+        inspect_denied_fields=True,
+    )
+
+
+_PII_FIELDS = (
+    "u_first_name",
+    "u_last_name",
+    "u_email",
+    "u_phone",
+    "u_date_of_birth",
+    "u_gender",
+    "u_ethnicity",
+)
+
+ACL_TEST_PROBES: dict[str, tuple[AclProbe, ...]] = {
     "svc-identity-verification-agent": (
         AclProbe(
             label="Allowed patient identity fields",
@@ -229,6 +260,13 @@ ACL_TEST_PROBES: dict[str, tuple[AclProbe, AclProbe]] = {
             expected="denied",
             table="u_appointment",
             fields=("sys_id",),
+        ),
+        AclProbe(
+            label="Denied write to appointments",
+            expected="denied",
+            table="u_appointment",
+            fields=(),
+            operation="write",
         ),
     ),
     "svc-scheduling-agent": (
@@ -245,20 +283,14 @@ ACL_TEST_PROBES: dict[str, tuple[AclProbe, AclProbe]] = {
                 "u_account_status",
             ),
         ),
+        _pii_deny_probe(_PII_FIELDS),
         AclProbe(
-            label="Denied patient PII fields",
+            label="Denied writing a clinical note",
             expected="denied",
-            table="u_patient",
-            fields=(
-                "u_first_name",
-                "u_last_name",
-                "u_email",
-                "u_phone",
-                "u_date_of_birth",
-                "u_gender",
-                "u_ethnicity",
-            ),
-            inspect_denied_fields=True,
+            table="u_summary_notes",
+            fields=(),
+            operation="write",
+            write_payload=(("u_summary_note_id", "ACL_PROBE"),),
         ),
     ),
     "svc-reminder-agent": (
@@ -268,11 +300,15 @@ ACL_TEST_PROBES: dict[str, tuple[AclProbe, AclProbe]] = {
             table="u_appointment",
             fields=("sys_id",),
         ),
+        # Reminder reads the patient table (via u_scheduling_agent) but PII is denied.
+        _pii_deny_probe(_PII_FIELDS),
         AclProbe(
-            label="Denied patient table",
+            label="Denied writing the patient record",
             expected="denied",
             table="u_patient",
-            fields=("sys_id",),
+            fields=(),
+            operation="write",
+            write_payload=(("u_first_name", "ACL_PROBE"),),
         ),
     ),
     "svc-notes-agent": (
@@ -280,20 +316,16 @@ ACL_TEST_PROBES: dict[str, tuple[AclProbe, AclProbe]] = {
             label="Allowed appointment notes fields",
             expected="allowed",
             table="u_appointment",
-            fields=("sys_id", "u_notes"),
+            fields=("sys_id", "u_doctor_notes"),
         ),
+        _pii_deny_probe(_PII_FIELDS[:5]),
         AclProbe(
-            label="Denied patient PII fields",
+            label="Denied writing the patient record",
             expected="denied",
             table="u_patient",
-            fields=(
-                "u_first_name",
-                "u_last_name",
-                "u_email",
-                "u_phone",
-                "u_date_of_birth",
-            ),
-            inspect_denied_fields=True,
+            fields=(),
+            operation="write",
+            write_payload=(("u_first_name", "ACL_PROBE"),),
         ),
     ),
     "svc-triage-agent": (
@@ -303,21 +335,43 @@ ACL_TEST_PROBES: dict[str, tuple[AclProbe, AclProbe]] = {
             table="u_patient",
             fields=("sys_id", "u_reason_text", "u_health_condition"),
         ),
+        _pii_deny_probe(_PII_FIELDS[:5]),
         AclProbe(
-            label="Denied patient PII fields",
+            label="Denied writing to appointments",
             expected="denied",
-            table="u_patient",
-            fields=(
-                "u_first_name",
-                "u_last_name",
-                "u_email",
-                "u_phone",
-                "u_date_of_birth",
-            ),
-            inspect_denied_fields=True,
+            table="u_appointment",
+            fields=(),
+            operation="write",
         ),
     ),
 }
+
+
+# Security-ops agents hold no patient roles — their blast radius excludes all patient
+# data entirely (read and write both denied). They share one "no patient access" matrix.
+_SECURITY_AGENT_PROBES: tuple[AclProbe, ...] = (
+    AclProbe(
+        label="Denied patient table (read)",
+        expected="denied",
+        table="u_patient",
+        fields=("sys_id",),
+    ),
+    AclProbe(
+        label="Denied patient record (write)",
+        expected="denied",
+        table="u_patient",
+        fields=(),
+        operation="write",
+        write_payload=(("u_first_name", "ACL_PROBE"),),
+    ),
+)
+for _sec_agent in (
+    "svc-security-scanner",
+    "svc-security-remediation",
+    "svc-threat-intel",
+    "svc-pipeline-orchestrator",
+):
+    ACL_TEST_PROBES[_sec_agent] = _SECURITY_AGENT_PROBES
 
 
 class ServiceNowError(RuntimeError):
@@ -841,6 +895,53 @@ def _map_audit_log(record: dict[str, Any]) -> dict[str, str]:
     }
 
 
+async def record_approval_decision(
+    settings: Settings,
+    *,
+    intent: str,
+    decision: str,
+    approver: str,
+    reason: str,
+    http_client: httpx.AsyncClient | None = None,
+) -> dict[str, str]:
+    """Record a UC2 human-approval-gate decision in u_ai_action_audit_log.
+
+    Captures the approver identity and whether the high-impact agent action was
+    approved or denied, so the audit trail shows a human was in the loop.
+    """
+    final_action = "approved" if decision == "approve" else "denied"
+    payload = {
+        "u_agent_identity": "human_approval_gate",
+        "u_final_action": final_action,
+        "u_rejection_reason": (
+            f"UC2 Excessive-Agency gate — high-impact intent '{intent}' ({reason}) "
+            f"{final_action} by governance officer '{approver}'."
+        ),
+        "u_patient_id_anon": "N/A",
+        "u_val_agent_auth": "true" if decision == "approve" else "false",
+    }
+
+    async def run(client: httpx.AsyncClient) -> httpx.Response:
+        return await client.post(
+            f"{settings.snow_base_url}/api/now/table/u_ai_action_audit_log",
+            json=payload,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+
+    if http_client is not None:
+        response = await run(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+            response = await run(client)
+
+    if not response.is_success:
+        _raise_snow_error(response)
+    body = response.json() if response.content else {}
+    result = body.get("result") if isinstance(body, dict) else None
+    return _map_audit_log(result) if isinstance(result, dict) else {}
+
+
 async def create_guardrail_audit_log(
     settings: Settings,
     *,
@@ -1071,6 +1172,85 @@ async def fetch_patient_profile(
 
     async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
         return await run(client)
+
+
+async def search_patients(
+    settings: Settings,
+    query: str,
+    limit: int = 8,
+    http_client: httpx.AsyncClient | None = None,
+) -> list[PatientSearchResult]:
+    """Typeahead search across patient first/last name and email (LIKE)."""
+    q = _service_now_query_value(query or "")
+    if len(q) < 2:
+        return []
+
+    clauses = [
+        f"u_first_nameLIKE{q}",
+        f"u_last_nameLIKE{q}",
+        f"u_emailLIKE{q}",
+    ]
+    # If the user typed two words, also match "first AND last" as a strong clause.
+    first, last = (_service_now_query_value(p) for p in _first_last_from_name(query))
+    if first and last:
+        clauses.append(f"u_first_nameLIKE{first}^u_last_nameLIKE{last}")
+    snow_query = "^NQ".join(clauses) + "^ORDERBYu_first_name"
+
+    params = {
+        "sysparm_query": snow_query,
+        "sysparm_fields": "sys_id,u_patient_id,u_first_name,u_last_name,u_email",
+        "sysparm_display_value": "true",
+        "sysparm_limit": str(max(1, min(limit, 25))),
+    }
+
+    async def run(client: httpx.AsyncClient) -> httpx.Response:
+        return await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_patient",
+            params=params,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+
+    if http_client is not None:
+        response = await run(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+            response = await run(client)
+
+    if not response.is_success:
+        _raise_snow_error(response)
+
+    results: list[PatientSearchResult] = []
+    seen: set[str] = set()
+    for record in response.json().get("result", []):
+        if not isinstance(record, dict):
+            continue
+        sys_id = _field_best(record.get("sys_id"))
+        if not sys_id:
+            continue
+        name = " ".join(
+            part
+            for part in (
+                _field_best(record.get("u_first_name")),
+                _field_best(record.get("u_last_name")),
+            )
+            if part
+        ).strip()
+        email = _field_best(record.get("u_email"))
+        # Collapse duplicate test records that share the same name + email.
+        dedupe_key = f"{name.lower()}|{email.lower()}" if (name or email) else sys_id
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        results.append(
+            PatientSearchResult(
+                sys_id=sys_id,
+                patient_id=_field_best(record.get("u_patient_id")),
+                name=name,
+                email=email,
+            )
+        )
+    return results
 
 
 def _map_patient_profile(record: dict[str, Any]) -> PatientProfileResponse:
@@ -2205,12 +2385,53 @@ async def test_service_account_acl(
     )
 
 
+async def summarize_acl_posture(
+    settings: Settings,
+    http_client: httpx.AsyncClient | None = None,
+) -> "AclSummaryResponse":
+    """Run every governed agent's ACL probes and aggregate the least-privilege posture."""
+    import asyncio
+
+    agents = list(ACL_TEST_PROBES.keys())
+
+    async def run(client: httpx.AsyncClient) -> AclSummaryResponse:
+        results = await asyncio.gather(
+            *(test_service_account_acl(settings, a, http_client=client) for a in agents),
+            return_exceptions=True,
+        )
+        summary = AclSummaryResponse(agents_tested=0)
+        for result in results:
+            if isinstance(result, Exception) or not isinstance(result, AclTestResponse):
+                continue
+            summary.agents_tested += 1
+            if result.overall_status == "passed":
+                summary.agents_passed += 1
+            for check in result.checks:
+                summary.checks_total += 1
+                if check.expected == "denied":
+                    if check.actual == "denied":
+                        summary.access_blocked += 1
+                        if check.operation == "write":
+                            summary.write_denials += 1
+                    elif check.actual == "allowed":
+                        summary.leaks += 1
+        return summary
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
 async def _run_acl_probe(
     settings: Settings,
     client: httpx.AsyncClient,
     username: str,
     probe: AclProbe,
 ) -> AclTestCheck:
+    if probe.operation == "write":
+        return await _run_acl_write_probe(settings, client, username, probe)
+
     params = {
         "sysparm_fields": ",".join(probe.fields),
         "sysparm_display_value": "true",
@@ -2247,6 +2468,61 @@ async def _run_acl_probe(
         actual="allowed",
         status_code=response.status_code,
         detail=f"ServiceNow returned HTTP {response.status_code}.",
+    )
+
+
+async def _run_acl_write_probe(
+    settings: Settings,
+    client: httpx.AsyncClient,
+    username: str,
+    probe: AclProbe,
+) -> AclTestCheck:
+    """Attempt a create as the agent; a denial (401/403) proves least-privilege.
+
+    If the create unexpectedly succeeds it is an excessive-agency leak — the record
+    is immediately deleted (cleanup) and the probe reports "allowed".
+    """
+    payload = {key: value for key, value in probe.write_payload} or {"u_active": "false"}
+    response = await client.post(
+        f"{settings.snow_base_url}/api/now/table/{probe.table}",
+        json=payload,
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        auth=(username, settings.snow_password),
+    )
+
+    if response.status_code in (401, 403):
+        return _acl_check(
+            probe,
+            actual="denied",
+            status_code=response.status_code,
+            detail=f"Write denied (HTTP {response.status_code}).",
+        )
+
+    if response.status_code in (201, 200):
+        # Leak: the agent could create the record. Clean it up so the probe is
+        # non-destructive, then report the violation.
+        created = response.json().get("result", {}) if response.content else {}
+        created_id = _field_value(created.get("sys_id")) if isinstance(created, dict) else ""
+        if created_id:
+            await client.delete(
+                f"{settings.snow_base_url}/api/now/table/{probe.table}/{created_id}",
+                headers={"Accept": "application/json"},
+                auth=(settings.snow_username, settings.snow_password),
+            )
+        return _acl_check(
+            probe,
+            actual="allowed",
+            status_code=response.status_code,
+            detail="Write succeeded — excessive-agency leak (test record removed).",
+        )
+
+    # A 400/other usually means the write got past the ACL but failed validation,
+    # which still indicates the operation was not blocked by least-privilege.
+    return _acl_check(
+        probe,
+        actual="error",
+        status_code=response.status_code,
+        detail=_error_detail(response),
     )
 
 
@@ -2308,6 +2584,7 @@ def _acl_check(
         passed=actual == probe.expected,
         table=probe.table,
         fields=list(probe.fields),
+        operation=probe.operation,
         status_code=status_code,
         detail=detail,
     )
@@ -2819,22 +3096,196 @@ PATIENT_ACCESS_FIELDS: tuple[tuple[str, str, str], ...] = (
 _ACCESS_QUERY_FIELDS = ["sys_id"] + [key for key, _, _ in PATIENT_ACCESS_FIELDS]
 
 
+# ---------------------------------------------------------------------------
+# UC2 (portal continuation) — page-scoped AI agents bounded by their ACL identity.
+# Each portal page's "Ask AI" assistant runs as a named svc-* identity; when asked
+# about a patient it reads the record live AS that identity, so PII / out-of-scope
+# fields are stripped by ServiceNow (not by the app), proving least privilege.
+# ---------------------------------------------------------------------------
+
+# agent_key -> (username, label, scope sentence, allowed (field,label) pairs)
+SCOPED_AGENTS: dict[str, dict[str, Any]] = {
+    "scheduling": {
+        "username": "svc-scheduling-agent",
+        "label": "Scheduling Agent",
+        "scope": "rank appointment slots from non-PII scheduling signals",
+        "allowed": (
+            ("u_health_condition", "Health condition"),
+            ("u_accessibility", "Accessibility need"),
+            ("u_time_preference", "Time preference"),
+            ("u_account_status", "Account status"),
+        ),
+    },
+    "triage": {
+        "username": "svc-triage-agent",
+        "label": "Triage Agent",
+        "scope": "assign a triage priority from the visit reason and health condition",
+        "allowed": (
+            ("u_reason_text", "Reason for visit"),
+            ("u_health_condition", "Health condition"),
+        ),
+    },
+    "notes": {
+        "username": "svc-notes-agent",
+        "label": "Clinical Notes Agent",
+        "scope": "read and write appointment notes (it is denied the patient record's PII)",
+        "allowed": (
+            ("u_health_condition", "Health condition"),
+            ("u_account_status", "Account status"),
+        ),
+    },
+    "reminder": {
+        "username": "svc-reminder-agent",
+        "label": "Reminder Agent",
+        "scope": "read appointment timing to send reminders",
+        "allowed": (
+            ("u_time_preference", "Time preference"),
+            ("u_account_status", "Account status"),
+        ),
+    },
+    "identity": {
+        "username": "svc-identity-verification-agent",
+        "label": "Identity Verification Agent",
+        "scope": "verify identity from registration status and confidence score",
+        "allowed": (
+            ("u_registration_status", "Registration status"),
+            ("u_confidence_score", "Identity confidence"),
+        ),
+    },
+}
+
+# PII fields every scoped agent is denied (stripped by the field-level ACL).
+_SCOPED_PII = (
+    ("u_first_name", "First name"),
+    ("u_last_name", "Last name"),
+    ("u_email", "Email"),
+    ("u_phone", "Phone"),
+    ("u_date_of_birth", "Date of birth"),
+    ("u_gender", "Gender"),
+    ("u_ethnicity", "Ethnicity"),
+    ("u_insurance_id", "Insurance ID"),
+)
+
+
+async def ask_scoped_agent(
+    settings: Settings,
+    *,
+    agent_key: str,
+    question: str,
+    patient_email: str = "",
+    patient_sys_id: str = "",
+    http_client: httpx.AsyncClient | None = None,
+) -> "ScopedAgentAnswer":
+    """Answer as a page-scoped agent, reading the patient live under its ACL identity."""
+    from .approvals import classify_intent, create_request
+
+    config = SCOPED_AGENTS.get(agent_key)
+    if config is None:
+        raise ServiceNowError(f"Unknown scoped agent: {agent_key}")
+    label = config["label"]
+    username = config["username"]
+    scope = config["scope"]
+
+    # 1) High-impact intent → stop for a human (reuse the UC2 approval gate).
+    high_impact, reason = classify_intent(question)
+    if high_impact:
+        record = create_request(question)
+        return ScopedAgentAnswer(
+            kind="approval",
+            agent_key=agent_key,
+            agent_label=label,
+            agent_username=username,
+            scope=scope,
+            request_id=record.request_id,
+            intent=record.intent,
+            reason=reason,
+            reply=(
+                f"I'm the {label}. That's a high-impact action ({reason}). I can't do it on "
+                f"my own — it's stopped at status: pending_approval for a human to approve."
+            ),
+        )
+
+    async def run(client: httpx.AsyncClient) -> ScopedAgentAnswer:
+        # 2) Resolve which patient to read.
+        sys_id, patient_ref = await _resolve_demo_patient(
+            settings, client, patient_email or None, sys_id=patient_sys_id or None
+        )
+        if not sys_id:
+            return ScopedAgentAnswer(
+                kind="info",
+                agent_key=agent_key,
+                agent_label=label,
+                agent_username=username,
+                scope=scope,
+                reply=f"I'm the {label} ({username}). My job is to {scope}. No patient record was in context.",
+            )
+
+        # 3) Read the record AS this agent identity (PII is stripped by the ACL).
+        fields = [f for f, _ in config["allowed"]] + [f for f, _ in _SCOPED_PII]
+        response = await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_patient/{sys_id}",
+            params={"sysparm_fields": ",".join(fields), "sysparm_display_value": "true"},
+            headers={"Accept": "application/json"},
+            auth=(username, settings.snow_password),
+        )
+        record = response.json().get("result", {}) if response.is_success else {}
+        record = record if isinstance(record, dict) else {}
+
+        allowed = [
+            ScopedFieldValue(label=lbl, value=_field_best(record.get(f)))
+            for f, lbl in config["allowed"]
+            if f in record and _field_best(record.get(f))
+        ]
+        denied = [lbl for f, lbl in _SCOPED_PII if f not in record]
+
+        allowed_text = (
+            "\n".join(f"• {fv.label}: {fv.value}" for fv in allowed) or "• (no in-scope values set)"
+        )
+        denied_text = ", ".join(denied) or "none"
+
+        reply = (
+            f"I'm the {label} ({username}). For patient {patient_ref} I'm authorized to see:\n"
+            f"{allowed_text}\n\n"
+            f"🔒 Denied by ServiceNow ACL — my identity lacks role_patient_pii, so these were "
+            f"stripped from my response and I literally cannot read them: {denied_text}."
+        )
+        return ScopedAgentAnswer(
+            kind="scoped_data",
+            agent_key=agent_key,
+            agent_label=label,
+            agent_username=username,
+            scope=scope,
+            patient_ref=patient_ref,
+            allowed=allowed,
+            denied=denied,
+            reply=reply,
+        )
+
+    if http_client is not None:
+        return await run(http_client)
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        return await run(client)
+
+
 async def fetch_patient_access_comparison(
     settings: Settings,
     query: str | None = None,
+    sys_id: str | None = None,
     http_client: httpx.AsyncClient | None = None,
 ) -> PatientAccessComparison:
     """Read one patient as the restricted and privileged agents; diff what each sees."""
 
     async def run(client: httpx.AsyncClient) -> PatientAccessComparison:
-        sys_id, patient_ref = await _resolve_demo_patient(settings, client, query)
-        if not sys_id:
+        sys_id_resolved, patient_ref = await _resolve_demo_patient(
+            settings, client, query, sys_id=sys_id
+        )
+        if not sys_id_resolved:
             raise ServiceNowError("No patient record found to compare.")
 
         restricted_record, restricted_meta = await _read_patient_as_agent(
             settings,
             client,
-            sys_id,
+            sys_id_resolved,
             username=settings.snow_pii_agent_username,
             password=settings.snow_pii_agent_password,
             allow_main_fallback=False,
@@ -2842,7 +3293,7 @@ async def fetch_patient_access_comparison(
         privileged_record, privileged_meta = await _read_patient_as_agent(
             settings,
             client,
-            sys_id,
+            sys_id_resolved,
             username=settings.snow_clinical_agent_username,
             password=settings.snow_clinical_agent_password,
             allow_main_fallback=True,
@@ -2891,7 +3342,7 @@ async def fetch_patient_access_comparison(
         )
 
         return PatientAccessComparison(
-            patient_sys_id=sys_id,
+            patient_sys_id=sys_id_resolved,
             patient_ref=patient_ref,
             restricted=restricted_identity,
             privileged=privileged_identity,
@@ -2906,10 +3357,17 @@ async def fetch_patient_access_comparison(
 
 
 async def _resolve_demo_patient(
-    settings: Settings, client: httpx.AsyncClient, query: str | None
+    settings: Settings,
+    client: httpx.AsyncClient,
+    query: str | None,
+    sys_id: str | None = None,
 ) -> tuple[str, str]:
     """Find the patient to demo with, using the main account (always sees the record)."""
-    if query and query.strip():
+    if sys_id and sys_id.strip():
+        # Caller already knows the exact record (e.g. the logged-in patient or the
+        # record a clinician is viewing) — look it up directly by sys_id.
+        snow_query = f"sys_id={sys_id.strip()}"
+    elif query and query.strip():
         q = query.strip().replace("^", " ")
         snow_query = (
             f"u_first_nameLIKE{q}^ORu_last_nameLIKE{q}"

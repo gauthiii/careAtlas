@@ -54,6 +54,7 @@ export interface AclTestCheck {
   passed: boolean
   table: string
   fields: string[]
+  operation: 'read' | 'write'
   status_code?: number | null
   detail: string
 }
@@ -62,6 +63,95 @@ export interface AclTestResponse {
   service_account: string
   overall_status: 'passed' | 'failed' | 'inconclusive' | 'error'
   checks: AclTestCheck[]
+}
+
+export interface AclSummary {
+  agents_tested: number
+  agents_passed: number
+  checks_total: number
+  access_blocked: number
+  write_denials: number
+  leaks: number
+}
+
+export async function fetchAclSummary(): Promise<AclSummary> {
+  const res = await fetch(`${API_BASE}/acl/summary`, { headers: { Accept: 'application/json' } })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as AclSummary
+}
+
+export interface ApprovalRecord {
+  request_id: string
+  intent: string
+  high_impact: boolean
+  reason: string
+  status: 'pending_approval' | 'auto_completed' | 'approved' | 'denied'
+  approver: string
+  audit_logged: boolean
+}
+
+export interface ScopedFieldValue {
+  label: string
+  value: string
+}
+
+export interface ScopedAgentAnswer {
+  kind: 'scoped_data' | 'approval' | 'info'
+  agent_key: string
+  agent_label: string
+  agent_username: string
+  scope: string
+  patient_ref: string
+  allowed: ScopedFieldValue[]
+  denied: string[]
+  reply: string
+  request_id: string
+  intent: string
+  reason: string
+}
+
+export async function askScopedAgent(input: {
+  agentKey: string
+  question: string
+  patientEmail?: string
+  patientSysId?: string
+}): Promise<ScopedAgentAnswer> {
+  const res = await fetch(`${API_BASE}/governance/agent/ask`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      agent_key: input.agentKey,
+      question: input.question,
+      patient_email: input.patientEmail ?? '',
+      patient_sys_id: input.patientSysId ?? '',
+    }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as ScopedAgentAnswer
+}
+
+export async function submitApprovalIntent(intent: string): Promise<ApprovalRecord> {
+  const res = await fetch(`${API_BASE}/governance/approval/submit`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ intent }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as ApprovalRecord
+}
+
+export async function decideApproval(
+  requestId: string,
+  decision: 'approve' | 'deny',
+  approver: string,
+): Promise<ApprovalRecord> {
+  const res = await fetch(`${API_BASE}/governance/approval/${requestId}/decision`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decision, approver }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as ApprovalRecord
 }
 
 export interface PatientRegistrationRequest {
@@ -139,6 +229,26 @@ export interface PatientProfileLookup {
   email?: string
   username?: string
   name?: string
+}
+
+export interface PatientSearchResult {
+  sys_id: string
+  patient_id: string
+  name: string
+  email: string
+}
+
+export async function searchPatients(q: string, limit = 8): Promise<PatientSearchResult[]> {
+  const term = q.trim()
+  if (term.length < 2) return []
+  const params = new URLSearchParams({ q: term, limit: String(limit) })
+  const res = await fetch(`${API_BASE}/patients/search?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+  return (await res.json()) as PatientSearchResult[]
 }
 
 export interface BookingDoctor {
@@ -777,9 +887,14 @@ export interface PatientAccessComparison {
   redacted_count: number
 }
 
-export async function fetchPatientAccessComparison(q?: string): Promise<PatientAccessComparison> {
+export async function fetchPatientAccessComparison(
+  opts?: string | { q?: string; sysId?: string },
+): Promise<PatientAccessComparison> {
   const params = new URLSearchParams()
-  if (q && q.trim()) params.set('q', q.trim())
+  // Back-compat: a bare string is treated as the `q` search term.
+  const normalized = typeof opts === 'string' ? { q: opts } : (opts ?? {})
+  if (normalized.q && normalized.q.trim()) params.set('q', normalized.q.trim())
+  if (normalized.sysId && normalized.sysId.trim()) params.set('sys_id', normalized.sysId.trim())
   const suffix = params.toString() ? `?${params.toString()}` : ''
   const res = await fetch(`${API_BASE}/governance/privacy/patient-lookup${suffix}`, {
     headers: { Accept: 'application/json' },

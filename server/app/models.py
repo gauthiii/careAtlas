@@ -462,6 +462,64 @@ class PrivacyControlsResponse(BaseModel):
     anonymized_rows: int = 0
 
 
+class ScopedFieldValue(BaseModel):
+    label: str
+    value: str = ""
+
+
+class ScopedAgentAskRequest(BaseModel):
+    agent_key: str
+    question: str
+    patient_email: str = ""
+    patient_sys_id: str = ""
+
+
+class ScopedAgentAnswer(BaseModel):
+    """A page-scoped AI agent's response, bounded by its ServiceNow ACL identity (UC2)."""
+
+    kind: Literal["scoped_data", "approval", "info"]
+    agent_key: str
+    agent_label: str
+    agent_username: str
+    scope: str
+    patient_ref: str = ""
+    allowed: list[ScopedFieldValue] = []
+    denied: list[str] = []
+    reply: str = ""
+    # Present when kind == "approval" (high-impact intent stopped for a human).
+    request_id: str = ""
+    intent: str = ""
+    reason: str = ""
+
+
+class ApprovalSubmitRequest(BaseModel):
+    intent: str
+
+
+class ApprovalDecisionRequest(BaseModel):
+    decision: Literal["approve", "deny"]
+    approver: str = ""
+
+
+class ApprovalRecordResponse(BaseModel):
+    request_id: str
+    intent: str
+    high_impact: bool
+    reason: str
+    status: Literal["pending_approval", "auto_completed", "approved", "denied"]
+    approver: str = ""
+    audit_logged: bool = False
+
+
+class PatientSearchResult(BaseModel):
+    """Lightweight typeahead suggestion for the clinician patient search."""
+
+    sys_id: str = ""
+    patient_id: str = ""
+    name: str = ""
+    email: str = ""
+
+
 class AgentIdentity(BaseModel):
     """One non-human agent identity used in the role-based redaction demo."""
 
@@ -536,6 +594,7 @@ class AclTestCheck(BaseModel):
     passed: bool
     table: str
     fields: list[str]
+    operation: Literal["read", "write"] = "read"
     status_code: int | None = None
     detail: str = ""
 
@@ -544,6 +603,17 @@ class AclTestResponse(BaseModel):
     service_account: str
     overall_status: Literal["passed", "failed", "inconclusive", "error"]
     checks: list[AclTestCheck]
+
+
+class AclSummaryResponse(BaseModel):
+    """Aggregate least-privilege posture across every governed service account (UC2)."""
+
+    agents_tested: int = 0
+    agents_passed: int = 0
+    checks_total: int = 0
+    access_blocked: int = 0  # denied checks that were correctly blocked
+    write_denials: int = 0  # blocked write attempts (excessive-agency guardrails)
+    leaks: int = 0  # expected-denied checks that were actually allowed
 
 
 class RegisterAgentRequest(BaseModel):

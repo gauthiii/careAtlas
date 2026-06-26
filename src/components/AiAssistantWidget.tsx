@@ -2,7 +2,7 @@ import { FormEvent, useRef, useState } from 'react'
 import { LoaderCircle, Send, Sparkles, X } from 'lucide-react'
 import { executeAgent, fetchAgentExecution, type ExecuteAgentResponse } from '../services/serviceNow'
 import { provisionSampleDoctor, type ProvisionSampleDoctorResponse } from '../services/awsAuth'
-import { flagLlm02Event } from '../services/serviceNow'
+import { askScopedAgent, decideApproval, flagLlm02Event } from '../services/serviceNow'
 import { isHighImpactIntent } from '../data/useCaseDemoData'
 
 type ChatMessage = {
@@ -15,6 +15,18 @@ export type AiAssistantAgentConfig = {
   agentSysId: string
   pageName: string
   systemContext?: string | null
+  /**
+   * UC2 — when set, the assistant runs as a scoped ServiceNow ACL identity instead of
+   * the OAuth A2A agent. It reads patient data live AS this svc-* identity, so PII /
+   * out-of-scope fields are stripped by ServiceNow, and high-impact intents stop for
+   * a human approval.
+   */
+  identity?: {
+    key: string
+    label: string
+    scope: string
+    patientEmail?: string
+  } | null
 }
 
 const busyMessage = 'AI model is busy. Please try again in a few moments.'
@@ -64,6 +76,8 @@ export function AiAssistantWidget({
   const [isOpen, setIsOpen] = useState(false)
   const [approvalId, setApprovalId] = useState<string | null>(null)
   const [approvalIntent, setApprovalIntent] = useState('')
+  // Backend approval request id (set when a scoped identity stops for approval).
+  const [approvalRealId, setApprovalRealId] = useState<string | null>(null)
   const [drStep, setDrStep] = useState<DoctorRegStep>('prompt')
   const [drResult, setDrResult] = useState<ProvisionSampleDoctorResponse | null>(null)
   const [drError, setDrError] = useState('')
@@ -91,14 +105,44 @@ export function AiAssistantWidget({
     setDrError('')
     setApprovalId(null)
     setApprovalIntent('')
+    setApprovalRealId(null)
   }
 
-  function resolveApproval(decision: 'approve' | 'deny') {
+  async function resolveApproval(decision: 'approve' | 'deny') {
     if (!approvalId) return
     const id = approvalId
     const intent = approvalIntent
+    const realId = approvalRealId
     setApprovalId(null)
     setApprovalIntent('')
+    setApprovalRealId(null)
+
+    // Scoped-identity path: record the decision live (audited in ServiceNow).
+    if (realId) {
+      try {
+        const result = await decideApproval(realId, decision, 'On-call supervisor (human-in-the-loop)')
+        setMessages((current) =>
+          replaceMessage(current, id, {
+            id,
+            role: result.status === 'approved' ? 'assistant' : 'error',
+            content:
+              result.status === 'approved'
+                ? `Approved by ${result.approver}. Action “${intent}” executed with a human in the loop.${result.audit_logged ? ' Recorded in the ServiceNow audit log.' : ''}`
+                : `Denied by ${result.approver}. Action “${intent}” was never executed — blast radius contained.${result.audit_logged ? ' Logged to ServiceNow.' : ''}`,
+          }),
+        )
+      } catch (error) {
+        setMessages((current) =>
+          replaceMessage(current, id, {
+            id,
+            role: 'error',
+            content: error instanceof Error ? error.message : 'Failed to record the decision.',
+          }),
+        )
+      }
+      return
+    }
+
     setMessages((current) =>
       replaceMessage(current, id, {
         id,
@@ -137,6 +181,59 @@ export function AiAssistantWidget({
     }
 
     setInput('')
+
+    // UC2 (portal continuation) — scoped-identity agent: read patient data live AS the
+    // page's svc-* ACL identity, so PII / out-of-scope fields are stripped by ServiceNow.
+    if (agentConfig?.identity) {
+      const identity = agentConfig.identity
+      const pendingMessage: ChatMessage = {
+        id: newId(),
+        role: 'pending',
+        content: `${identity.label} is checking what its identity is allowed to access…`,
+      }
+      const sessionVersion = sessionVersionRef.current
+      setMessages((current) => [...current, userMessage, pendingMessage])
+      setPending(true)
+      try {
+        const ans = await askScopedAgent({
+          agentKey: identity.key,
+          question: trimmedInput,
+          patientEmail: identity.patientEmail,
+        })
+        if (sessionVersion !== sessionVersionRef.current) return
+        if (ans.kind === 'approval') {
+          setMessages((current) =>
+            replaceMessage(current, pendingMessage.id, {
+              id: pendingMessage.id,
+              role: 'approval',
+              content: ans.reply,
+            }),
+          )
+          setApprovalId(pendingMessage.id)
+          setApprovalRealId(ans.request_id)
+          setApprovalIntent(ans.intent)
+        } else {
+          setMessages((current) =>
+            replaceMessage(current, pendingMessage.id, {
+              id: pendingMessage.id,
+              role: 'assistant',
+              content: ans.reply,
+            }),
+          )
+        }
+      } catch (error) {
+        setMessages((current) =>
+          replaceMessage(current, pendingMessage.id, {
+            id: pendingMessage.id,
+            role: 'error',
+            content: error instanceof Error ? error.message : 'Scoped agent request failed.',
+          }),
+        )
+      } finally {
+        setPending(false)
+      }
+      return
+    }
 
     // UC2 — high-impact intents stop for a human Approve/Deny before the agent acts.
     if (approvalMode && isHighImpactIntent(trimmedInput)) {
@@ -350,7 +447,7 @@ export function AiAssistantWidget({
                       return (
                         <div
                           key={message.id}
-                          className="mr-auto max-w-[92%] rounded-[12px] border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800"
+                          className="mr-auto max-w-[92%] whitespace-pre-wrap rounded-[12px] border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800"
                         >
                           {message.content}
                           {isActive && (
@@ -378,7 +475,7 @@ export function AiAssistantWidget({
                       <div
                         key={message.id}
                         className={[
-                          'max-w-[86%] rounded-[12px] px-4 py-3 text-sm font-semibold leading-6',
+                          'max-w-[86%] whitespace-pre-wrap rounded-[12px] px-4 py-3 text-sm font-semibold leading-6',
                           message.role === 'user'
                             ? 'ml-auto bg-[#143A57] text-white'
                             : message.role === 'error'

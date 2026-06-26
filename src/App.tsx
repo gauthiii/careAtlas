@@ -743,17 +743,50 @@ function Shell() {
   )
 }
 
+// UC2 (portal continuation) — each page's "Ask AI" runs as a scoped svc-* ACL identity.
+// patientEmail (patient portal) binds the read to the logged-in patient; doctor pages
+// omit it, so the backend reads a representative patient to show the redaction contrast.
+type ScopedPageAgent = { key: string; label: string; scope: string; pageName: string }
+
+const PATIENT_PAGE_AGENTS: Record<string, ScopedPageAgent> = {
+  '/patient/book': { key: 'scheduling', label: 'Scheduling Agent', scope: 'rank appointment slots', pageName: 'Book Appointment' },
+  '/patient/appointments': { key: 'reminder', label: 'Reminder Agent', scope: 'send appointment reminders', pageName: 'My Appointments' },
+  '/patient/profile': { key: 'identity', label: 'Identity Verification Agent', scope: 'verify your identity', pageName: 'Profile' },
+  '/patient/contact': { key: 'triage', label: 'Triage Agent', scope: 'assign a triage priority', pageName: 'Contact' },
+}
+
+const DOCTOR_PAGE_AGENTS: Record<string, ScopedPageAgent> = {
+  '/staff/notes': { key: 'notes', label: 'Clinical Notes Agent', scope: 'read/write appointment notes', pageName: 'Doctor Notes' },
+  '/staff/appointments': { key: 'scheduling', label: 'Scheduling Agent', scope: 'rank appointment slots', pageName: 'Appointments' },
+  '/staff/queue': { key: 'triage', label: 'Triage Agent', scope: 'assign a triage priority', pageName: 'Patient Queue' },
+}
+
 function getAssistantAgentConfig(pathname: string, user: PatientAuthUser | null): AiAssistantAgentConfig | null {
-  if (pathname !== '/patient/book') return null
-
-  const fullName = patientDisplayName(user)
-  const email = user?.attributes.email?.trim() || user?.username || 'unknown email'
-
-  return {
-    agentSysId: BOOK_APPOINTMENT_AGENT_ID,
-    pageName: 'Book Appointment',
-    systemContext: `System context: The logged-in CareAtlas patient is ${fullName}. Email: ${email}. Current page: Book Appointment. Use this context when helping with appointment booking.`,
+  // Patient portal — scoped agent bound to the logged-in patient.
+  const patientAgent = PATIENT_PAGE_AGENTS[pathname]
+  if (patientAgent) {
+    const email = user?.attributes.email?.trim() || user?.username || ''
+    return {
+      agentSysId: BOOK_APPOINTMENT_AGENT_ID,
+      pageName: patientAgent.pageName,
+      identity: { key: patientAgent.key, label: patientAgent.label, scope: patientAgent.scope, patientEmail: email },
+    }
   }
+
+  // Doctor portal — Patient Record page (route carries the patient id) + fixed routes.
+  const doctorAgent =
+    pathname.startsWith('/staff/patient/')
+      ? { key: 'identity', label: 'Identity Verification Agent', scope: 'verify patient identity', pageName: 'Patient Record' }
+      : DOCTOR_PAGE_AGENTS[pathname]
+  if (doctorAgent) {
+    return {
+      agentSysId: BOOK_APPOINTMENT_AGENT_ID,
+      pageName: doctorAgent.pageName,
+      identity: { key: doctorAgent.key, label: doctorAgent.label, scope: doctorAgent.scope },
+    }
+  }
+
+  return null
 }
 
 export default App

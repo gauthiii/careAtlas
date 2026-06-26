@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -19,7 +19,6 @@ import {
   PortalPage,
 } from '../../components/portal/PortalShell'
 import { SchedulingAgentCompareModal } from '../../components/governance/SchedulingAgentCompareModal'
-import { DemoTag } from '../../components/governance/DemoTag'
 import { DENIED_WRITE_PROBES } from '../../data/useCaseDemoData'
 
 import {
@@ -27,13 +26,26 @@ import {
   type NonHumanIdentity,
 } from '../../data/staffGovernanceData'
 import {
+  fetchAclSummary,
   testServiceAccountAcl,
+  type AclSummary,
   type AclTestCheck,
   type AclTestResponse,
 } from '../../services/serviceNow'
 
 export function GovernanceAclPage() {
   const [compareOpen, setCompareOpen] = useState(false)
+  const [summary, setSummary] = useState<AclSummary | null>(null)
+
+  useEffect(() => {
+    let active = true
+    fetchAclSummary()
+      .then((s) => active && setSummary(s))
+      .catch(() => active && setSummary(null))
+    return () => {
+      active = false
+    }
+  }, [])
 
   return (
     <PortalPage
@@ -70,14 +82,19 @@ export function GovernanceAclPage() {
                 <div className="text-sm font-bold text-[#102033]">Denied-write probes — least privilege enforced</div>
                 <p className="m-0 text-[11px] font-semibold text-[#53687b]">
                   UC2 · Risk · OWASP LLM06 — agents physically cannot write beyond their job or self-approve.
+                  {summary
+                    ? ` Live: ${summary.access_blocked} access attempts blocked across ${summary.agents_tested} agents (${summary.write_denials} writes), ${summary.leaks} leaks.`
+                    : ''}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="rounded-full bg-[#feeceb] px-2.5 py-1 text-[0.68rem] font-bold text-[#a22828]">
-                {DENIED_WRITE_PROBES.length} access violations blocked
+                {summary ? summary.access_blocked : DENIED_WRITE_PROBES.length} access violations blocked
               </span>
-              <DemoTag />
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#e7f7ef] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0f6b4f]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" /> {summary ? 'Live' : '…'}
+              </span>
             </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
