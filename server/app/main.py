@@ -41,6 +41,7 @@ from .models import (
     AiDecisionLogEntry,
     AIAsset,
     AISystem,
+    FairnessResponse,
     BookingAppointment,
     BookingAppointmentRequest,
     BookingAvailabilityResponse,
@@ -85,6 +86,7 @@ from .servicenow import (
     ServiceNowError,
     SummaryNoteAppointmentNotFoundError,
     create_agent,
+    fetch_fairness_outcomes,
     create_clinician_appointment,
     create_doctor,
     create_guardrail_audit_log,
@@ -633,6 +635,20 @@ async def get_governance_privacy_controls(
     """UC1 Privacy — live PII-protection posture (ACLs, output guardrail, anonymized log)."""
     try:
         return await fetch_privacy_controls(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/fairness", response_model=FairnessResponse)
+async def get_governance_fairness(
+    settings: Settings = Depends(get_settings),
+) -> FairnessResponse:
+    """UC6 Fairness — live appointment-outcome distribution by gender, ethnicity, and age band.
+
+    Joins u_appointment + u_patient. Returns grouped aggregates only — no PII.
+    """
+    try:
+        return await fetch_fairness_outcomes(settings)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

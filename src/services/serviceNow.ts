@@ -999,3 +999,34 @@ export async function markNotificationRead(
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
 }
+
+// ---------------------------------------------------------------------------
+// UC6 Fairness — Non-Discriminatory Scheduling
+// ---------------------------------------------------------------------------
+
+export interface FairnessGroupItem {
+  group: string
+  pct: number
+  expected: number
+  count: number
+  skewed: boolean
+}
+
+export interface FairnessData {
+  by_gender: FairnessGroupItem[]
+  by_ethnicity: FairnessGroupItem[]
+  by_age: FairnessGroupItem[]
+  total_appointments: number
+  bias_risk_statements: string[]
+  fairness_metric_count: number
+  max_skew_pp: number
+  skew_alert: boolean
+}
+
+export async function fetchFairnessData(): Promise<FairnessData> {
+  const res = await fetch(`${API_BASE}/governance/fairness`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as FairnessData
+}

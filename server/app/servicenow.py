@@ -40,6 +40,8 @@ from .models import (
     PatientRegistrationResponse,
     PatientRegistrationSummary,
     PatientSearchResult,
+    FairnessGroupItem,
+    FairnessResponse,
     PiiFieldAclStatus,
     PrivacyControlsResponse,
     ScopedAgentAnswer,
@@ -3504,3 +3506,204 @@ async def _read_patient_as_agent(
         _raise_snow_error(response)
 
     return {}, meta
+
+
+# ---------------------------------------------------------------------------
+# UC6 Fairness — Non-Discriminatory Scheduling
+# ---------------------------------------------------------------------------
+
+# Population-proportion baselines for CareAtlas patient cohort (%).
+# These are the "expected" values the monitor alerts against.
+_EXPECTED_GENDER: dict[str, float] = {"female": 50.0, "male": 48.0, "other": 2.0}
+_EXPECTED_ETHNICITY: dict[str, float] = {
+    "asian": 23.0,
+    "asian_british": 23.0,
+    "black": 21.0,
+    "black_british": 21.0,
+    "black_african": 21.0,
+    "mixed": 23.0,
+    "white": 28.0,
+    "white_british": 28.0,
+    "other": 5.0,
+    "prefer_not_to_say": 0.0,
+    "unknown": 0.0,
+}
+_EXPECTED_AGE: dict[str, float] = {
+    "18–34": 30.0,
+    "35–54": 35.0,
+    "55–74": 25.0,
+    "75+": 10.0,
+}
+
+_SKEW_THRESHOLD_PP = 5.0  # percentage-point deviation that triggers alert
+
+
+def _age_band(dob: str) -> str:
+    """Map an ISO date-of-birth string to an age-band label."""
+    from datetime import date as _date
+
+    try:
+        birth = _date.fromisoformat(dob)
+    except (ValueError, TypeError):
+        return "unknown"
+    today = _date.today()
+    age = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+    if age < 18:
+        return "< 18"
+    if age <= 34:
+        return "18–34"
+    if age <= 54:
+        return "35–54"
+    if age <= 74:
+        return "55–74"
+    return "75+"
+
+
+def _build_fairness_groups(
+    counts: dict[str, int],
+    total: int,
+    expected: dict[str, float],
+) -> list[FairnessGroupItem]:
+    """Turn raw group counts into FairnessGroupItem list, sorted by group name."""
+    items: list[FairnessGroupItem] = []
+    for group, count in sorted(counts.items()):
+        pct = round(count / total * 100, 1) if total else 0.0
+        exp = expected.get(group, 0.0)
+        items.append(
+            FairnessGroupItem(
+                group=group,
+                pct=pct,
+                expected=exp,
+                count=count,
+                skewed=abs(pct - exp) >= _SKEW_THRESHOLD_PP,
+            )
+        )
+    return items
+
+
+async def fetch_fairness_outcomes(settings: Settings) -> FairnessResponse:
+    """UC6 — join u_appointment + u_patient to compute outcome distribution by demographic.
+
+    Returns grouped aggregates only — no PII, no individual-level records.
+    The 'priority_score' proxy is u_triage_priority mapped to a 1–5 integer;
+    we count appointments where priority <= 2 (urgent/high) per group to measure
+    whether protected cohorts receive equivalent urgent-slot access.
+    """
+    PRIORITY_MAP = {"critical": 1, "urgent": 2, "high": 3, "routine": 4, "low": 5}
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        auth = (settings.snow_username, settings.snow_password)
+        base = settings.snow_base_url
+
+        # 1. Pull all appointments (limit 500 — 90 exist today).
+        appt_resp = await client.get(
+            f"{base}/api/now/table/u_appointment",
+            params={
+                "sysparm_fields": "u_patient,u_triage_priority,u_status",
+                "sysparm_limit": "500",
+                "sysparm_query": "u_statusNOT INcancelled",
+            },
+            headers={"Accept": "application/json"},
+            auth=auth,
+        )
+        if not appt_resp.is_success:
+            _raise_snow_error(appt_resp)
+        appointments = appt_resp.json().get("result", [])
+
+        # Collect unique patient sys_ids referenced by appointments.
+        patient_ids: set[str] = set()
+        for appt in appointments:
+            pid = _field_value(appt.get("u_patient"))
+            if pid:
+                patient_ids.add(pid)
+
+        if not patient_ids:
+            return FairnessResponse()
+
+        # 2. Pull demographics for those patients in one query.
+        id_filter = "^ORsys_id=".join(sorted(patient_ids))
+        pat_resp = await client.get(
+            f"{base}/api/now/table/u_patient",
+            params={
+                "sysparm_query": f"sys_id={id_filter}",
+                "sysparm_fields": "sys_id,u_gender,u_ethnicity,u_date_of_birth",
+                "sysparm_limit": str(len(patient_ids) + 10),
+            },
+            headers={"Accept": "application/json"},
+            auth=auth,
+        )
+        patients: dict[str, dict[str, str]] = {}
+        if pat_resp.is_success:
+            for p in pat_resp.json().get("result", []):
+                patients[p["sys_id"]] = p
+
+        # 3. Aggregate.
+        gender_counts: dict[str, int] = {}
+        ethnicity_counts: dict[str, int] = {}
+        age_counts: dict[str, int] = {}
+
+        for appt in appointments:
+            pid = _field_value(appt.get("u_patient"))
+            pat = patients.get(pid, {})
+
+            gender = (pat.get("u_gender") or "unknown").lower().strip() or "unknown"
+            ethnicity = (pat.get("u_ethnicity") or "unknown").lower().strip() or "unknown"
+            dob = pat.get("u_date_of_birth", "")
+            age = _age_band(dob)
+
+            gender_counts[gender] = gender_counts.get(gender, 0) + 1
+            ethnicity_counts[ethnicity] = ethnicity_counts.get(ethnicity, 0) + 1
+            age_counts[age] = age_counts.get(age, 0) + 1
+
+        total = len(appointments)
+
+        by_gender = _build_fairness_groups(gender_counts, total, _EXPECTED_GENDER)
+        by_ethnicity = _build_fairness_groups(ethnicity_counts, total, _EXPECTED_ETHNICITY)
+        by_age = _build_fairness_groups(age_counts, total, _EXPECTED_AGE)
+
+        max_skew = max(
+            (abs(g.pct - g.expected) for g in by_gender + by_ethnicity + by_age),
+            default=0.0,
+        )
+
+        # 4. Fetch bias risk-statement names (2 expected) + fairness metric count.
+        risk_resp = await client.get(
+            f"{base}/api/now/table/sn_risk_definition",
+            params={
+                "sysparm_query": "nameLIKEbias^ORnameLIKEdiscrim",
+                "sysparm_fields": "name",
+                "sysparm_limit": "10",
+            },
+            headers={"Accept": "application/json"},
+            auth=auth,
+        )
+        bias_names: list[str] = []
+        if risk_resp.is_success:
+            bias_names = [
+                _field_value(r.get("name"))
+                for r in risk_resp.json().get("result", [])
+                if r.get("name")
+            ]
+
+        metric_resp = await client.get(
+            f"{base}/api/now/stats/sn_grc_metric_m2m_definition_risk_statement",
+            params={"sysparm_count": "true"},
+            headers={"Accept": "application/json"},
+            auth=auth,
+        )
+        metric_count = 0
+        if metric_resp.is_success:
+            metric_count = int(
+                metric_resp.json().get("result", {}).get("stats", {}).get("count", 0)
+            )
+
+        return FairnessResponse(
+            by_gender=by_gender,
+            by_ethnicity=by_ethnicity,
+            by_age=by_age,
+            total_appointments=total,
+            bias_risk_statements=bias_names,
+            fairness_metric_count=metric_count,
+            max_skew_pp=round(max_skew, 1),
+            skew_alert=max_skew >= _SKEW_THRESHOLD_PP,
+        )

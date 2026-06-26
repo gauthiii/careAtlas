@@ -462,6 +462,29 @@ class PrivacyControlsResponse(BaseModel):
     anonymized_rows: int = 0
 
 
+class FairnessGroupItem(BaseModel):
+    """One demographic group's appointment-outcome allocation (no PII — grouped aggregates)."""
+
+    group: str
+    pct: float
+    expected: float
+    count: int
+    skewed: bool
+
+
+class FairnessResponse(BaseModel):
+    """UC6 Fairness — live outcome distribution by demographic group."""
+
+    by_gender: list[FairnessGroupItem] = []
+    by_ethnicity: list[FairnessGroupItem] = []
+    by_age: list[FairnessGroupItem] = []
+    total_appointments: int = 0
+    bias_risk_statements: list[str] = []
+    fairness_metric_count: int = 0
+    max_skew_pp: float = 0.0
+    skew_alert: bool = False
+
+
 class ScopedFieldValue(BaseModel):
     label: str
     value: str = ""
