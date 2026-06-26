@@ -51,6 +51,9 @@ from .models import (
     ApprovalLogEntry,
     ApprovalRecordResponse,
     ApprovalSubmitRequest,
+    GuardrailScanRequest,
+    GuardrailScanResponse,
+    SecurityKpisResponse,
     ScopedAgentAnswer,
     ScopedAgentAskRequest,
     NotificationListResponse,
@@ -119,6 +122,8 @@ from .servicenow import (
     update_registration_status,
     update_summary_note,
     validate_user,
+    guardrail_scan,
+    fetch_security_kpis,
 )
 
 logging.basicConfig(
@@ -774,6 +779,27 @@ async def get_acl_summary(
         return await summarize_acl_posture(settings)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.post("/governance/guardrail/scan", response_model=GuardrailScanResponse)
+async def post_guardrail_scan(
+    body: GuardrailScanRequest,
+    settings: Settings = Depends(get_settings),
+) -> GuardrailScanResponse:
+    """UC5 Security — scan text for prompt-injection patterns.
+
+    Blocked inputs open a live AI Case on the ServiceNow instance
+    (sn_ai_case_mgmt_ai_case, case_type=adversarial_attacks).
+    """
+    return await guardrail_scan(settings, body.text)
+
+
+@api.get("/governance/security-kpis", response_model=SecurityKpisResponse)
+async def get_security_kpis(
+    settings: Settings = Depends(get_settings),
+) -> SecurityKpisResponse:
+    """UC5 Security — live KPIs: open AI Cases, active injection filters, output patterns, automation rules."""
+    return await fetch_security_kpis(settings)
 
 
 async def _read_json_body(request: Request) -> Any:

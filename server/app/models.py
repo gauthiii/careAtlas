@@ -702,3 +702,28 @@ class ExecuteAgentResponse(BaseModel):
     state: str | None = None
     status: str = "completed"
     error: str | None = None
+
+
+class GuardrailScanRequest(BaseModel):
+    text: str
+
+
+class MatchedPattern(BaseModel):
+    name: str
+    surface: str  # "input" | "output"
+
+
+class GuardrailScanResponse(BaseModel):
+    verdict: str  # "blocked" | "flagged" | "clean"
+    matched_patterns: list[MatchedPattern]
+    action: str
+    ai_case_number: str | None = None
+    ai_case_sys_id: str | None = None
+
+
+class SecurityKpisResponse(BaseModel):
+    ai_cases_open: int
+    active_injection_filters: int
+    injection_output_patterns: int
+    automation_rules_active: int
+    recent_cases: list[dict]

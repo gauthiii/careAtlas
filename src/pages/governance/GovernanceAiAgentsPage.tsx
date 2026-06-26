@@ -42,6 +42,7 @@ import {
   fetchAgentExecution,
   fetchManagedAIAssets,
   fetchUnmanagedAIAssets,
+  scanGuardrailApi,
   type ExecuteAgentResponse,
   type SnowAIAsset,
   type SnowAISystem,
@@ -903,9 +904,36 @@ function AgentChatDrawer({ agent, session, onClose, onSessionChange }: {
     const text = input.trim()
     const now = new Date().toISOString()
     const userMsg: ChatMessage = { id: newId(), role: 'user', text, timestamp: now }
+    setInput('')
+
+    // UC5 — Prompt-Injection Defense (OWASP LLM01).
+    const scanPendingId = newId()
+    update({ ...active, messages: [...active.messages, userMsg, { id: scanPendingId, role: 'pending', text: 'Scanning for injection patterns…', timestamp: now }], pending: true })
+
+    try {
+      const scan = await scanGuardrailApi(text)
+      if (scan.verdict === 'blocked') {
+        const caseRef = scan.ai_case_number ? ` (AI Case ${scan.ai_case_number} opened in Control Tower)` : ''
+        update({
+          ...active,
+          messages: [
+            ...active.messages,
+            userMsg,
+            { id: scanPendingId, role: 'error', text: `⚠️ Prompt Injection Detected — this prompt has been flagged and blocked. It will not be processed by any agent.${caseRef}`, timestamp: new Date().toISOString() },
+          ],
+          pending: false,
+        })
+        return
+      }
+      // Clean — remove scan bubble, continue to agent
+      update({ ...active, messages: [...active.messages, userMsg], pending: false })
+    } catch {
+      // Scan unreachable — remove bubble, continue
+      update({ ...active, messages: [...active.messages, userMsg], pending: false })
+    }
+
     const pendingMsg: ChatMessage = { id: newId(), role: 'pending', text: 'Waiting for ServiceNow callback...', timestamp: now }
     const optimistic: ChatSession = { ...active, messages: [...active.messages, userMsg, pendingMsg], pending: true }
-    setInput('')
     update(optimistic)
 
     try {

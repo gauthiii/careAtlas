@@ -1030,3 +1030,52 @@ export async function fetchFairnessData(): Promise<FairnessData> {
   if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
   return (await res.json()) as FairnessData
 }
+
+// ---------------------------------------------------------------------------
+// UC5 Security — Prompt-Injection Defense + Output-Pattern Detection
+// ---------------------------------------------------------------------------
+
+export interface MatchedPattern {
+  name: string
+  surface: 'input' | 'output'
+}
+
+export interface GuardrailScanResult {
+  verdict: 'blocked' | 'flagged' | 'clean'
+  matched_patterns: MatchedPattern[]
+  action: string
+  ai_case_number: string | null
+  ai_case_sys_id: string | null
+}
+
+export interface SecurityKpis {
+  ai_cases_open: number
+  active_injection_filters: number
+  injection_output_patterns: number
+  automation_rules_active: number
+  recent_cases: Array<{
+    number: string
+    short_description: string
+    created_on: string
+    priority: string
+    state: string
+  }>
+}
+
+export async function scanGuardrailApi(text: string): Promise<GuardrailScanResult> {
+  const res = await fetch(`${API_BASE}/governance/guardrail/scan`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as GuardrailScanResult
+}
+
+export async function fetchSecurityKpis(): Promise<SecurityKpis> {
+  const res = await fetch(`${API_BASE}/governance/security-kpis`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as SecurityKpis
+}

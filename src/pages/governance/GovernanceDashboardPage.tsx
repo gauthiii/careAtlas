@@ -20,7 +20,7 @@ import {
 } from '../../components/portal/PortalShell'
 import { governanceDisplayName, useGovernanceAuth } from '../../contexts/GovernanceAuthContext'
 import { useUnmanagedAISystems } from '../../hooks/useUnmanagedAISystems'
-import { fetchAiDecisionLog, fetchFairnessData, type AiDecisionLogEntry, type FairnessData, type FairnessGroupItem } from '../../services/serviceNow'
+import { fetchAiDecisionLog, fetchFairnessData, fetchSecurityKpis, type AiDecisionLogEntry, type FairnessData, type FairnessGroupItem, type SecurityKpis } from '../../services/serviceNow'
 import { PrivacyControlsPanel } from '../../components/governance/PrivacyControlsPanel'
 import { RegulatoryClassificationBadge } from '../../components/governance/RegulatoryClassificationBadge'
 import { DemoTag } from '../../components/governance/DemoTag'
@@ -52,6 +52,7 @@ export function GovernanceDashboardPage() {
   const [logError, setLogError] = useState<string | null>(null)
   const [logRefreshKey, setLogRefreshKey] = useState(0)
   const [fairness, setFairness] = useState<FairnessData | null>(null)
+  const [securityKpis, setSecurityKpis] = useState<SecurityKpis | null>(null)
 
   useEffect(() => {
     let active = true
@@ -76,6 +77,9 @@ export function GovernanceDashboardPage() {
     fetchFairnessData()
       .then(setFairness)
       .catch(() => {/* silently keep null — fallback rendering handles it */})
+    fetchSecurityKpis()
+      .then(setSecurityKpis)
+      .catch(() => {/* silently keep null */})
   }, [logRefreshKey])
 
   function handleRefresh() {
@@ -151,11 +155,13 @@ export function GovernanceDashboardPage() {
           </div>
 
           <div className="mt-2 text-2xl font-bold">
-            4
+            {securityKpis != null ? securityKpis.ai_cases_open : '—'}
           </div>
 
           <div className="text-sm font-semibold text-amber-600">
-            2 blocked • 2 flagged today
+            {securityKpis != null
+              ? `${securityKpis.active_injection_filters} filters · ${securityKpis.injection_output_patterns} patterns`
+              : 'Loading…'}
           </div>
         </div>
 
@@ -331,52 +337,58 @@ export function GovernanceDashboardPage() {
             title="Prompt Injection Alerts"
             icon={<ShieldAlert size={18} />}
           >
-            <div className="mb-3 flex justify-end">
-              <DemoTag />
-            </div>
-             <table className="w-full border-separate border-spacing-y-3 text-sm text-left">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Session</th>
-                  <th>Agent</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
+            {securityKpis == null ? (
+              <div className="py-4 text-center text-sm text-[#53687b]">Loading…</div>
+            ) : (
+              <>
+                <div className="mb-3 grid grid-cols-3 gap-3">
+                  <div className="rounded-lg border border-[#d7e5ec] bg-[#f4f8fb] p-3 text-center">
+                    <div className="text-xl font-bold text-[#a22828]">{securityKpis.ai_cases_open}</div>
+                    <div className="text-[10px] font-semibold uppercase text-[#53687b]">AI Cases open</div>
+                  </div>
+                  <div className="rounded-lg border border-[#d7e5ec] bg-[#f4f8fb] p-3 text-center">
+                    <div className="text-xl font-bold text-[#0f6b4f]">{securityKpis.active_injection_filters}</div>
+                    <div className="text-[10px] font-semibold uppercase text-[#53687b]">Active filters</div>
+                  </div>
+                  <div className="rounded-lg border border-[#d7e5ec] bg-[#f4f8fb] p-3 text-center">
+                    <div className="text-xl font-bold text-[#143A57]">{securityKpis.injection_output_patterns}</div>
+                    <div className="text-[10px] font-semibold uppercase text-[#53687b]">Output patterns</div>
+                  </div>
+                </div>
 
-              <tbody>
-                <tr>
-                  <td>09:14</td>
-                  <td>S-9130 • 98%</td>
-                  <td>Scheduling Ranker</td>
-                  <td>
-                    <Badge danger>Blocked</Badge>
-                  </td>
-                </tr>
+                {securityKpis.recent_cases.length > 0 && (
+                  <table className="w-full border-separate border-spacing-y-2 text-sm text-left">
+                    <thead>
+                      <tr>
+                        <th className="text-xs font-semibold text-[#53687b]">Case #</th>
+                        <th className="text-xs font-semibold text-[#53687b]">Description</th>
+                        <th className="text-xs font-semibold text-[#53687b]">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {securityKpis.recent_cases.map((c) => (
+                        <tr key={c.number}>
+                          <td className="font-mono text-xs text-[#143A57]">{c.number}</td>
+                          <td className="max-w-[200px] truncate text-xs text-[#40566b]">{c.short_description}</td>
+                          <td>
+                            {c.priority === '1' ? (
+                              <Badge danger>Blocked</Badge>
+                            ) : (
+                              <Badge warning>Flagged</Badge>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
 
-                <tr>
-                  <td>08:52</td>
-                  <td>S-9189 • 95%</td>
-                  <td>Identity Verifier</td>
-                  <td>
-                    <Badge warning>Flagged</Badge>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div className="mt-6">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide">
-                Today's injection pattern
-              </div>
-
-              <div className="flex gap-1">
-                <div className="h-8 w-28 bg-red-300" />
-                <div className="h-8 w-24 bg-red-200" />
-                <div className="h-8 w-24 bg-orange-100" />
-                <div className="h-8 flex-1 bg-green-100" />
-              </div>
-            </div>
+                <div className="mt-3 text-[10px] text-[#6b7c8f]">
+                  Live from <span className="font-mono">sn_ai_case_mgmt_ai_case</span> · case_type=adversarial_attacks ·{' '}
+                  <span className="font-mono">sn_ai_governance_automation_rule</span> active
+                </div>
+              </>
+            )}
           </PortalPanel>
         </div>
 

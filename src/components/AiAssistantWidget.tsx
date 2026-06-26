@@ -1,6 +1,6 @@
 import { FormEvent, useRef, useState } from 'react'
-import { LoaderCircle, Send, Sparkles, X } from 'lucide-react'
-import { executeAgent, fetchAgentExecution, type ExecuteAgentResponse } from '../services/serviceNow'
+import { LoaderCircle, Send, ShieldAlert, Sparkles, X } from 'lucide-react'
+import { executeAgent, fetchAgentExecution, scanGuardrailApi, type ExecuteAgentResponse } from '../services/serviceNow'
 import { provisionSampleDoctor, type ProvisionSampleDoctorResponse } from '../services/awsAuth'
 import { askScopedAgent, decideApproval, flagLlm02Event } from '../services/serviceNow'
 import { isHighImpactIntent } from '../data/useCaseDemoData'
@@ -181,6 +181,40 @@ export function AiAssistantWidget({
     }
 
     setInput('')
+
+    // UC5 — Prompt-Injection Defense (OWASP LLM01).
+    // Scans every message universally before it reaches any agent or model.
+    // Blocked inputs open a live AI Case on ServiceNow and never proceed further.
+    {
+      const scanPendingId = newId()
+      setMessages((current) => [
+        ...current,
+        userMessage,
+        { id: scanPendingId, role: 'pending', content: 'Scanning for injection patterns…' },
+      ])
+      setPending(true)
+      try {
+        const scan = await scanGuardrailApi(trimmedInput)
+        if (scan.verdict === 'blocked') {
+          const caseRef = scan.ai_case_number ? ` (AI Case ${scan.ai_case_number} opened in Control Tower)` : ''
+          setMessages((current) =>
+            replaceMessage(current, scanPendingId, {
+              id: scanPendingId,
+              role: 'error',
+              content: `⚠️ Prompt Injection Detected — this prompt has been flagged and blocked. It will not be processed by any agent.${caseRef}`,
+            }),
+          )
+          setPending(false)
+          return
+        }
+        // Clean or flagged (output-only) — remove the scan pending bubble and continue normally.
+        setMessages((current) => current.filter((m) => m.id !== scanPendingId))
+      } catch {
+        // If the scan endpoint is unreachable, remove the pending bubble and continue.
+        setMessages((current) => current.filter((m) => m.id !== scanPendingId))
+      }
+      setPending(false)
+    }
 
     // UC2 (portal continuation) — scoped-identity agent: read patient data live AS the
     // page's svc-* ACL identity, so PII / out-of-scope fields are stripped by ServiceNow.

@@ -5,6 +5,7 @@ user-credential validation (`sys_user`). This is the server-side home of the
 logic that used to live in the frontend `serviceNow.ts` plus the Vite proxy.
 """
 
+import asyncio
 import logging
 import time
 from dataclasses import dataclass
@@ -3707,3 +3708,238 @@ async def fetch_fairness_outcomes(settings: Settings) -> FairnessResponse:
             max_skew_pp=round(max_skew, 1),
             skew_alert=max_skew >= _SKEW_THRESHOLD_PP,
         )
+
+
+# ---------------------------------------------------------------------------
+# UC5 Security — Prompt-Injection Defense + Output-Pattern Detection
+# OWASP LLM01 guardrail scan + AI Case creation + live KPI fetch
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+_INPUT_INJECTION_PATTERNS: list[tuple[str, _re.Pattern]] = [
+    (
+        "Instruction-override",
+        _re.compile(
+            r"ignore (your|previous|all).*instructions|disregard (the|your) (rules|policy)",
+            _re.IGNORECASE,
+        ),
+    ),
+    (
+        "Privilege-escalation",
+        _re.compile(
+            r"mark me urgent|set.*priority.*urgent|make me (an )?admin",
+            _re.IGNORECASE,
+        ),
+    ),
+    (
+        "Data-exfiltration",
+        _re.compile(
+            r"dump (the )?(full )?record|exfiltrate|send.*all.*(records|data)|reveal.*(patient|pii)",
+            _re.IGNORECASE,
+        ),
+    ),
+]
+
+_OUTPUT_INJECTION_PATTERNS: list[tuple[str, _re.Pattern]] = [
+    ("SQL-query-injection", _re.compile(r"union\s+select|drop\s+table|or\s+1=1|;\s*--", _re.IGNORECASE)),
+    ("Script-Tag-injection", _re.compile(r"<script[\s>]", _re.IGNORECASE)),
+    ("Html-Tag-injection", _re.compile(r"<(img|iframe|svg)[\s>]", _re.IGNORECASE)),
+    ("Eval-Function-Audit", _re.compile(r"\beval\s*\(", _re.IGNORECASE)),
+    ("Terminal-RCE", _re.compile(r"rm\s+-rf|curl\s+http|wget\s+http|bash\s+-c|/bin/sh", _re.IGNORECASE)),
+]
+
+# sys_id of the CareAtlas Prompt-Injection Guard filter created on the instance.
+_INJECTION_FILTER_SYS_ID = "198267883bfd4b1076f13b64c3e45a75"
+# case_type sys_id for "adversarial_attacks"
+_ADVERSARIAL_CASE_TYPE = "88a5a11d7befd21005de3782f38cb63a"
+
+
+async def guardrail_scan(
+    settings: Settings, text: str
+) -> "GuardrailScanResponse":
+    """UC5 — scan *text* for prompt-injection (input) and output patterns.
+
+    If any input-injection pattern matches the request is blocked and an AI Case
+    is opened on the instance.  Output-pattern hits are flagged but not blocked.
+    """
+    from .models import GuardrailScanResponse, MatchedPattern
+
+    matched: list[MatchedPattern] = []
+
+    for name, pattern in _INPUT_INJECTION_PATTERNS:
+        if pattern.search(text):
+            matched.append(MatchedPattern(name=name, surface="input"))
+
+    for name, pattern in _OUTPUT_INJECTION_PATTERNS:
+        if pattern.search(text):
+            matched.append(MatchedPattern(name=name, surface="output"))
+
+    input_hits = [m for m in matched if m.surface == "input"]
+    output_hits = [m for m in matched if m.surface == "output"]
+
+    if input_hits:
+        verdict = "blocked"
+        action = (
+            "Input blocked before reaching the model. "
+            "CareAtlas Prompt-Injection Guard (sys_gen_ai_filter) triggered. "
+            "AI Case opened in Control Tower."
+        )
+        ai_case_number, ai_case_sys_id = await _open_ai_case(settings, text, input_hits)
+    elif output_hits:
+        verdict = "flagged"
+        action = (
+            "Output matches a known-bad pattern. "
+            "Response suppressed and flagged for review. "
+            "No AI Case opened — output-only hit."
+        )
+        ai_case_number, ai_case_sys_id = None, None
+    else:
+        verdict = "clean"
+        action = "No injection patterns detected. Input and output cleared by guardrail."
+        ai_case_number, ai_case_sys_id = None, None
+
+    return GuardrailScanResponse(
+        verdict=verdict,
+        matched_patterns=matched,
+        action=action,
+        ai_case_number=ai_case_number,
+        ai_case_sys_id=ai_case_sys_id,
+    )
+
+
+async def _open_ai_case(
+    settings: Settings,
+    text: str,
+    hits: list,
+) -> tuple[str | None, str | None]:
+    """Create an adversarial-attacks AI Case on the instance and return (number, sys_id)."""
+    pattern_names = ", ".join(h.name for h in hits)
+    truncated = text[:200] + ("…" if len(text) > 200 else "")
+    payload = {
+        "short_description": f"[CareAtlas] Prompt injection blocked — {hits[0].name} detected",
+        "description": (
+            f"Guardrail trip on CareAtlas agent (input path).\n"
+            f"Matched patterns: {pattern_names}.\n"
+            f"Payload (truncated): {truncated}\n"
+            f"Filter: CareAtlas Prompt-Injection Guard (sys_gen_ai_filter · {_INJECTION_FILTER_SYS_ID}).\n"
+            f"Automation rule: CareAtlas Guardrail Trip → AI Case.\n"
+            f"OWASP LLM01."
+        ),
+        "case_type": _ADVERSARIAL_CASE_TYPE,
+        "impact": "1",
+        "urgency": "1",
+        "priority": "1",
+        "source": "manual",
+        "reporting_status": "to_be_determined",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"{settings.snow_base_url}/api/now/table/sn_ai_case_mgmt_ai_case",
+                json=payload,
+                headers={"Accept": "application/json"},
+                auth=(settings.snow_username, settings.snow_password),
+            )
+        if resp.is_success:
+            r = resp.json().get("result", {})
+            return r.get("number"), r.get("sys_id")
+    except Exception:
+        logger.exception("Failed to open AI Case for guardrail trip")
+    return None, None
+
+
+async def fetch_security_kpis(settings: Settings) -> "SecurityKpisResponse":
+    """UC5 — fetch live security KPIs: open AI Cases, active filters, output patterns, automation rules."""
+    from .models import SecurityKpisResponse
+
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        cases_resp, filters_resp, patterns_resp, rules_resp, recent_resp = await asyncio.gather(
+            client.get(
+                f"{base}/api/now/stats/sn_ai_case_mgmt_ai_case",
+                params={"sysparm_query": "case_type=88a5a11d7befd21005de3782f38cb63a", "sysparm_count": "true"},
+                headers={"Accept": "application/json"},
+                auth=auth,
+            ),
+            client.get(
+                f"{base}/api/now/table/sys_gen_ai_filter",
+                params={
+                    "sysparm_query": "active=true^filter_nameLIKEinjection^ORactive=true^filter_nameLIKECareAtlas",
+                    "sysparm_fields": "filter_name,active",
+                    "sysparm_limit": "50",
+                },
+                headers={"Accept": "application/json"},
+                auth=auth,
+            ),
+            client.get(
+                f"{base}/api/now/table/sn_data_discovery_data_pattern",
+                params={
+                    "sysparm_query": "nameLIKEinjection^ORnameLIKERCE^ORnameLIKEeval^ORnameLIKEscript",
+                    "sysparm_fields": "name",
+                    "sysparm_limit": "20",
+                },
+                headers={"Accept": "application/json"},
+                auth=auth,
+            ),
+            client.get(
+                f"{base}/api/now/table/sn_ai_governance_automation_rule",
+                params={
+                    "sysparm_query": "active=true^nameLIKECareAtlas",
+                    "sysparm_fields": "name,active",
+                    "sysparm_limit": "20",
+                },
+                headers={"Accept": "application/json"},
+                auth=auth,
+            ),
+            client.get(
+                f"{base}/api/now/table/sn_ai_case_mgmt_ai_case",
+                params={
+                    "sysparm_query": "case_type=88a5a11d7befd21005de3782f38cb63a^ORDERBYDESCsys_created_on",
+                    "sysparm_fields": "number,short_description,sys_created_on,priority,state",
+                    "sysparm_limit": "5",
+                },
+                headers={"Accept": "application/json"},
+                auth=auth,
+            ),
+        )
+
+    ai_cases_open = 0
+    if cases_resp.is_success:
+        try:
+            ai_cases_open = int(cases_resp.json()["result"]["stats"]["count"])
+        except (KeyError, TypeError, ValueError):
+            pass
+
+    active_injection_filters = 0
+    if filters_resp.is_success:
+        active_injection_filters = len(filters_resp.json().get("result", []))
+
+    injection_output_patterns = 0
+    if patterns_resp.is_success:
+        injection_output_patterns = len(patterns_resp.json().get("result", []))
+
+    automation_rules_active = 0
+    if rules_resp.is_success:
+        automation_rules_active = len(rules_resp.json().get("result", []))
+
+    recent_cases: list[dict] = []
+    if recent_resp.is_success:
+        for r in recent_resp.json().get("result", []):
+            recent_cases.append({
+                "number": _field_value(r.get("number")),
+                "short_description": _field_value(r.get("short_description")),
+                "created_on": _field_value(r.get("sys_created_on")),
+                "priority": _field_value(r.get("priority")),
+                "state": _field_value(r.get("state")),
+            })
+
+    return SecurityKpisResponse(
+        ai_cases_open=ai_cases_open,
+        active_injection_filters=active_injection_filters,
+        injection_output_patterns=injection_output_patterns,
+        automation_rules_active=automation_rules_active,
+        recent_cases=recent_cases,
+    )
