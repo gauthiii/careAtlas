@@ -501,6 +501,16 @@ class ApprovalDecisionRequest(BaseModel):
     approver: str = ""
 
 
+class ApprovalLogEntry(BaseModel):
+    """A persisted UC2 human-approval-gate decision from u_ai_action_audit_log."""
+
+    sys_id: str = ""
+    timestamp: str = ""
+    decision: Literal["approved", "denied", "unknown"] = "unknown"
+    detail: str = ""
+    created_by: str = ""
+
+
 class ApprovalRecordResponse(BaseModel):
     request_id: str
     intent: str

@@ -80,6 +80,23 @@ export async function fetchAclSummary(): Promise<AclSummary> {
   return (await res.json()) as AclSummary
 }
 
+export interface ApprovalLogEntry {
+  sys_id: string
+  timestamp: string
+  decision: 'approved' | 'denied' | 'unknown'
+  detail: string
+  created_by: string
+}
+
+export async function fetchApprovalLog(limit = 50): Promise<ApprovalLogEntry[]> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  const res = await fetch(`${API_BASE}/governance/approval/log?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as ApprovalLogEntry[]
+}
+
 export interface ApprovalRecord {
   request_id: string
   intent: string

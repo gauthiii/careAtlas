@@ -23,6 +23,7 @@ from .models import (
     AclTestCheck,
     AclTestResponse,
     AgentIdentity,
+    ApprovalLogEntry,
     AiDecisionLogEntry,
     PatientAccessComparison,
     PatientFieldAccess,
@@ -940,6 +941,63 @@ async def record_approval_decision(
     body = response.json() if response.content else {}
     result = body.get("result") if isinstance(body, dict) else None
     return _map_audit_log(result) if isinstance(result, dict) else {}
+
+
+def _map_approval_log_entry(record: dict[str, Any]) -> ApprovalLogEntry:
+    # u_final_action is a restricted choice list that can blank our value, so the
+    # authoritative approved/denied signal is u_val_agent_auth (true = approved).
+    raw_action = _field_value(record.get("u_final_action")).lower()
+    if raw_action in ("approved", "denied"):
+        decision = raw_action
+    elif _truthy_snow(record.get("u_val_agent_auth")):
+        decision = "approved"
+    elif _field_value(record.get("u_val_agent_auth")):
+        decision = "denied"
+    else:
+        decision = "unknown"
+    return ApprovalLogEntry(
+        sys_id=_field_value(record.get("sys_id")),
+        timestamp=_field_best(record.get("sys_created_on")),
+        decision=decision,  # type: ignore[arg-type]
+        detail=_field_best(record.get("u_rejection_reason")),
+        created_by=_field_best(record.get("sys_created_by")),
+    )
+
+
+async def fetch_approval_log(
+    settings: Settings,
+    limit: int = 50,
+    http_client: httpx.AsyncClient | None = None,
+) -> list[ApprovalLogEntry]:
+    """Return UC2 human-approval-gate decisions (newest first) from the audit table."""
+    params = {
+        "sysparm_query": "u_agent_identity=human_approval_gate^ORDERBYDESCsys_created_on",
+        "sysparm_fields": (
+            "sys_id,sys_created_on,u_final_action,u_rejection_reason,"
+            "u_val_agent_auth,sys_created_by"
+        ),
+        "sysparm_display_value": "all",
+        "sysparm_limit": str(max(1, min(limit, 200))),
+    }
+
+    async def run(client: httpx.AsyncClient) -> httpx.Response:
+        return await client.get(
+            f"{settings.snow_base_url}/api/now/table/u_ai_action_audit_log",
+            params=params,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+
+    if http_client is not None:
+        response = await run(http_client)
+    else:
+        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+            response = await run(client)
+
+    if not response.is_success:
+        _raise_snow_error(response)
+    records = response.json().get("result", [])
+    return [_map_approval_log_entry(r) for r in records if isinstance(r, dict)]
 
 
 async def create_guardrail_audit_log(

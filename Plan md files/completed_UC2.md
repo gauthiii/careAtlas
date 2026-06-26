@@ -155,6 +155,7 @@ least-privilege posture (patient data fully out of scope).
 | `GET /api/acl/summary` | Live aggregate posture across all 9 agents (`access_blocked`, `write_denials`, `leaks`, `agents_passed`). |
 | `POST /api/governance/approval/submit` | Submit an agent intent; high-impact → `pending_approval`, else `auto_completed`. |
 | `POST /api/governance/approval/{id}/decision` | Governance officer approves/denies; writes the decision + approver to the ServiceNow audit log. |
+| `GET /api/governance/approval/log` | Live, persisted approval decisions (the `human_approval_gate` rows from `u_ai_action_audit_log`) — surfaced in the UI. |
 
 **How the write-deny probe stays safe:** it issues a `POST` (create) as the agent. A
 `401/403` ⇒ denied (pass). A `201` ⇒ excessive-agency leak — the created record is
@@ -169,6 +170,7 @@ returns `403`, so nothing is ever created.
 | `components/governance/ApprovalGateDemo.tsx` | **Rewired from a client-side mock to the live backend** — server classifies the intent, real approve/deny, "Live · ServiceNow" badge, audit confirmation. |
 | `pages/governance/GovernanceAclPage.tsx` | "Access violations blocked" KPI now reads `GET /acl/summary` (live) instead of static data; removed the Demo tag. |
 | `data/staffGovernanceData.ts` | Added the **4 security-ops agents** so the NHI inventory shows all 9, each testable. |
+| `components/governance/ApprovalLogPanel.tsx` *(new)* | Live **"Agent action & approval log"** panel on the ACL page — reads `GET /governance/approval/log` and shows every approved/denied high-impact decision (intent, approver, timestamp) from `u_ai_action_audit_log`. Makes the otherwise-invisible approval audit trail demonstrable in the UI. |
 
 ---
 

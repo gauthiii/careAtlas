@@ -47,6 +47,7 @@ from .models import (
     ExecuteAgentRequest,
     ExecuteAgentResponse,
     ApprovalDecisionRequest,
+    ApprovalLogEntry,
     ApprovalRecordResponse,
     ApprovalSubmitRequest,
     ScopedAgentAnswer,
@@ -95,6 +96,7 @@ from .servicenow import (
     fetch_agents,
     fetch_ai_decision_log,
     ask_scoped_agent,
+    fetch_approval_log,
     fetch_patient_access_comparison,
     fetch_privacy_controls,
     record_approval_decision,
@@ -668,6 +670,18 @@ async def post_scoped_agent_ask(
             patient_email=body.patient_email,
             patient_sys_id=body.patient_sys_id,
         )
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/approval/log", response_model=list[ApprovalLogEntry])
+async def get_approval_log(
+    limit: int = 50,
+    settings: Settings = Depends(get_settings),
+) -> list[ApprovalLogEntry]:
+    """UC2 Risk — persisted human-approval-gate decisions (approved/denied + approver)."""
+    try:
+        return await fetch_approval_log(settings, limit=limit)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
