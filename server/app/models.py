@@ -530,3 +530,24 @@ class ExecuteAgentResponse(BaseModel):
     state: str | None = None
     status: str = "completed"
     error: str | None = None
+
+class ConsentFlagsResponse(BaseModel):
+    flags: list[str] = []
+    consent_accepted: bool = False
+    flags_set: bool = False
+
+
+class ConsentFlagsRequest(BaseModel):
+    flags: list[str] = []
+
+
+class ConsentViolationEntry(BaseModel):
+    opened_at: str = ""
+    short_description: str = ""
+    priority: str = ""
+    state: str = ""
+
+
+class ConsentViolationsResponse(BaseModel):
+    count_30_days: int = 0
+    recent: list[ConsentViolationEntry] = []

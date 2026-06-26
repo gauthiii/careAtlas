@@ -2569,3 +2569,145 @@ async def validate_user(settings: Settings, username: str, password: str) -> boo
         _raise_snow_error(response)
 
     return len(response.json().get("result", [])) > 0
+
+# ── UC11 Consent flags ────────────────────────────────────────────────────────
+
+CONSENT_FLAGS_FIELDS = [
+    "sys_id",
+    "u_patient_id",
+    "u_consent_flags",
+    "u_consent_accepted",
+    "u_consent_accepted_on",
+    "u_username",
+    "u_email",
+]
+
+
+async def fetch_consent_flags(username: str, settings: Settings) -> dict:
+    """Read consent flags for a patient looked up by username or email."""
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        # Try username first
+        resp = await client.get(
+            f"{base}/api/now/table/u_patient",
+            auth=auth,
+            params={
+                "sysparm_query": f"u_username={username}",
+                "sysparm_fields": ",".join(CONSENT_FLAGS_FIELDS),
+                "sysparm_limit": 1,
+            },
+        )
+        results = resp.json().get("result", [])
+
+        # Fall back to email
+        if not results:
+            resp = await client.get(
+                f"{base}/api/now/table/u_patient",
+                auth=auth,
+                params={
+                    "sysparm_query": f"u_email={username}",
+                    "sysparm_fields": ",".join(CONSENT_FLAGS_FIELDS),
+                    "sysparm_limit": 1,
+                },
+            )
+            results = resp.json().get("result", [])
+
+        if not results:
+            return {"flags": [], "consent_accepted": False, "flags_set": False}
+
+        row = results[0]
+        raw = row.get("u_consent_flags", "") or ""
+        flags = [f.strip() for f in raw.split(",") if f.strip()]
+        return {
+            "flags": flags,
+            "consent_accepted": row.get("u_consent_accepted") == "true",
+            "flags_set": len(flags) > 0,
+        }
+
+
+async def update_consent_flags(
+    username: str, flags: list[str], settings: Settings
+) -> bool:
+    """Write consent flags for a patient looked up by username."""
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        resp = await client.get(
+            f"{base}/api/now/table/u_patient",
+            auth=auth,
+            params={
+                "sysparm_query": f"u_username={username}",
+                "sysparm_fields": "sys_id",
+                "sysparm_limit": 1,
+            },
+        )
+        results = resp.json().get("result", [])
+        if not results:
+            return False
+
+        sys_id = results[0]["sys_id"]
+        from datetime import datetime, timezone
+        payload = {
+            "u_consent_flags": ",".join(flags),
+            "u_consent_accepted": True,
+            "u_consent_accepted_on": datetime.now(timezone.utc).isoformat(),
+        }
+        patch = await client.patch(
+            f"{base}/api/now/table/u_patient/{sys_id}",
+            auth=auth,
+            json=payload,
+        )
+        patch.raise_for_status()
+        return True
+
+
+async def fetch_consent_violations(settings: Settings) -> dict:
+    """Fetch consent violation SecOps incidents for the governance dashboard."""
+    from datetime import datetime, timezone, timedelta
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+    thirty_days_ago = (
+        datetime.now(timezone.utc) - timedelta(days=30)
+    ).strftime("%Y-%m-%d %H:%M:%S")
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        count_resp = await client.get(
+            f"{base}/api/now/table/sn_si_incident",
+            auth=auth,
+            params={
+                "sysparm_query": (
+                    f"category=consent_purpose_violation"
+                    f"^opened_at>={thirty_days_ago}"
+                ),
+                "sysparm_fields": "sys_id",
+                "sysparm_limit": 1000,
+            },
+        )
+        count = len(count_resp.json().get("result", []))
+
+        recent_resp = await client.get(
+            f"{base}/api/now/table/sn_si_incident",
+            auth=auth,
+            params={
+                "sysparm_query": "category=consent_purpose_violation^ORDERBYDESCopened_at",
+                "sysparm_fields": "opened_at,short_description,priority,state",
+                "sysparm_limit": 20,
+            },
+        )
+        recent = recent_resp.json().get("result", [])
+
+        return {
+            "count_30_days": count,
+            "recent": [
+                {
+                    "opened_at": r.get("opened_at", ""),
+                    "short_description": r.get("short_description", ""),
+                    "priority": r.get("priority", ""),
+                    "state": r.get("state", ""),
+                }
+                for r in recent
+            ],
+        }
