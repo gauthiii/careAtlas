@@ -1362,6 +1362,12 @@ def _patient_registration_payload(registration: PatientRegistrationRequest) -> d
         "u_email_verified": "false",
         "u_profile_complete": str(_has_complete_patient_profile(registration)).lower(),
         "u_consent_accepted": str(registration.consent_accepted).lower(),
+        # Seed the four AI-feature consent purposes ON by default so a freshly
+        # registered patient's scoped agents (scheduling/triage/notes/reminders)
+        # work out of the box. The patient can withdraw any purpose in Profile →
+        # AI feature consent (which rewrites u_consent_flags). Without this the
+        # ConsentGate is fail-closed and every scoped agent would block.
+        "u_consent_flags": ",".join(DEFAULT_AI_CONSENT_FLAGS),
         "u_privacy_notice_version": "v1",
         "u_confidence_score": "100",
     }
@@ -3477,6 +3483,15 @@ _SCOPED_PII = (
 # verification is exempt (it is not a patient-toggleable AI purpose). Behaviour
 # is fail-closed: missing flag (or any read error) → blocked + incident logged.
 # ---------------------------------------------------------------------------
+# The four patient-toggleable AI consent purposes, seeded ON at registration so
+# scoped agents work out of the box (the patient can withdraw any in Profile).
+DEFAULT_AI_CONSENT_FLAGS: tuple[str, ...] = (
+    "scheduling",
+    "notes_summarisation",
+    "reminders",
+    "triage",
+)
+
 AGENT_CONSENT_PURPOSE: dict[str, str | None] = {
     "scheduling": "scheduling",
     "notes": "notes_summarisation",

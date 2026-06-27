@@ -19,6 +19,7 @@ HIGH_IMPACT_RULES: tuple[tuple[str, str], ...] = (
     ("approve registration", "Self-approving a patient registration"),
     ("approve the registration", "Self-approving a patient registration"),
     ("approve a registration", "Self-approving a patient registration"),
+    ("approve my registration", "Self-approving a patient registration"),
     ("write a clinical note", "Writing a clinical note"),
     ("write a note", "Writing a clinical note"),
     ("add a clinical note", "Writing a clinical note"),

@@ -787,15 +787,26 @@ function getAssistantAgentConfig(pathname: string, user: PatientAuthUser | null)
   }
 
   // Doctor portal — Patient Record page (route carries the patient id) + fixed routes.
-  const doctorAgent =
-    pathname.startsWith('/staff/patient/')
-      ? { key: 'identity', label: 'Identity Verification Agent', scope: 'verify patient identity', pageName: 'Patient Record' }
-      : DOCTOR_PAGE_AGENTS[pathname]
+  const isPatientRecord = pathname.startsWith('/staff/patient/')
+  const doctorAgent = isPatientRecord
+    ? { key: 'identity', label: 'Identity Verification Agent', scope: 'verify patient identity', pageName: 'Patient Record' }
+    : DOCTOR_PAGE_AGENTS[pathname]
   if (doctorAgent) {
+    // On the Patient Record page, bind the scoped read to the record on screen.
+    // The route's :id is a lookup value (name / email / patient id), so pass it as
+    // the resolver query — the backend matches it LIKE name/email/patient_id — so
+    // the assistant answers about the patient the clinician is viewing rather than
+    // a representative one. The "search" placeholder (no patient chosen yet) falls
+    // back to the representative patient.
+    let patientLookup: string | undefined
+    if (isPatientRecord) {
+      const raw = decodeURIComponent(pathname.split('/staff/patient/')[1]?.split('/')[0] || '').trim()
+      patientLookup = raw && raw.toLowerCase() !== 'search' ? raw : undefined
+    }
     return {
       agentSysId: BOOK_APPOINTMENT_AGENT_ID,
       pageName: doctorAgent.pageName,
-      identity: { key: doctorAgent.key, label: doctorAgent.label, scope: doctorAgent.scope },
+      identity: { key: doctorAgent.key, label: doctorAgent.label, scope: doctorAgent.scope, patientEmail: patientLookup },
     }
   }
 
