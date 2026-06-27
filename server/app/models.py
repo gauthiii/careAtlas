@@ -35,6 +35,39 @@ class AIAsset(BaseModel):
     risk_classification: str = ""
 
 
+class RegulatoryEvidenceCandidate(BaseModel):
+    sys_id: str = ""
+    name: str = ""
+    state: str = ""
+    risk_classification: str = ""
+    updated_on: str = ""
+    evidence_url: str = ""
+
+
+class RegulatoryEvidenceResponse(BaseModel):
+    query: str
+    target_sys_id: str = ""
+    target_name: str = ""
+    state: str = ""
+    risk_classification: str = ""
+    evidence_url: str = ""
+    candidates: list[RegulatoryEvidenceCandidate] = Field(default_factory=list)
+    assessment_tasks_count: int = 0
+    risk_assessment_results_count: int = 0
+    entity_maps_count: int = 0
+    post_assessment_actions_count: int = 0
+    fria_actions_active_count: int = 0
+    fria_actions_inactive_count: int = 0
+    has_ai_system_record: bool = False
+    has_completed_classification: bool = False
+    has_assessment_task: bool = False
+    has_risk_assessment_result: bool = False
+    has_entity_mapping: bool = False
+    has_post_assessment_actions: bool = False
+    fria_attached: bool = False
+    demo_ready: bool = False
+
+
 class ValidateRequest(BaseModel):
     username: str
     password: str

@@ -61,6 +61,7 @@ from .models import (
     PatientAccessComparison,
     PatientProfileResponse,
     PrivacyControlsResponse,
+    RegulatoryEvidenceResponse,
     AppointmentUpdateRequest,
     ClinicianAppointmentCreateRequest,
     DoctorAppointmentOption,
@@ -104,6 +105,7 @@ from .servicenow import (
     fetch_approval_log,
     fetch_patient_access_comparison,
     fetch_privacy_controls,
+    fetch_regulatory_evidence,
     record_approval_decision,
     fetch_appointment_option,
     fetch_doctor_appointment_options,
@@ -179,6 +181,17 @@ async def get_managed_ai_assets(settings: Settings = Depends(get_settings)) -> l
 async def get_unmanaged_ai_assets(settings: Settings = Depends(get_settings)) -> list[AIAsset]:
     try:
         return await fetch_unmanaged_ai_assets(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/regulation/evidence", response_model=RegulatoryEvidenceResponse)
+async def get_regulatory_evidence(
+    query: str = "Triage Appointment DG1",
+    settings: Settings = Depends(get_settings),
+) -> RegulatoryEvidenceResponse:
+    try:
+        return await fetch_regulatory_evidence(settings, query=query)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

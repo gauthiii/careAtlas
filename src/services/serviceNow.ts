@@ -31,6 +31,39 @@ export interface SnowAIAsset {
   risk_classification: string
 }
 
+export interface RegulatoryEvidenceCandidate {
+  sys_id: string
+  name: string
+  state: string
+  risk_classification: string
+  updated_on: string
+  evidence_url: string
+}
+
+export interface RegulatoryEvidence {
+  query: string
+  target_sys_id: string
+  target_name: string
+  state: string
+  risk_classification: string
+  evidence_url: string
+  candidates: RegulatoryEvidenceCandidate[]
+  assessment_tasks_count: number
+  risk_assessment_results_count: number
+  entity_maps_count: number
+  post_assessment_actions_count: number
+  fria_actions_active_count: number
+  fria_actions_inactive_count: number
+  has_ai_system_record: boolean
+  has_completed_classification: boolean
+  has_assessment_task: boolean
+  has_risk_assessment_result: boolean
+  has_entity_mapping: boolean
+  has_post_assessment_actions: boolean
+  fria_attached: boolean
+  demo_ready: boolean
+}
+
 export interface ExecuteAgentResponse {
   request_id: string
   output: string
@@ -490,6 +523,15 @@ export async function fetchUnmanagedAIAssets(): Promise<SnowAIAsset[]> {
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
   return (await res.json()) as SnowAIAsset[]
+}
+
+export async function fetchRegulatoryEvidence(query = 'Triage Appointment DG1'): Promise<RegulatoryEvidence> {
+  const params = new URLSearchParams({ query })
+  const res = await fetch(`${API_BASE}/governance/regulation/evidence?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as RegulatoryEvidence
 }
 
 export async function executeAgent(

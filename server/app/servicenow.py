@@ -45,6 +45,8 @@ from .models import (
     FairnessResponse,
     PiiFieldAclStatus,
     PrivacyControlsResponse,
+    RegulatoryEvidenceCandidate,
+    RegulatoryEvidenceResponse,
     ScopedAgentAnswer,
     ScopedFieldValue,
     SummaryNoteRequest,
@@ -748,6 +750,216 @@ async def fetch_managed_ai_assets(settings: Settings) -> list[AIAsset]:
 async def fetch_unmanaged_ai_assets(settings: Settings) -> list[AIAsset]:
     """Return post-June-2 assets with no owner assigned (unmanaged/shadow AI)."""
     return await _fetch_ai_assets(settings, managed=False)
+
+
+REGULATORY_AI_SYSTEM_FIELDS = [
+    "sys_id",
+    "name",
+    "state",
+    "risk_classification",
+    "sys_updated_on",
+]
+
+
+def _snow_record_url(settings: Settings, table: str, sys_id: str) -> str:
+    if not sys_id:
+        return ""
+    return f"{settings.snow_base_url}/{table}.do?sys_id={sys_id}"
+
+
+async def _snow_table_get(
+    client: httpx.AsyncClient,
+    settings: Settings,
+    table: str,
+    *,
+    query: str,
+    fields: list[str] | tuple[str, ...],
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    params = {
+        "sysparm_query": query,
+        "sysparm_fields": ",".join(fields),
+        "sysparm_limit": str(limit),
+        "sysparm_display_value": "all",
+    }
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/table/{table}",
+        params=params,
+        headers={"Accept": "application/json"},
+        auth=(settings.snow_username, settings.snow_password),
+    )
+    if not response.is_success:
+        _raise_snow_error(response)
+    return response.json().get("result", [])
+
+
+async def _snow_table_count(
+    client: httpx.AsyncClient,
+    settings: Settings,
+    table: str,
+    *,
+    query: str = "",
+) -> int:
+    params = {"sysparm_count": "true"}
+    if query:
+        params["sysparm_query"] = query
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/stats/{table}",
+        params=params,
+        headers={"Accept": "application/json"},
+        auth=(settings.snow_username, settings.snow_password),
+    )
+    if not response.is_success:
+        _raise_snow_error(response)
+    stats = response.json().get("result", {}).get("stats", {})
+    try:
+        return int(stats.get("count") or stats.get("COUNT") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _map_regulatory_candidate(settings: Settings, record: dict[str, Any]) -> RegulatoryEvidenceCandidate:
+    sys_id = _field_best(record.get("sys_id"))
+    return RegulatoryEvidenceCandidate(
+        sys_id=sys_id,
+        name=_field_best(record.get("name")),
+        state=_field_best(record.get("state")),
+        risk_classification=_field_best(record.get("risk_classification")),
+        updated_on=_field_best(record.get("sys_updated_on")),
+        evidence_url=_snow_record_url(settings, "sn_grc_ai_gov_ai_system", sys_id),
+    )
+
+
+def _pick_regulatory_target(
+    candidates: list[RegulatoryEvidenceCandidate],
+    query: str,
+) -> RegulatoryEvidenceCandidate | None:
+    if not candidates:
+        return None
+    normalized_query = query.strip().lower()
+    for candidate in candidates:
+        if candidate.name.strip().lower() == normalized_query:
+            return candidate
+    if "triage" in normalized_query:
+        for candidate in candidates:
+            name = candidate.name.lower()
+            if "triage" in name and "appointment" in name:
+                return candidate
+    return candidates[0]
+
+
+async def fetch_regulatory_evidence(
+    settings: Settings,
+    *,
+    query: str = "Triage Appointment DG1",
+) -> RegulatoryEvidenceResponse:
+    """Return live, read-only UC3 evidence for one AI system.
+
+    This intentionally does not fabricate FRIA/assessment status. Missing live
+    records become false readiness flags so the demo cannot imply completion.
+    """
+    clean_query = query.strip() or "Triage Appointment DG1"
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        records = await _snow_table_get(
+            client,
+            settings,
+            "sn_grc_ai_gov_ai_system",
+            query=f"123TEXTQUERY321={clean_query}^ORDERBYDESCsys_updated_on",
+            fields=REGULATORY_AI_SYSTEM_FIELDS,
+            limit=10,
+        )
+        candidates = [_map_regulatory_candidate(settings, record) for record in records]
+        target = _pick_regulatory_target(candidates, clean_query)
+
+        post_actions_count = await _snow_table_count(
+            client,
+            settings,
+            "sn_smart_imp_auto_assessment_action",
+        )
+        fria_active_count = await _snow_table_count(
+            client,
+            settings,
+            "sn_smart_imp_auto_assessment_action",
+            query="assessment_templateLIKEFundamental Rights Impact Assessment^active=true",
+        )
+        fria_inactive_count = await _snow_table_count(
+            client,
+            settings,
+            "sn_smart_imp_auto_assessment_action",
+            query="assessment_templateLIKEFundamental Rights Impact Assessment^active=false",
+        )
+
+        if target is None:
+            return RegulatoryEvidenceResponse(
+                query=clean_query,
+                candidates=candidates,
+                post_assessment_actions_count=post_actions_count,
+                fria_actions_active_count=fria_active_count,
+                fria_actions_inactive_count=fria_inactive_count,
+                has_post_assessment_actions=post_actions_count > 0,
+            )
+
+        task_rows = await _snow_table_get(
+            client,
+            settings,
+            "sn_grc_ai_gov_ai_system_task",
+            query=f"ai_system={target.sys_id}^ORDERBYDESCsys_updated_on",
+            fields=["sys_id", "assessment_template", "state", "sys_updated_on"],
+            limit=50,
+        )
+        risk_result_count = await _snow_table_count(
+            client,
+            settings,
+            "sn_grc_ai_gov_risk_assessment_result",
+            query=f"ai_system={target.sys_id}",
+        )
+        entity_map_count = await _snow_table_count(
+            client,
+            settings,
+            "sn_grc_ai_gov_ai_system_entity_map",
+            query=f"ai_system={target.sys_id}",
+        )
+
+    task_templates = " ".join(_field_best(row.get("assessment_template")) for row in task_rows).lower()
+    risk_classification = target.risk_classification.strip()
+    has_completed_classification = bool(risk_classification) and risk_classification.lower() not in {
+        "to be determined",
+        "tbd",
+    }
+    fria_attached = "fundamental rights" in task_templates or "fria" in task_templates
+    has_assessment_task = bool(task_rows)
+    has_risk_result = risk_result_count > 0
+    has_post_actions = post_actions_count > 0
+
+    return RegulatoryEvidenceResponse(
+        query=clean_query,
+        target_sys_id=target.sys_id,
+        target_name=target.name,
+        state=target.state,
+        risk_classification=risk_classification,
+        evidence_url=target.evidence_url,
+        candidates=candidates,
+        assessment_tasks_count=len(task_rows),
+        risk_assessment_results_count=risk_result_count,
+        entity_maps_count=entity_map_count,
+        post_assessment_actions_count=post_actions_count,
+        fria_actions_active_count=fria_active_count,
+        fria_actions_inactive_count=fria_inactive_count,
+        has_ai_system_record=True,
+        has_completed_classification=has_completed_classification,
+        has_assessment_task=has_assessment_task,
+        has_risk_assessment_result=has_risk_result,
+        has_entity_mapping=entity_map_count > 0,
+        has_post_assessment_actions=has_post_actions,
+        fria_attached=fria_attached,
+        demo_ready=(
+            has_completed_classification
+            and has_assessment_task
+            and has_risk_result
+            and fria_attached
+            and has_post_actions
+        ),
+    )
 
 
 async def create_patient_registration(
