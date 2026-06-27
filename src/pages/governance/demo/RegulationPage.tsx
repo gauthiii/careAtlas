@@ -155,7 +155,7 @@ export function GovernanceRegulationPage() {
                   href={evidence.evidence_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-md bg-[#143A57] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#0f5f8c]"
+                  className="inline-flex items-center gap-2 rounded-md bg-[#143A57] px-4 py-2 text-sm font-bold !text-white transition-colors hover:bg-[#0f5f8c]"
                 >
                   Open AI system record <ExternalLink size={15} />
                 </a>
