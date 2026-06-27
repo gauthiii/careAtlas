@@ -61,6 +61,7 @@ from .models import (
     PatientAccessComparison,
     PatientProfileResponse,
     PrivacyControlsResponse,
+    RegulatoryEvidenceCandidate,
     RegulatoryEvidenceResponse,
     AppointmentUpdateRequest,
     ClinicianAppointmentCreateRequest,
@@ -105,6 +106,7 @@ from .servicenow import (
     fetch_approval_log,
     fetch_patient_access_comparison,
     fetch_privacy_controls,
+    fetch_regulatory_ai_systems,
     fetch_regulatory_evidence,
     record_approval_decision,
     fetch_appointment_option,
@@ -181,6 +183,16 @@ async def get_managed_ai_assets(settings: Settings = Depends(get_settings)) -> l
 async def get_unmanaged_ai_assets(settings: Settings = Depends(get_settings)) -> list[AIAsset]:
     try:
         return await fetch_unmanaged_ai_assets(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/regulation/ai-systems", response_model=list[RegulatoryEvidenceCandidate])
+async def get_regulatory_ai_systems(
+    settings: Settings = Depends(get_settings),
+) -> list[RegulatoryEvidenceCandidate]:
+    try:
+        return await fetch_regulatory_ai_systems(settings)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

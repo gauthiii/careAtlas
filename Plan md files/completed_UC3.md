@@ -115,9 +115,20 @@ Open the Regulation page (`/governance/demo/regulation`) → it loads live and s
 
 ---
 
-## 6. Optional follow-ups (not blocking the demo)
+## 6. Cosmetic follow-ups — outcome (2026-06-26)
 
-- The target's `risk_assessment_methodology` field still shows *"Risk assessment for AI inventory"* on the record header while the classification came from the automated-classification RAM — cosmetic; the classification, tasks, and FRIA are all correct and the app reads green.
-- AI system **state** is still `Assess`. If you want the demo narrative to show it progressed past the gate, advance the lifecycle state to `Approve`/`Live and Monitor` in the workspace (not required for `demo_ready`).
+- **RAM methodology label:** Not an issue for the target. `Triage Appointment DG1`'s `risk_assessment_methodology` is already the primary RAM (`977ffce453b25210762cddeeff7b12b5`). The earlier note was based on Demo Agent 9's record. No change needed.
+- **Lifecycle state advance:** Attempted `Assess → Live and Monitor` (and intermediate states) via REST PATCH — **blocked by the AIRC state model** (the value silently reverts to `Assess`; classification stayed `High`, no damage). Advancing the lifecycle requires the gated Playbook transitions in the AIRC Workspace UI. This is purely cosmetic and does **not** affect `demo_ready`. Left at `Assess`.
+
+## 7. Regulation page enhancement (2026-06-26)
+
+Per request, the Regulation page (`/governance/demo/regulation`) was changed:
+- Removed the "Live ServiceNow Evidence" heading.
+- The target AI system name is now a **dropdown** listing all governed AI systems (`sn_grc_ai_gov_ai_system`), each annotated with its live risk classification. Selecting a different system re-fetches and shows that system's live readiness/status.
+
+**Code changes:**
+- Backend — new read-only endpoint `GET /api/governance/regulation/ai-systems` ([server/app/main.py](../server/app/main.py)) backed by `fetch_regulatory_ai_systems` ([server/app/servicenow.py](../server/app/servicenow.py)); returns `list[RegulatoryEvidenceCandidate]` (sys_id, name, state, risk_classification) for all 111 systems, ordered by name.
+- Service — `fetchRegulatoryAiSystems()` ([src/services/serviceNow.ts](../src/services/serviceNow.ts)).
+- Page — [src/pages/governance/demo/RegulationPage.tsx](../src/pages/governance/demo/RegulationPage.tsx): dropdown bound to `selected`; changing it drives `fetchRegulatoryEvidence(query)`. Verified: list endpoint returns 111 systems (only `Triage Appointment DG1` = High), `tsc` clean.
 </content>
 </invoke>

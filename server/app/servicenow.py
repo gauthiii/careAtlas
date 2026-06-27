@@ -848,6 +848,37 @@ def _pick_regulatory_target(
     return candidates[0]
 
 
+async def fetch_regulatory_ai_systems(
+    settings: Settings,
+    *,
+    limit: int = 200,
+) -> list[RegulatoryEvidenceCandidate]:
+    """Return governed AI systems (sn_grc_ai_gov_ai_system) for the UC3 picker.
+
+    Read-only. Scoped to AI systems owned (business_owner) by the CareAtlas demo
+    team so the Regulation page dropdown only lists agents the team created, not
+    the full instance inventory. Selecting one shows that system's live readiness.
+    """
+    owner_user_names = ",".join(
+        [
+            "interface_gautham",
+            "gautham.vijayaraj@accelare.com",
+            "sheshang.ramesh@accelare.com",
+            "tanush.kuppusami@accelare.com",
+        ]
+    )
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        records = await _snow_table_get(
+            client,
+            settings,
+            "sn_grc_ai_gov_ai_system",
+            query=f"business_owner.user_nameIN{owner_user_names}^ORDERBYname",
+            fields=REGULATORY_AI_SYSTEM_FIELDS,
+            limit=limit,
+        )
+    return [_map_regulatory_candidate(settings, record) for record in records]
+
+
 async def fetch_regulatory_evidence(
     settings: Settings,
     *,

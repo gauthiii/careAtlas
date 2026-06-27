@@ -534,6 +534,14 @@ export async function fetchRegulatoryEvidence(query = 'Triage Appointment DG1'):
   return (await res.json()) as RegulatoryEvidence
 }
 
+export async function fetchRegulatoryAiSystems(): Promise<RegulatoryEvidenceCandidate[]> {
+  const res = await fetch(`${API_BASE}/governance/regulation/ai-systems`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as RegulatoryEvidenceCandidate[]
+}
+
 export async function executeAgent(
   agentSysId: string,
   userInput: string,

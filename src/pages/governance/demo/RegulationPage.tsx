@@ -3,18 +3,27 @@ import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { ArrowRight, Scale, FileText, ArrowLeft, AlertTriangle, CheckCircle2, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { fetchRegulatoryEvidence, type RegulatoryEvidence } from '../../../services/serviceNow'
+import {
+  fetchRegulatoryAiSystems,
+  fetchRegulatoryEvidence,
+  type RegulatoryEvidence,
+  type RegulatoryEvidenceCandidate,
+} from '../../../services/serviceNow'
+
+const DEFAULT_TARGET = 'Triage Appointment DG1'
 
 export function GovernanceRegulationPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [evidence, setEvidence] = useState<RegulatoryEvidence | null>(null)
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading')
   const [errorMsg, setErrorMsg] = useState('')
+  const [systems, setSystems] = useState<RegulatoryEvidenceCandidate[]>([])
+  const [selected, setSelected] = useState(DEFAULT_TARGET)
 
-  const loadEvidence = () => {
+  const loadEvidence = (query: string = selected) => {
     setState('loading')
     setErrorMsg('')
-    fetchRegulatoryEvidence()
+    fetchRegulatoryEvidence(query)
       .then((data) => {
         setEvidence(data)
         setState('ok')
@@ -26,7 +35,14 @@ export function GovernanceRegulationPage() {
   }
 
   useEffect(() => {
-    loadEvidence()
+    loadEvidence(selected)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected])
+
+  useEffect(() => {
+    fetchRegulatoryAiSystems()
+      .then(setSystems)
+      .catch(() => setSystems([]))
   }, [])
 
   return (
@@ -67,12 +83,25 @@ export function GovernanceRegulationPage() {
         </button>
 
         <section className="rounded-xl border border-[#d7e5ec] bg-white p-6 shadow-sm">
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h3 className="text-lg font-bold text-[#102033]">Live ServiceNow Evidence</h3>
-              <p className="mt-1 text-sm text-[#53687b]">
-                Target AI system: {evidence?.target_name || 'Triage Appointment DG1'}
-              </p>
+              <label htmlFor="uc3-target" className="block text-[0.68rem] font-bold uppercase tracking-[0.08em] text-[#6b7c8f]">
+                Target AI system
+              </label>
+              <select
+                id="uc3-target"
+                value={selected}
+                onChange={(e) => setSelected(e.target.value)}
+                className="mt-1 min-w-[18rem] max-w-full rounded-lg border border-[#cfe0ea] bg-white px-3 py-2 text-sm font-bold text-[#102033] transition-colors hover:border-[#0f5f8c] focus:border-[#0f5f8c] focus:outline-none"
+              >
+                {systems.length === 0 && <option value={selected}>{selected}</option>}
+                {systems.map((sys) => (
+                  <option key={sys.sys_id} value={sys.name}>
+                    {sys.name}
+                    {sys.risk_classification ? ` — ${sys.risk_classification}` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex items-center gap-2">
               {state === 'ok' && evidence && (
@@ -83,7 +112,7 @@ export function GovernanceRegulationPage() {
               )}
               <button
                 type="button"
-                onClick={loadEvidence}
+                onClick={() => loadEvidence()}
                 className="inline-flex items-center gap-1.5 rounded-md border border-[#cfe0ea] bg-white px-3 py-1.5 text-xs font-bold text-[#0f5f8c] transition-colors hover:border-[#0f5f8c] hover:bg-[#f5f9fb]"
               >
                 <RefreshCw size={13} /> Refresh
