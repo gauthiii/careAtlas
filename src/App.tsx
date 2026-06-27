@@ -5,6 +5,7 @@ import { GovernanceAclPage } from './pages/governance/GovernanceAclPage'
 import { GovernanceAiAgentsPage } from './pages/governance/GovernanceAiAgentsPage'
 import { GovernanceDashboardPage } from './pages/governance/GovernanceDashboardPage'
 import { GovernanceAgendaPage } from './pages/governance/GovernanceAgendaPage'
+import { GovernanceAgenda26Page } from './pages/governance/GovernanceAgenda26Page'
 import { GovernanceAdditionalWorkPage } from './pages/governance/GovernanceAdditionalWorkPage'
 import { GovernanceLlm02AuditPage } from './pages/governance/GovernanceLlm02AuditPage'
 import { GovernanceDemoPage } from './pages/governance/GovernanceDemoPage'
@@ -456,6 +457,18 @@ function App() {
               <ClinicianRoleBlocker>
                 <GovernanceProtectedRoute>
                   <GovernanceAgendaPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
+        <Route
+          path="/governance/agenda-26"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernanceAgenda26Page />
                 </GovernanceProtectedRoute>
               </ClinicianRoleBlocker>
             </PatientRoleBlocker>
