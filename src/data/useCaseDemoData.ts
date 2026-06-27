@@ -117,7 +117,7 @@ export function isHighImpactIntent(text: string): boolean {
 // UC3 · Regulation — EU AI Act conformity + FRIA classification
 // ---------------------------------------------------------------------------
 
-export type RegulatoryTier = 'High' | 'Limited' | 'Minimal'
+export type RegulatoryTier = 'High' | 'Medium' | 'Low' | 'Unacceptable' | 'To be determined' | 'Limited' | 'Minimal' | 'Unverified'
 
 export type RegulatoryClassification = {
   agent: string

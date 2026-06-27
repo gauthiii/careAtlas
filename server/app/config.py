@@ -15,6 +15,16 @@ class Settings(BaseSettings):
     # Service account with read access to the AI Control Tower tables.
     snow_username: str
     snow_password: str
+    # UC1 Privacy — non-human AI agent identity that has u_patient table read but
+    # lacks role_patient_pii, used to live-probe field-level PII denial. Optional so
+    # existing .env files still load; the privacy endpoint degrades gracefully if unset.
+    snow_pii_agent_username: Optional[str] = None
+    snow_pii_agent_password: Optional[str] = None
+    # UC1 Privacy — privileged counterpart that DOES hold role_patient_pii, so it
+    # reads full PII. Used by the role-based redaction demo as the "authorized" agent.
+    # If unset/unauthenticated, the demo falls back to the main account for this view.
+    snow_clinical_agent_username: Optional[str] = None
+    snow_clinical_agent_password: Optional[str] = None
     # OAuth client credentials used to invoke ServiceNow AI Agents over A2A.
     snow_a2a_client_id: Optional[str] = None
     snow_a2a_client_secret: Optional[str] = None

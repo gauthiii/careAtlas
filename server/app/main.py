@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import Settings, get_settings
+from .approvals import create_request, decide, get_request
 from .aws_auth import (
     DEFAULT_DOCTOR_TEMP_PASSWORD,
     create_force_change_user,
@@ -35,23 +36,39 @@ from .a2a_callbacks import (
 
 from .models import (
     AclTestRequest,
+    AclSummaryResponse,
     AclTestResponse,
     AiDecisionLogEntry,
     AIAsset,
     AISystem,
+    FairnessResponse,
     BookingAppointment,
     BookingAppointmentRequest,
     BookingAvailabilityResponse,
     ExecuteAgentRequest,
     ExecuteAgentResponse,
+    ApprovalDecisionRequest,
+    ApprovalLogEntry,
+    ApprovalRecordResponse,
+    ApprovalSubmitRequest,
+    GuardrailScanRequest,
+    GuardrailScanResponse,
+    SecurityKpisResponse,
+    ScopedAgentAnswer,
+    ScopedAgentAskRequest,
     NotificationListResponse,
     NotificationReadRequest,
+    PatientAccessComparison,
     PatientProfileResponse,
+    PrivacyControlsResponse,
+    RegulatoryEvidenceCandidate,
+    RegulatoryEvidenceResponse,
     AppointmentUpdateRequest,
     ClinicianAppointmentCreateRequest,
     DoctorAppointmentOption,
     PatientProfileResponse,
     PatientProfileUpdateRequest,
+    PatientSearchResult,
     PatientRegistrationRequest,
     PatientRegistrationResponse,
     PatientRegistrationSummary,
@@ -74,6 +91,7 @@ from .servicenow import (
     ServiceNowError,
     SummaryNoteAppointmentNotFoundError,
     create_agent,
+    fetch_fairness_outcomes,
     create_clinician_appointment,
     create_doctor,
     create_guardrail_audit_log,
@@ -84,21 +102,32 @@ from .servicenow import (
     execute_agent,
     fetch_agents,
     fetch_ai_decision_log,
+    ask_scoped_agent,
+    fetch_approval_log,
+    fetch_patient_access_comparison,
+    fetch_privacy_controls,
+    fetch_regulatory_ai_systems,
+    fetch_regulatory_evidence,
+    record_approval_decision,
     fetch_appointment_option,
     fetch_doctor_appointment_options,
     fetch_guardrail_audit_logs,
     fetch_managed_ai_assets,
     fetch_patient_booking_availability,
     fetch_patient_profile,
+    search_patients,
     fetch_patient_registrations,
     fetch_summary_notes,
     fetch_unmanaged_ai_assets,
+    summarize_acl_posture,
     test_service_account_acl,
     update_appointment,
     update_patient_profile,
     update_registration_status,
     update_summary_note,
     validate_user,
+    guardrail_scan,
+    fetch_security_kpis,
 )
 
 logging.basicConfig(
@@ -154,6 +183,27 @@ async def get_managed_ai_assets(settings: Settings = Depends(get_settings)) -> l
 async def get_unmanaged_ai_assets(settings: Settings = Depends(get_settings)) -> list[AIAsset]:
     try:
         return await fetch_unmanaged_ai_assets(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/regulation/ai-systems", response_model=list[RegulatoryEvidenceCandidate])
+async def get_regulatory_ai_systems(
+    settings: Settings = Depends(get_settings),
+) -> list[RegulatoryEvidenceCandidate]:
+    try:
+        return await fetch_regulatory_ai_systems(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/regulation/evidence", response_model=RegulatoryEvidenceResponse)
+async def get_regulatory_evidence(
+    query: str = "Triage Appointment DG1",
+    settings: Settings = Depends(get_settings),
+) -> RegulatoryEvidenceResponse:
+    try:
+        return await fetch_regulatory_evidence(settings, query=query)
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -364,6 +414,19 @@ async def get_patient_profile(
     if profile is None:
         raise HTTPException(status_code=404, detail="Patient profile not found")
     return profile
+
+
+@api.get("/patients/search", response_model=list[PatientSearchResult])
+async def get_patient_search(
+    q: str,
+    limit: int = 8,
+    settings: Settings = Depends(get_settings),
+) -> list[PatientSearchResult]:
+    """Typeahead patient search by name or email for the clinician record lookup."""
+    try:
+        return await search_patients(settings, query=q, limit=limit)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @api.get("/patients/booking/availability", response_model=BookingAvailabilityResponse)
@@ -595,6 +658,130 @@ async def get_governance_decision_log(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
+@api.get("/governance/privacy-controls", response_model=PrivacyControlsResponse)
+async def get_governance_privacy_controls(
+    settings: Settings = Depends(get_settings),
+) -> PrivacyControlsResponse:
+    """UC1 Privacy — live PII-protection posture (ACLs, output guardrail, anonymized log)."""
+    try:
+        return await fetch_privacy_controls(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/fairness", response_model=FairnessResponse)
+async def get_governance_fairness(
+    settings: Settings = Depends(get_settings),
+) -> FairnessResponse:
+    """UC6 Fairness — live appointment-outcome distribution by gender, ethnicity, and age band.
+
+    Joins u_appointment + u_patient. Returns grouped aggregates only — no PII.
+    """
+    try:
+        return await fetch_fairness_outcomes(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/privacy/patient-lookup", response_model=PatientAccessComparison)
+async def get_privacy_patient_lookup(
+    q: str | None = None,
+    sys_id: str | None = None,
+    settings: Settings = Depends(get_settings),
+) -> PatientAccessComparison:
+    """UC1 Privacy — read one patient as a restricted vs privileged agent (live redaction).
+
+    Pass `sys_id` to compare an exact record (logged-in patient / record on screen),
+    or `q` to search by name / email / patient id. With neither, a sample patient is used.
+    """
+    try:
+        return await fetch_patient_access_comparison(settings, query=q, sys_id=sys_id)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.post("/governance/agent/ask", response_model=ScopedAgentAnswer)
+async def post_scoped_agent_ask(
+    body: ScopedAgentAskRequest,
+    settings: Settings = Depends(get_settings),
+) -> ScopedAgentAnswer:
+    """UC2 — a page-scoped agent answers within its ACL identity (PII read live & stripped)."""
+    if not body.question.strip():
+        raise HTTPException(status_code=400, detail="A question is required.")
+    try:
+        return await ask_scoped_agent(
+            settings,
+            agent_key=body.agent_key,
+            question=body.question,
+            patient_email=body.patient_email,
+            patient_sys_id=body.patient_sys_id,
+        )
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/approval/log", response_model=list[ApprovalLogEntry])
+async def get_approval_log(
+    limit: int = 50,
+    settings: Settings = Depends(get_settings),
+) -> list[ApprovalLogEntry]:
+    """UC2 Risk — persisted human-approval-gate decisions (approved/denied + approver)."""
+    try:
+        return await fetch_approval_log(settings, limit=limit)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+def _approval_response(record, audit_logged: bool = False) -> ApprovalRecordResponse:
+    return ApprovalRecordResponse(
+        request_id=record.request_id,
+        intent=record.intent,
+        high_impact=record.high_impact,
+        reason=record.reason,
+        status=record.status,
+        approver=record.approver,
+        audit_logged=audit_logged,
+    )
+
+
+@api.post("/governance/approval/submit", response_model=ApprovalRecordResponse)
+async def post_approval_submit(body: ApprovalSubmitRequest) -> ApprovalRecordResponse:
+    """UC2 Risk — submit an agent intent; high-impact ones stop for human approval."""
+    if not body.intent.strip():
+        raise HTTPException(status_code=400, detail="An intent is required.")
+    return _approval_response(create_request(body.intent))
+
+
+@api.post("/governance/approval/{request_id}/decision", response_model=ApprovalRecordResponse)
+async def post_approval_decision(
+    request_id: str,
+    body: ApprovalDecisionRequest,
+    settings: Settings = Depends(get_settings),
+) -> ApprovalRecordResponse:
+    """UC2 Risk — a governance officer approves/denies; the decision is audited."""
+    record = get_request(request_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Approval request not found.")
+    if not record.high_impact:
+        raise HTTPException(status_code=409, detail="This intent did not require approval.")
+    record = decide(request_id, body.decision, body.approver)
+    audit_logged = False
+    try:
+        await record_approval_decision(
+            settings,
+            intent=record.intent,
+            decision=body.decision,
+            approver=record.approver,
+            reason=record.reason,
+        )
+        audit_logged = True
+    except ServiceNowError:
+        # The decision still stands locally even if the audit write fails; surface it
+        # via audit_logged=false rather than failing the whole request.
+        audit_logged = False
+    return _approval_response(record, audit_logged=audit_logged)
+
+
 @api.post("/acl/test", response_model=AclTestResponse)
 async def post_acl_test(
     body: AclTestRequest,
@@ -606,6 +793,38 @@ async def post_acl_test(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/acl/summary", response_model=AclSummaryResponse)
+async def get_acl_summary(
+    settings: Settings = Depends(get_settings),
+) -> AclSummaryResponse:
+    """UC2 Risk — live aggregate least-privilege posture across all governed agents."""
+    try:
+        return await summarize_acl_posture(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.post("/governance/guardrail/scan", response_model=GuardrailScanResponse)
+async def post_guardrail_scan(
+    body: GuardrailScanRequest,
+    settings: Settings = Depends(get_settings),
+) -> GuardrailScanResponse:
+    """UC5 Security — scan text for prompt-injection patterns.
+
+    Blocked inputs open a live AI Case on the ServiceNow instance
+    (sn_ai_case_mgmt_ai_case, case_type=adversarial_attacks).
+    """
+    return await guardrail_scan(settings, body.text)
+
+
+@api.get("/governance/security-kpis", response_model=SecurityKpisResponse)
+async def get_security_kpis(
+    settings: Settings = Depends(get_settings),
+) -> SecurityKpisResponse:
+    """UC5 Security — live KPIs: open AI Cases, active injection filters, output patterns, automation rules."""
+    return await fetch_security_kpis(settings)
 
 
 async def _read_json_body(request: Request) -> Any:

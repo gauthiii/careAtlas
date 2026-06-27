@@ -20,7 +20,7 @@ import {
 } from '../../components/portal/PortalShell'
 import { governanceDisplayName, useGovernanceAuth } from '../../contexts/GovernanceAuthContext'
 import { useUnmanagedAISystems } from '../../hooks/useUnmanagedAISystems'
-import { fetchAiDecisionLog, type AiDecisionLogEntry } from '../../services/serviceNow'
+import { fetchAiDecisionLog, fetchFairnessData, fetchSecurityKpis, type AiDecisionLogEntry, type FairnessData, type FairnessGroupItem, type SecurityKpis } from '../../services/serviceNow'
 import { PrivacyControlsPanel } from '../../components/governance/PrivacyControlsPanel'
 import { RegulatoryClassificationBadge } from '../../components/governance/RegulatoryClassificationBadge'
 import { DemoTag } from '../../components/governance/DemoTag'
@@ -51,6 +51,8 @@ export function GovernanceDashboardPage() {
   const [isLogLoading, setIsLogLoading] = useState(true)
   const [logError, setLogError] = useState<string | null>(null)
   const [logRefreshKey, setLogRefreshKey] = useState(0)
+  const [fairness, setFairness] = useState<FairnessData | null>(null)
+  const [securityKpis, setSecurityKpis] = useState<SecurityKpis | null>(null)
 
   useEffect(() => {
     let active = true
@@ -71,6 +73,15 @@ export function GovernanceDashboardPage() {
     }
   }, [logRefreshKey])
 
+  useEffect(() => {
+    fetchFairnessData()
+      .then(setFairness)
+      .catch(() => {/* silently keep null — fallback rendering handles it */})
+    fetchSecurityKpis()
+      .then(setSecurityKpis)
+      .catch(() => {/* silently keep null */})
+  }, [logRefreshKey])
+
   function handleRefresh() {
     refetchAgents()
     setLogRefreshKey((k) => k + 1)
@@ -78,13 +89,18 @@ export function GovernanceDashboardPage() {
 
   const registeredAgents = agentsState === 'ok' ? systems.length : null
 
-  const fairnessData = [
-    { group: 'Asian', value: 32, expected: '+22%' },
-    { group: 'Black', value: 20, expected: '+2%' },
-    { group: 'Mixed', value: 24, expected: '+1%' },
-    { group: 'White', value: 27, expected: '-3%' },
-    { group: 'Other', value: 11, expected: '-5%' },
+  // Fallback used when the live endpoint hasn't loaded yet.
+  const FALLBACK_ETHNICITY: FairnessGroupItem[] = [
+    { group: 'Asian', pct: 32, expected: 23, count: 0, skewed: true },
+    { group: 'Black', pct: 20, expected: 21, count: 0, skewed: false },
+    { group: 'Mixed', pct: 24, expected: 23, count: 0, skewed: false },
+    { group: 'White', pct: 27, expected: 28, count: 0, skewed: false },
+    { group: 'Other', pct: 11, expected: 5, count: 0, skewed: true },
   ]
+  const fairnessItems: FairnessGroupItem[] =
+    fairness ? fairness.by_ethnicity : FALLBACK_ETHNICITY
+  const skewAlert = fairness ? fairness.skew_alert : true
+  const skewedGroup = fairnessItems.find((g) => g.skewed)
 
   return (
     <PortalPage
@@ -139,11 +155,13 @@ export function GovernanceDashboardPage() {
           </div>
 
           <div className="mt-2 text-2xl font-bold">
-            4
+            {securityKpis != null ? securityKpis.ai_cases_open : '—'}
           </div>
 
           <div className="text-sm font-semibold text-amber-600">
-            2 blocked • 2 flagged today
+            {securityKpis != null
+              ? `${securityKpis.active_injection_filters} filters · ${securityKpis.injection_output_patterns} patterns`
+              : 'Loading…'}
           </div>
         </div>
 
@@ -161,17 +179,19 @@ export function GovernanceDashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#d7e5ec] bg-white p-5">
+        <div className={`rounded-xl border bg-white p-5 ${skewAlert ? 'border-red-300' : 'border-[#d7e5ec]'}`}>
           <div className="text-xs font-bold uppercase tracking-[0.06em]">
             Fairness skew
           </div>
 
-          <div className="mt-2 text-xl font-bold">
-            High
+          <div className={`mt-2 text-xl font-bold ${skewAlert ? 'text-red-700' : 'text-emerald-700'}`}>
+            {fairness ? `${fairness.max_skew_pp}pp` : skewAlert ? 'High' : 'Within range'}
           </div>
 
-          <div className="text-sm font-semibold text-red-600">
-            Asian cohort p &lt; 0.05
+          <div className={`text-sm font-semibold ${skewAlert ? 'text-red-600' : 'text-emerald-600'}`}>
+            {skewAlert && skewedGroup
+              ? `${skewedGroup.group} cohort over-allocated`
+              : 'No significant skew detected'}
           </div>
         </div>
       </section>
@@ -271,34 +291,45 @@ export function GovernanceDashboardPage() {
             title="Scheduling Fairness Monitor"
             icon={<Activity size={18} />}
           >
-            <div className="mb-3 flex justify-end">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              {fairness && (
+                <span className="text-xs text-[#53687b]">
+                  {fairness.total_appointments} appointments · by ethnicity
+                </span>
+              )}
               <DemoTag />
             </div>
             <div className="space-y-3">
-              {fairnessData.map((item) => (
+              {fairnessItems.map((item) => (
                 <div key={item.group}>
                   <div className="mb-1 flex justify-between text-sm">
-                    <span>{item.group}</span>
-                    <span>{item.value}</span>
+                    <span className={item.skewed ? 'font-semibold text-red-700' : ''}>{item.group}</span>
+                    <span className={item.skewed ? 'font-semibold text-red-700' : ''}>
+                      {item.pct}%
+                      <span className="ml-1 text-xs text-[#53687b]">(exp {item.expected}%)</span>
+                    </span>
                   </div>
-
                   <div className="h-4 rounded-full bg-[#eef3f7]">
                     <div
-                      className="h-4 rounded-full bg-[#0397AE]"
-                      style={{
-                        width: `${item.value * 3}%`,
-                      }}
+                      className={`h-4 rounded-full ${item.skewed ? 'bg-[#e07a5f]' : 'bg-[#0397AE]'}`}
+                      style={{ width: `${Math.min(item.pct * 3, 100)}%` }}
                     />
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="mt-5 rounded-lg bg-[#fff7e6] p-3 text-sm text-[#946200]">
-              Statistically significant skew detected in Asian
-              cohort. Over-allocation relative to population
-              proportion.
-            </div>
+            {skewAlert && skewedGroup && (
+              <div className="mt-5 rounded-lg bg-[#fff7e6] p-3 text-sm text-[#946200]">
+                Statistically significant skew detected in {skewedGroup.group} cohort.
+                {fairness && ` Max deviation: ${fairness.max_skew_pp}pp above expected allocation.`}
+              </div>
+            )}
+            {!skewAlert && fairness && (
+              <div className="mt-5 rounded-lg bg-[#e7f6f0] p-3 text-sm text-[#12805c]">
+                All demographic groups within ±5pp of expected allocation.
+              </div>
+            )}
           </PortalPanel>
 
           {/* PROMPT ALERTS */}
@@ -306,52 +337,58 @@ export function GovernanceDashboardPage() {
             title="Prompt Injection Alerts"
             icon={<ShieldAlert size={18} />}
           >
-            <div className="mb-3 flex justify-end">
-              <DemoTag />
-            </div>
-             <table className="w-full border-separate border-spacing-y-3 text-sm text-left">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Session</th>
-                  <th>Agent</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
+            {securityKpis == null ? (
+              <div className="py-4 text-center text-sm text-[#53687b]">Loading…</div>
+            ) : (
+              <>
+                <div className="mb-3 grid grid-cols-3 gap-3">
+                  <div className="rounded-lg border border-[#d7e5ec] bg-[#f4f8fb] p-3 text-center">
+                    <div className="text-xl font-bold text-[#a22828]">{securityKpis.ai_cases_open}</div>
+                    <div className="text-[10px] font-semibold uppercase text-[#53687b]">AI Cases open</div>
+                  </div>
+                  <div className="rounded-lg border border-[#d7e5ec] bg-[#f4f8fb] p-3 text-center">
+                    <div className="text-xl font-bold text-[#0f6b4f]">{securityKpis.active_injection_filters}</div>
+                    <div className="text-[10px] font-semibold uppercase text-[#53687b]">Active filters</div>
+                  </div>
+                  <div className="rounded-lg border border-[#d7e5ec] bg-[#f4f8fb] p-3 text-center">
+                    <div className="text-xl font-bold text-[#143A57]">{securityKpis.injection_output_patterns}</div>
+                    <div className="text-[10px] font-semibold uppercase text-[#53687b]">Output patterns</div>
+                  </div>
+                </div>
 
-              <tbody>
-                <tr>
-                  <td>09:14</td>
-                  <td>S-9130 • 98%</td>
-                  <td>Scheduling Ranker</td>
-                  <td>
-                    <Badge danger>Blocked</Badge>
-                  </td>
-                </tr>
+                {securityKpis.recent_cases.length > 0 && (
+                  <table className="w-full border-separate border-spacing-y-2 text-sm text-left">
+                    <thead>
+                      <tr>
+                        <th className="text-xs font-semibold text-[#53687b]">Case #</th>
+                        <th className="text-xs font-semibold text-[#53687b]">Description</th>
+                        <th className="text-xs font-semibold text-[#53687b]">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {securityKpis.recent_cases.map((c) => (
+                        <tr key={c.number}>
+                          <td className="font-mono text-xs text-[#143A57]">{c.number}</td>
+                          <td className="max-w-[200px] truncate text-xs text-[#40566b]">{c.short_description}</td>
+                          <td>
+                            {c.priority === '1' ? (
+                              <Badge danger>Blocked</Badge>
+                            ) : (
+                              <Badge warning>Flagged</Badge>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
 
-                <tr>
-                  <td>08:52</td>
-                  <td>S-9189 • 95%</td>
-                  <td>Identity Verifier</td>
-                  <td>
-                    <Badge warning>Flagged</Badge>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div className="mt-6">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide">
-                Today's injection pattern
-              </div>
-
-              <div className="flex gap-1">
-                <div className="h-8 w-28 bg-red-300" />
-                <div className="h-8 w-24 bg-red-200" />
-                <div className="h-8 w-24 bg-orange-100" />
-                <div className="h-8 flex-1 bg-green-100" />
-              </div>
-            </div>
+                <div className="mt-3 text-[10px] text-[#6b7c8f]">
+                  Live from <span className="font-mono">sn_ai_case_mgmt_ai_case</span> · case_type=adversarial_attacks ·{' '}
+                  <span className="font-mono">sn_ai_governance_automation_rule</span> active
+                </div>
+              </>
+            )}
           </PortalPanel>
         </div>
 
@@ -413,24 +450,37 @@ export function GovernanceDashboardPage() {
           {/* EXPECTED VS ACTUAL */}
           <PortalPanel icon={<ChartBar size={18} />} title="Expected vs Actual Allocation (%)">
             <div className="space-y-4">
-              {fairnessData.map((item) => (
-                <div
-                  key={item.group}
-                  className="grid grid-cols-[100px_1fr_60px] items-center gap-3"
-                >
-                  <span>{item.group}</span>
-
-                  <div className="h-3 rounded-full bg-[#edf2f5]">
-                    <div
-                      className="h-3 rounded-full bg-[#0397AE]"
-                      style={{ width: '75%' }}
-                    />
+              {fairnessItems.map((item) => {
+                const delta = item.pct - item.expected
+                return (
+                  <div
+                    key={item.group}
+                    className="grid grid-cols-[90px_1fr_80px] items-center gap-3"
+                  >
+                    <span className={item.skewed ? 'font-semibold text-red-700' : ''}>{item.group}</span>
+                    <div className="relative h-3 rounded-full bg-[#edf2f5]">
+                      {/* expected marker */}
+                      <div
+                        className="absolute top-0 h-3 w-0.5 bg-[#143A57] opacity-40"
+                        style={{ left: `${Math.min(item.expected * 3, 100)}%` }}
+                      />
+                      {/* actual bar */}
+                      <div
+                        className={`h-3 rounded-full ${item.skewed ? 'bg-[#e07a5f]' : 'bg-[#0397AE]'}`}
+                        style={{ width: `${Math.min(item.pct * 3, 100)}%` }}
+                      />
+                    </div>
+                    <span className={`text-xs ${item.skewed ? 'font-bold text-red-700' : 'text-[#53687b]'}`}>
+                      {delta > 0 ? '+' : ''}{delta.toFixed(1)}pp
+                    </span>
                   </div>
-
-                  <span>{item.expected}</span>
-                </div>
-              ))}
+                )
+              })}
             </div>
+            <p className="mt-3 text-xs text-[#53687b]">
+              Vertical marker = expected %. Bar = actual %. Delta shown right.
+              {fairness && ` Live from ${fairness.total_appointments} appointments.`}
+            </p>
           </PortalPanel>
 
           {/* ACCESS VIOLATIONS */}

@@ -170,8 +170,10 @@ Per the *AI Governance Life Cycle* docs: AIRC publishes delivered (Draft) assess
 
 > **Prereq to confirm (no assumption):** risk-based classification at intake requires version **22.0.3+** and the **Migrate to Advanced Risk Assessments** property — and that migration is a **one-way** change. Confirm version + the manager role on `interface_gautham`/demo admin before the demo.
 
+> **Live audit 2026-06-26:** `Triage Appointment DG1` exists in `sn_grc_ai_gov_ai_system`, but is **not demo-ready**: risk classification is `To be determined`, assessment tasks = 0, risk assessment results = 0, FRIA attached = false. `interface_gautham` has business-user/asset-owner roles only; manager/admin/analyst access is still needed to publish/verify templates and close assessments.
+
 ### CareAtlas app integration
-- Surface the AI system's **regulatory classification** + **assessment status** as a read-only badge on the governance portal (read `sn_grc_ai_gov_ai_system` fields). No write path needed — this UC is config + demo data.
+- Implemented read-only live evidence on the Regulation page via `/api/governance/regulation/evidence`; the badge no longer guesses from agent names and shows `Unverified` when live data is missing. No ServiceNow write path added.
 
 ### Curl verification (run on instance)
 ```bash

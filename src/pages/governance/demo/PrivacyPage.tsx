@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { PiiRedactionDemo } from '../../../components/governance/PiiRedactionDemo'
+import { RoleBasedRedactionDemo } from '../../../components/governance/RoleBasedRedactionDemo'
 import { ArrowRight, ScanSearch, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -44,6 +45,10 @@ export function GovernancePrivacyPage() {
             Open workflow modal <ArrowRight size={16} />
           </span>
         </button>
+
+        <div className="mt-8">
+          <RoleBasedRedactionDemo />
+        </div>
 
         <div className="mt-8">
           <PiiRedactionDemo />

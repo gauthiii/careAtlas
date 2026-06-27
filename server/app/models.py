@@ -35,6 +35,39 @@ class AIAsset(BaseModel):
     risk_classification: str = ""
 
 
+class RegulatoryEvidenceCandidate(BaseModel):
+    sys_id: str = ""
+    name: str = ""
+    state: str = ""
+    risk_classification: str = ""
+    updated_on: str = ""
+    evidence_url: str = ""
+
+
+class RegulatoryEvidenceResponse(BaseModel):
+    query: str
+    target_sys_id: str = ""
+    target_name: str = ""
+    state: str = ""
+    risk_classification: str = ""
+    evidence_url: str = ""
+    candidates: list[RegulatoryEvidenceCandidate] = Field(default_factory=list)
+    assessment_tasks_count: int = 0
+    risk_assessment_results_count: int = 0
+    entity_maps_count: int = 0
+    post_assessment_actions_count: int = 0
+    fria_actions_active_count: int = 0
+    fria_actions_inactive_count: int = 0
+    has_ai_system_record: bool = False
+    has_completed_classification: bool = False
+    has_assessment_task: bool = False
+    has_risk_assessment_result: bool = False
+    has_entity_mapping: bool = False
+    has_post_assessment_actions: bool = False
+    fria_attached: bool = False
+    demo_ready: bool = False
+
+
 class ValidateRequest(BaseModel):
     username: str
     password: str
@@ -430,6 +463,166 @@ class AiDecisionLogEntry(BaseModel):
     appointment: str = ""
 
 
+class PiiFieldAclStatus(BaseModel):
+    """One PII field on u_patient and whether a field-level read ACL guards it."""
+
+    field: str
+    label: str
+    protected: bool
+
+
+class PrivacyControlsResponse(BaseModel):
+    """UC1 Privacy — live evidence for the 'Data Privacy & PII Protection' panel."""
+
+    # Wall 1 — field-level ACL denial on u_patient PII columns.
+    pii_acl_status: Literal["enforced", "partial", "off"] = "off"
+    protected_field_count: int = 0
+    pii_fields: list[PiiFieldAclStatus] = []
+    # Live deny-probe: a non-human agent identity (lacks role_patient_pii) reading
+    # u_patient — proves PII columns are stripped while non-PII columns remain.
+    deny_probe_ran: bool = False
+    deny_probe_passed: bool = False
+    deny_probe_detail: str = ""
+    visible_pii_fields: list[str] = []
+    # Wall 2 — PII data-privacy guardrail on the agent output path.
+    redaction_on: bool = False
+    active_pii_filters: int = 0
+    active_filter_total: int = 0
+    pii_pattern_count: int = 0
+    # Wall 3 — anonymized audit log.
+    anonymization_rate: int = 0
+    decision_log_rows: int = 0
+    anonymized_rows: int = 0
+
+
+class FairnessGroupItem(BaseModel):
+    """One demographic group's appointment-outcome allocation (no PII — grouped aggregates)."""
+
+    group: str
+    pct: float
+    expected: float
+    count: int
+    skewed: bool
+
+
+class FairnessResponse(BaseModel):
+    """UC6 Fairness — live outcome distribution by demographic group."""
+
+    by_gender: list[FairnessGroupItem] = []
+    by_ethnicity: list[FairnessGroupItem] = []
+    by_age: list[FairnessGroupItem] = []
+    total_appointments: int = 0
+    bias_risk_statements: list[str] = []
+    fairness_metric_count: int = 0
+    max_skew_pp: float = 0.0
+    skew_alert: bool = False
+
+
+class ScopedFieldValue(BaseModel):
+    label: str
+    value: str = ""
+
+
+class ScopedAgentAskRequest(BaseModel):
+    agent_key: str
+    question: str
+    patient_email: str = ""
+    patient_sys_id: str = ""
+
+
+class ScopedAgentAnswer(BaseModel):
+    """A page-scoped AI agent's response, bounded by its ServiceNow ACL identity (UC2)."""
+
+    kind: Literal["scoped_data", "approval", "info"]
+    agent_key: str
+    agent_label: str
+    agent_username: str
+    scope: str
+    patient_ref: str = ""
+    allowed: list[ScopedFieldValue] = []
+    denied: list[str] = []
+    reply: str = ""
+    # Present when kind == "approval" (high-impact intent stopped for a human).
+    request_id: str = ""
+    intent: str = ""
+    reason: str = ""
+
+
+class ApprovalSubmitRequest(BaseModel):
+    intent: str
+
+
+class ApprovalDecisionRequest(BaseModel):
+    decision: Literal["approve", "deny"]
+    approver: str = ""
+
+
+class ApprovalLogEntry(BaseModel):
+    """A persisted UC2 human-approval-gate decision from u_ai_action_audit_log."""
+
+    sys_id: str = ""
+    timestamp: str = ""
+    decision: Literal["approved", "denied", "unknown"] = "unknown"
+    detail: str = ""
+    created_by: str = ""
+
+
+class ApprovalRecordResponse(BaseModel):
+    request_id: str
+    intent: str
+    high_impact: bool
+    reason: str
+    status: Literal["pending_approval", "auto_completed", "approved", "denied"]
+    approver: str = ""
+    audit_logged: bool = False
+
+
+class PatientSearchResult(BaseModel):
+    """Lightweight typeahead suggestion for the clinician patient search."""
+
+    sys_id: str = ""
+    patient_id: str = ""
+    name: str = ""
+    email: str = ""
+
+
+class AgentIdentity(BaseModel):
+    """One non-human agent identity used in the role-based redaction demo."""
+
+    key: Literal["restricted", "privileged"]
+    label: str
+    username: str
+    role: str
+    has_pii_role: bool
+    served_by: str = ""  # actual account that answered (fallback transparency)
+    reachable: bool = True
+    note: str = ""
+
+
+class PatientFieldAccess(BaseModel):
+    """One u_patient field and how each agent sees it."""
+
+    key: str
+    label: str
+    category: Literal["pii", "safe"]
+    # Value the privileged (authorized) agent sees.
+    privileged_value: str = ""
+    # Value the restricted agent sees ("" when redacted by the field-level ACL).
+    restricted_value: str = ""
+    redacted_for_restricted: bool = False
+
+
+class PatientAccessComparison(BaseModel):
+    """Live side-by-side of one patient record read by two differently-scoped agents."""
+
+    patient_sys_id: str = ""
+    patient_ref: str = ""  # non-PII u_patient_id, always safe to show
+    restricted: AgentIdentity
+    privileged: AgentIdentity
+    fields: list[PatientFieldAccess] = []
+    redacted_count: int = 0
+
+
 class NotificationItem(BaseModel):
     sys_id: str = ""
     notification_id: str = ""
@@ -467,6 +660,7 @@ class AclTestCheck(BaseModel):
     passed: bool
     table: str
     fields: list[str]
+    operation: Literal["read", "write"] = "read"
     status_code: int | None = None
     detail: str = ""
 
@@ -475,6 +669,17 @@ class AclTestResponse(BaseModel):
     service_account: str
     overall_status: Literal["passed", "failed", "inconclusive", "error"]
     checks: list[AclTestCheck]
+
+
+class AclSummaryResponse(BaseModel):
+    """Aggregate least-privilege posture across every governed service account (UC2)."""
+
+    agents_tested: int = 0
+    agents_passed: int = 0
+    checks_total: int = 0
+    access_blocked: int = 0  # denied checks that were correctly blocked
+    write_denials: int = 0  # blocked write attempts (excessive-agency guardrails)
+    leaks: int = 0  # expected-denied checks that were actually allowed
 
 
 class RegisterAgentRequest(BaseModel):
@@ -530,3 +735,28 @@ class ExecuteAgentResponse(BaseModel):
     state: str | None = None
     status: str = "completed"
     error: str | None = None
+
+
+class GuardrailScanRequest(BaseModel):
+    text: str
+
+
+class MatchedPattern(BaseModel):
+    name: str
+    surface: str  # "input" | "output"
+
+
+class GuardrailScanResponse(BaseModel):
+    verdict: str  # "blocked" | "flagged" | "clean"
+    matched_patterns: list[MatchedPattern]
+    action: str
+    ai_case_number: str | None = None
+    ai_case_sys_id: str | None = None
+
+
+class SecurityKpisResponse(BaseModel):
+    ai_cases_open: int
+    active_injection_filters: int
+    injection_output_patterns: int
+    automation_rules_active: int
+    recent_cases: list[dict]

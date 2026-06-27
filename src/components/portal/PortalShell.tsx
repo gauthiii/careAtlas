@@ -152,7 +152,7 @@ export function PortalPage({
   children,
 }: {
   label: string
-  title: string
+  title: ReactNode
   intro?: string
   children: ReactNode
 }) {

@@ -31,6 +31,39 @@ export interface SnowAIAsset {
   risk_classification: string
 }
 
+export interface RegulatoryEvidenceCandidate {
+  sys_id: string
+  name: string
+  state: string
+  risk_classification: string
+  updated_on: string
+  evidence_url: string
+}
+
+export interface RegulatoryEvidence {
+  query: string
+  target_sys_id: string
+  target_name: string
+  state: string
+  risk_classification: string
+  evidence_url: string
+  candidates: RegulatoryEvidenceCandidate[]
+  assessment_tasks_count: number
+  risk_assessment_results_count: number
+  entity_maps_count: number
+  post_assessment_actions_count: number
+  fria_actions_active_count: number
+  fria_actions_inactive_count: number
+  has_ai_system_record: boolean
+  has_completed_classification: boolean
+  has_assessment_task: boolean
+  has_risk_assessment_result: boolean
+  has_entity_mapping: boolean
+  has_post_assessment_actions: boolean
+  fria_attached: boolean
+  demo_ready: boolean
+}
+
 export interface ExecuteAgentResponse {
   request_id: string
   output: string
@@ -54,6 +87,7 @@ export interface AclTestCheck {
   passed: boolean
   table: string
   fields: string[]
+  operation: 'read' | 'write'
   status_code?: number | null
   detail: string
 }
@@ -62,6 +96,112 @@ export interface AclTestResponse {
   service_account: string
   overall_status: 'passed' | 'failed' | 'inconclusive' | 'error'
   checks: AclTestCheck[]
+}
+
+export interface AclSummary {
+  agents_tested: number
+  agents_passed: number
+  checks_total: number
+  access_blocked: number
+  write_denials: number
+  leaks: number
+}
+
+export async function fetchAclSummary(): Promise<AclSummary> {
+  const res = await fetch(`${API_BASE}/acl/summary`, { headers: { Accept: 'application/json' } })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as AclSummary
+}
+
+export interface ApprovalLogEntry {
+  sys_id: string
+  timestamp: string
+  decision: 'approved' | 'denied' | 'unknown'
+  detail: string
+  created_by: string
+}
+
+export async function fetchApprovalLog(limit = 50): Promise<ApprovalLogEntry[]> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  const res = await fetch(`${API_BASE}/governance/approval/log?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as ApprovalLogEntry[]
+}
+
+export interface ApprovalRecord {
+  request_id: string
+  intent: string
+  high_impact: boolean
+  reason: string
+  status: 'pending_approval' | 'auto_completed' | 'approved' | 'denied'
+  approver: string
+  audit_logged: boolean
+}
+
+export interface ScopedFieldValue {
+  label: string
+  value: string
+}
+
+export interface ScopedAgentAnswer {
+  kind: 'scoped_data' | 'approval' | 'info'
+  agent_key: string
+  agent_label: string
+  agent_username: string
+  scope: string
+  patient_ref: string
+  allowed: ScopedFieldValue[]
+  denied: string[]
+  reply: string
+  request_id: string
+  intent: string
+  reason: string
+}
+
+export async function askScopedAgent(input: {
+  agentKey: string
+  question: string
+  patientEmail?: string
+  patientSysId?: string
+}): Promise<ScopedAgentAnswer> {
+  const res = await fetch(`${API_BASE}/governance/agent/ask`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      agent_key: input.agentKey,
+      question: input.question,
+      patient_email: input.patientEmail ?? '',
+      patient_sys_id: input.patientSysId ?? '',
+    }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as ScopedAgentAnswer
+}
+
+export async function submitApprovalIntent(intent: string): Promise<ApprovalRecord> {
+  const res = await fetch(`${API_BASE}/governance/approval/submit`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ intent }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as ApprovalRecord
+}
+
+export async function decideApproval(
+  requestId: string,
+  decision: 'approve' | 'deny',
+  approver: string,
+): Promise<ApprovalRecord> {
+  const res = await fetch(`${API_BASE}/governance/approval/${requestId}/decision`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decision, approver }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as ApprovalRecord
 }
 
 export interface PatientRegistrationRequest {
@@ -139,6 +279,26 @@ export interface PatientProfileLookup {
   email?: string
   username?: string
   name?: string
+}
+
+export interface PatientSearchResult {
+  sys_id: string
+  patient_id: string
+  name: string
+  email: string
+}
+
+export async function searchPatients(q: string, limit = 8): Promise<PatientSearchResult[]> {
+  const term = q.trim()
+  if (term.length < 2) return []
+  const params = new URLSearchParams({ q: term, limit: String(limit) })
+  const res = await fetch(`${API_BASE}/patients/search?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+  return (await res.json()) as PatientSearchResult[]
 }
 
 export interface BookingDoctor {
@@ -363,6 +523,23 @@ export async function fetchUnmanagedAIAssets(): Promise<SnowAIAsset[]> {
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
   return (await res.json()) as SnowAIAsset[]
+}
+
+export async function fetchRegulatoryEvidence(query = 'Triage Appointment DG1'): Promise<RegulatoryEvidence> {
+  const params = new URLSearchParams({ query })
+  const res = await fetch(`${API_BASE}/governance/regulation/evidence?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as RegulatoryEvidence
+}
+
+export async function fetchRegulatoryAiSystems(): Promise<RegulatoryEvidenceCandidate[]> {
+  const res = await fetch(`${API_BASE}/governance/regulation/ai-systems`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as RegulatoryEvidenceCandidate[]
 }
 
 export async function executeAgent(
@@ -713,6 +890,90 @@ export async function fetchAiDecisionLog(limit = 25): Promise<AiDecisionLogEntry
   return (await res.json()) as AiDecisionLogEntry[]
 }
 
+export interface PiiFieldAclStatus {
+  field: string
+  label: string
+  protected: boolean
+}
+
+export interface PrivacyControls {
+  pii_acl_status: 'enforced' | 'partial' | 'off'
+  protected_field_count: number
+  pii_fields: PiiFieldAclStatus[]
+  deny_probe_ran: boolean
+  deny_probe_passed: boolean
+  deny_probe_detail: string
+  visible_pii_fields: string[]
+  redaction_on: boolean
+  active_pii_filters: number
+  active_filter_total: number
+  pii_pattern_count: number
+  anonymization_rate: number
+  decision_log_rows: number
+  anonymized_rows: number
+}
+
+export async function fetchPrivacyControls(): Promise<PrivacyControls> {
+  const res = await fetch(`${API_BASE}/governance/privacy-controls`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as PrivacyControls
+}
+
+export interface AgentIdentity {
+  key: 'restricted' | 'privileged'
+  label: string
+  username: string
+  role: string
+  has_pii_role: boolean
+  served_by: string
+  reachable: boolean
+  note: string
+}
+
+export interface PatientFieldAccess {
+  key: string
+  label: string
+  category: 'pii' | 'safe'
+  privileged_value: string
+  restricted_value: string
+  redacted_for_restricted: boolean
+}
+
+export interface PatientAccessComparison {
+  patient_sys_id: string
+  patient_ref: string
+  restricted: AgentIdentity
+  privileged: AgentIdentity
+  fields: PatientFieldAccess[]
+  redacted_count: number
+}
+
+export async function fetchPatientAccessComparison(
+  opts?: string | { q?: string; sysId?: string },
+): Promise<PatientAccessComparison> {
+  const params = new URLSearchParams()
+  // Back-compat: a bare string is treated as the `q` search term.
+  const normalized = typeof opts === 'string' ? { q: opts } : (opts ?? {})
+  if (normalized.q && normalized.q.trim()) params.set('q', normalized.q.trim())
+  if (normalized.sysId && normalized.sysId.trim()) params.set('sys_id', normalized.sysId.trim())
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  const res = await fetch(`${API_BASE}/governance/privacy/patient-lookup${suffix}`, {
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await readError(res)}`)
+  }
+
+  return (await res.json()) as PatientAccessComparison
+}
+
 export async function testServiceAccountAcl(serviceAccount: string): Promise<AclTestResponse> {
   const res = await fetch(`${API_BASE}/acl/test`, {
     method: 'POST',
@@ -787,4 +1048,84 @@ export async function markNotificationRead(
     body: JSON.stringify({ audience }),
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+}
+
+// ---------------------------------------------------------------------------
+// UC6 Fairness — Non-Discriminatory Scheduling
+// ---------------------------------------------------------------------------
+
+export interface FairnessGroupItem {
+  group: string
+  pct: number
+  expected: number
+  count: number
+  skewed: boolean
+}
+
+export interface FairnessData {
+  by_gender: FairnessGroupItem[]
+  by_ethnicity: FairnessGroupItem[]
+  by_age: FairnessGroupItem[]
+  total_appointments: number
+  bias_risk_statements: string[]
+  fairness_metric_count: number
+  max_skew_pp: number
+  skew_alert: boolean
+}
+
+export async function fetchFairnessData(): Promise<FairnessData> {
+  const res = await fetch(`${API_BASE}/governance/fairness`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as FairnessData
+}
+
+// ---------------------------------------------------------------------------
+// UC5 Security — Prompt-Injection Defense + Output-Pattern Detection
+// ---------------------------------------------------------------------------
+
+export interface MatchedPattern {
+  name: string
+  surface: 'input' | 'output'
+}
+
+export interface GuardrailScanResult {
+  verdict: 'blocked' | 'flagged' | 'clean'
+  matched_patterns: MatchedPattern[]
+  action: string
+  ai_case_number: string | null
+  ai_case_sys_id: string | null
+}
+
+export interface SecurityKpis {
+  ai_cases_open: number
+  active_injection_filters: number
+  injection_output_patterns: number
+  automation_rules_active: number
+  recent_cases: Array<{
+    number: string
+    short_description: string
+    created_on: string
+    priority: string
+    state: string
+  }>
+}
+
+export async function scanGuardrailApi(text: string): Promise<GuardrailScanResult> {
+  const res = await fetch(`${API_BASE}/governance/guardrail/scan`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as GuardrailScanResult
+}
+
+export async function fetchSecurityKpis(): Promise<SecurityKpis> {
+  const res = await fetch(`${API_BASE}/governance/security-kpis`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as SecurityKpis
 }

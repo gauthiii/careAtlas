@@ -1,12 +1,52 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { ArrowLeft, ArrowRight, Radar, ShieldAlert, Siren } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { InjectionTesterDemo } from '../../../components/governance/InjectionTesterDemo'
-import { ArrowRight, Radar, ArrowLeft } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { fetchSecurityKpis, type SecurityKpis } from '../../../services/serviceNow'
+
+const PRIORITY_LABEL: Record<string, { label: string; cls: string }> = {
+  '1': { label: 'Critical', cls: 'border-red-300 bg-red-50 text-red-700' },
+  '2': { label: 'High', cls: 'border-orange-300 bg-orange-50 text-orange-700' },
+  '3': { label: 'Moderate', cls: 'border-amber-300 bg-amber-50 text-amber-700' },
+  '4': { label: 'Low', cls: 'border-blue-200 bg-blue-50 text-blue-700' },
+  '5': { label: 'Planning', cls: 'border-slate-200 bg-slate-50 text-slate-600' },
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+  const p = PRIORITY_LABEL[priority] ?? { label: priority, cls: 'border-slate-200 bg-slate-50 text-slate-600' }
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${p.cls}`}>
+      {p.label}
+    </span>
+  )
+}
+
+function formatDate(iso: string) {
+  if (!iso) return '—'
+  // ServiceNow returns "2026-06-26 05:46:01"
+  const d = new Date(iso.replace(' ', 'T') + 'Z')
+  return isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
+}
 
 export function GovernanceSecurityPage() {
   const [modalOpen, setModalOpen] = useState(false)
+  const [kpis, setKpis] = useState<SecurityKpis | null>(null)
+  const [kpisLoading, setKpisLoading] = useState(true)
+  const [kpisError, setKpisError] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    let active = true
+    setKpisLoading(true)
+    setKpisError(null)
+    fetchSecurityKpis()
+      .then((data) => { if (active) setKpis(data) })
+      .catch((err: Error) => { if (active) setKpisError(err.message) })
+      .finally(() => { if (active) setKpisLoading(false) })
+    return () => { active = false }
+  }, [refreshKey])
 
   return (
     <PortalPage
@@ -26,6 +66,7 @@ export function GovernanceSecurityPage() {
       intro="OWASP LLM01: Catch the trick going in and scan every output for known-bad patterns. Run the interactive demo below, or view the end-to-end animated workflow."
     >
       <section className="px-6 pb-6">
+        {/* Workflow modal trigger */}
         <button
           type="button"
           onClick={() => setModalOpen(true)}
@@ -45,10 +86,107 @@ export function GovernanceSecurityPage() {
           </span>
         </button>
 
+        {/* Injection tester */}
         <div className="mt-8">
-          <InjectionTesterDemo />
+          <InjectionTesterDemo onScanComplete={() => setRefreshKey((k) => k + 1)} />
+        </div>
+
+        {/* AI Cases table */}
+        <div className="mt-8">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#fdecec] text-[#a22828]">
+                <Siren size={16} />
+              </span>
+              <div>
+                <h3 className="m-0 text-sm font-bold text-[#102033]">Injection Alert Cases</h3>
+                <p className="m-0 text-[11px] text-[#53687b]">
+                  Live from <span className="font-mono">sn_ai_case_mgmt_ai_case</span> · case_type = adversarial_attacks
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {kpis && (
+                <span className="rounded-full border border-[#d7e5ec] bg-[#f4f8fb] px-2.5 py-0.5 text-[11px] font-bold text-[#143A57]">
+                  {kpis.ai_cases_open} open
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setRefreshKey((k) => k + 1)}
+                className="text-[11px] font-bold text-[#0397AE] hover:underline"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#d7e5ec] bg-white overflow-hidden">
+            {kpisLoading && (
+              <div className="py-8 text-center text-sm text-[#53687b]">Loading cases…</div>
+            )}
+
+            {kpisError && !kpisLoading && (
+              <div className="py-6 text-center text-sm text-[#a22828]">
+                Failed to load cases: {kpisError}
+              </div>
+            )}
+
+            {!kpisLoading && !kpisError && kpis && kpis.recent_cases.length === 0 && (
+              <div className="py-8 text-center text-sm text-[#53687b]">
+                No adversarial AI Cases yet — run a scan above to create one.
+              </div>
+            )}
+
+            {!kpisLoading && !kpisError && kpis && kpis.recent_cases.length > 0 && (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#e5eef3] bg-[#f4f8fb] text-left">
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-[#53687b]">Case #</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-[#53687b]">Description</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-[#53687b]">Priority</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-[#53687b]">Opened</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kpis.recent_cases.map((c, i) => (
+                    <tr
+                      key={c.number}
+                      className={`border-b border-[#f0f6fa] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fafcfd]'}`}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <ShieldAlert size={13} className="shrink-0 text-[#a22828]" />
+                          <span className="font-mono text-xs font-bold text-[#143A57]">{c.number}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-[#40566b] max-w-[380px]">
+                        {c.short_description}
+                      </td>
+                      <td className="px-4 py-3">
+                        <PriorityBadge priority={c.priority} />
+                      </td>
+                      <td className="px-4 py-3 text-xs text-[#6b7c8f]">
+                        {formatDate(c.created_on)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {!kpisLoading && kpis && (
+              <div className="border-t border-[#e5eef3] bg-[#f4f8fb] px-4 py-2.5 text-[10px] text-[#6b7c8f]">
+                Showing last {kpis.recent_cases.length} cases ·{' '}
+                <span className="font-mono">sn_ai_governance_automation_rule</span> active ·{' '}
+                {kpis.active_injection_filters} injection filter{kpis.active_injection_filters !== 1 ? 's' : ''} ·{' '}
+                {kpis.injection_output_patterns} output patterns
+              </div>
+            )}
+          </div>
         </div>
       </section>
+
       <UseCaseWorkflowsModal open={modalOpen} onClose={() => setModalOpen(false)} initialTab="uc5" />
     </PortalPage>
   )

@@ -7,26 +7,52 @@ import {
   maxSkew,
   type FairnessGroup,
 } from '../../data/useCaseDemoData'
+import { useFairnessData } from '../../hooks/useFairnessData'
 import { DemoTag } from './DemoTag'
 import { cn } from '../../lib/cn'
 
-const DIMENSIONS: { key: string; label: string; groups: FairnessGroup[] }[] = [
-  { key: 'ethnicity', label: 'Ethnicity', groups: FAIRNESS_BY_ETHNICITY },
-  { key: 'gender', label: 'Gender', groups: FAIRNESS_BY_GENDER },
-  { key: 'age', label: 'Age band', groups: FAIRNESS_BY_AGE },
-]
-
 const ALERT_THRESHOLD = 5 // percentage points
+
+type DimKey = 'ethnicity' | 'gender' | 'age'
+
+interface Dimension {
+  key: DimKey
+  label: string
+  staticGroups: FairnessGroup[]
+}
+
+const DIMENSIONS: Dimension[] = [
+  { key: 'ethnicity', label: 'Ethnicity', staticGroups: FAIRNESS_BY_ETHNICITY },
+  { key: 'gender', label: 'Gender', staticGroups: FAIRNESS_BY_GENDER },
+  { key: 'age', label: 'Age band', staticGroups: FAIRNESS_BY_AGE },
+]
 
 /**
  * UC6 · Fairness — "before / after debiasing" view of appointment-outcome
  * allocation across demographic groups. Grouped aggregates only, no PII.
+ *
+ * "Before" = live data from the instance (u_appointment joined with u_patient demographics).
+ * "After"  = deterministic debiased view (each group nudged to expected ± 1pp).
+ * Falls back to static demo data if the API is unreachable.
  */
 export function FairnessDebiasDemo() {
-  const [dim, setDim] = useState(DIMENSIONS[0])
+  const [dimKey, setDimKey] = useState<DimKey>('ethnicity')
   const [mode, setMode] = useState<'biased' | 'debiased'>('biased')
 
-  const skew = maxSkew(dim.groups, mode)
+  const live = useFairnessData()
+
+  const dim = DIMENSIONS.find((d) => d.key === dimKey)!
+
+  // Use live groups if loaded and non-empty, else static fallback.
+  const groups: FairnessGroup[] = (() => {
+    if (!live.loaded) return dim.staticGroups
+    if (dimKey === 'ethnicity' && live.byEthnicity.length > 0) return live.byEthnicity
+    if (dimKey === 'gender' && live.byGender.length > 0) return live.byGender
+    if (dimKey === 'age' && live.byAge.length > 0) return live.byAge
+    return dim.staticGroups
+  })()
+
+  const skew = maxSkew(groups, mode)
   const tripped = skew >= ALERT_THRESHOLD
 
   return (
@@ -40,10 +66,11 @@ export function FairnessDebiasDemo() {
             <h3 className="m-0 text-sm font-bold text-[#102033]">Before / after debiasing</h3>
             <p className="m-0 text-[11px] font-semibold text-[#53687b]">
               UC6 · Fairness · EU AI Act Art. 10 — outcome allocation by group
+              {live.loaded && ` · ${live.totalAppointments} appointments live`}
             </p>
           </div>
         </div>
-        <DemoTag />
+        <DemoTag label={live.loaded ? 'Live · ven04690' : 'Simulated · demo'} />
       </div>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -52,10 +79,10 @@ export function FairnessDebiasDemo() {
             <button
               key={d.key}
               type="button"
-              onClick={() => setDim(d)}
+              onClick={() => setDimKey(d.key)}
               className={cn(
                 'rounded-md px-2.5 py-1 text-[11px] font-bold',
-                d.key === dim.key ? 'bg-[#143A57] text-white' : 'text-[#53687b] hover:bg-slate-50',
+                d.key === dimKey ? 'bg-[#143A57] text-white' : 'text-[#53687b] hover:bg-slate-50',
               )}
             >
               {d.label}
@@ -80,7 +107,7 @@ export function FairnessDebiasDemo() {
       </div>
 
       <div className="space-y-2.5">
-        {dim.groups.map((g) => {
+        {groups.map((g) => {
           const value = g[mode]
           const delta = value - g.expected
           const off = Math.abs(delta) >= ALERT_THRESHOLD
@@ -102,6 +129,19 @@ export function FairnessDebiasDemo() {
           )
         })}
       </div>
+
+      {live.loaded && live.biasRiskStatements.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {live.biasRiskStatements.map((name) => (
+            <span key={name} className="rounded-full bg-[#e7f0f8] px-2 py-0.5 text-[10px] font-semibold text-[#143A57]">
+              {name}
+            </span>
+          ))}
+          <span className="rounded-full bg-[#f0f4f8] px-2 py-0.5 text-[10px] font-semibold text-[#53687b]">
+            {live.fairnessMetricCount} fairness metrics
+          </span>
+        </div>
+      )}
 
       <div
         className={cn(
