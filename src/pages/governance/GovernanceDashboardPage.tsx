@@ -4,6 +4,7 @@ import {
   ClipboardList,
   Lock,
   ShieldAlert,
+  ShieldCheck,
   Siren,
   AlertTriangle,
   ArrowRight,
@@ -396,7 +397,57 @@ export function GovernanceDashboardPage() {
         <div className="space-y-8">
           {/* DATA PRIVACY & PII PROTECTION (UC1) */}
           <PrivacyControlsPanel />
+           {/* CONSENT ENFORCEMENT — UC11 */}
+          <PortalPanel
+            title="Patient Consent Enforcement"
+            icon={<ShieldCheck size={18} />}
+          >
+            <div className="mb-4 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
+              <ShieldCheck size={16} className="text-green-600 shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-green-700">ConsentGate active</p>
+                <p className="text-xs text-green-600">
+                  All agents checked against patient consent flags before data access
+                </p>
+              </div>
+            </div>
 
+            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-[#6c7b8a]">
+              Gated agents
+            </p>
+
+            <div className="space-y-2">
+              {[
+                { agent: 'Scheduling Agent', purpose: 'scheduling', account: 'svc-scheduling-agent' },
+                { agent: 'Clinical Notes Agent', purpose: 'notes_summarisation', account: 'svc-notes-agent' },
+                { agent: 'Reminder Agent', purpose: 'reminders', account: 'svc-reminder-agent' },
+                { agent: 'Triage Agent', purpose: 'triage', account: 'svc-triage-agent' },
+              ].map((row) => (
+                <div
+                  key={row.agent}
+                  className="flex items-center justify-between rounded-lg border border-[#d7e5ec] bg-[#fbfdfe] px-3 py-2 text-sm"
+                >
+                  <div>
+                    <p className="font-semibold text-[#102033]">{row.agent}</p>
+                    <p className="text-xs text-[#607487]">{row.account}</p>
+                  </div>
+                  <div className="text-right">
+                    <Badge success>Enforced</Badge>
+                    <p className="mt-1 text-xs text-[#607487]">{row.purpose}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-lg border border-[#d7e5ec] bg-[#f7fbfd] px-4 py-3 text-xs text-[#607487]">
+              <p className="font-semibold text-[#102033] mb-1">How enforcement works</p>
+              <p>
+                Before any agent reads a patient record, ConsentGate checks the patient's
+                consent flags in ServiceNow. If the required flag is absent, the agent is
+                blocked and an audit record is written. No patient data is accessed.
+              </p>
+            </div>
+          </PortalPanel>
           {/* SHADOW AI */}
           <PortalPanel
             title="Shadow AI Detection"

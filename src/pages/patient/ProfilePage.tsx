@@ -13,6 +13,7 @@ import {
   Move,
   RefreshCw,
   ShieldAlert,
+  ShieldCheck,
   Upload,
   X,
   ZoomIn,
@@ -21,7 +22,7 @@ import {
 import { PatientPage } from '../../components/patient/PatientShell'
 import { patient } from '../../data/patientPortalData'
 import { usePatientAuth } from '../../contexts/PatientAuthContext'
-import { fetchPatientProfile, updatePatientProfile, type PatientProfile } from '../../services/serviceNow'
+import { fetchPatientProfile, updatePatientProfile,fetchConsentFlags, updateConsentFlags, type PatientProfile } from '../../services/serviceNow'
 
 type ProfileView = {
   patientId: string
@@ -253,6 +254,10 @@ export function ProfilePage() {
   const [largeText, setLargeText] = useState(false)
   const [hearingLoop, setHearingLoop] = useState(false)
   const [interpreterRequired, setInterpreterRequired] = useState(false)
+  const [consentFlags, setConsentFlags] = useState<string[]>([])
+  const [isConsentLoading, setIsConsentLoading] = useState(false)
+  const [consentSaving, setConsentSaving] = useState(false)
+  const [consentError, setConsentError] = useState<string | null>(null)
   const [selectedActivity, setSelectedActivity] = useState(0)
   const [avatarDataUrl, setAvatarDataUrl] = useState('')
   const [cropSource, setCropSource] = useState('')
@@ -290,6 +295,33 @@ export function ProfilePage() {
     }
   }, [user?.attributes.email, user?.attributes.name, user?.username, profileRefreshKey])
 
+  useEffect(() => {
+    const username = user?.username?.trim() || ''
+    if (!username) return
+    setIsConsentLoading(true)
+    fetchConsentFlags(username)
+      .then((data) => setConsentFlags(data.flags))
+      .catch(() => {})
+      .finally(() => setIsConsentLoading(false))
+  }, [user?.username])
+
+  async function handleConsentToggle(value: string) {
+    const username = user?.username?.trim() || ''
+    if (!username) return
+    const updated = consentFlags.includes(value)
+      ? consentFlags.filter((f) => f !== value)
+      : [...consentFlags, value]
+    setConsentFlags(updated)
+    setConsentSaving(true)
+    setConsentError(null)
+    try {
+      await updateConsentFlags(username, updated)
+    } catch {
+      setConsentError('Could not save. Please try again.')
+    } finally {
+      setConsentSaving(false)
+    }
+  }
   const profile = useMemo(() => mergeProfile(loadedProfile), [loadedProfile])
   const displayName = `${profile.firstName} ${profile.lastName}`.trim()
 
@@ -524,6 +556,53 @@ export function ProfilePage() {
                 <RecordFact label="Consent accepted" value={profile.consentAccepted ? 'Yes' : 'No'} loading={isProfileLoading} />
                 <RecordFact label="Privacy notice" value={profile.privacyNoticeVersion} loading={isProfileLoading} />
                 <RecordFact label="Email verified" value={profile.verified ? 'Yes' : 'No'} loading={isProfileLoading} />
+              </div>
+              <div className="grid gap-3 rounded-[12px] border border-[#d7e5ec] bg-[#fbfdfe] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#6c7b8a]">
+                    AI feature consent
+                  </p>
+                  {consentSaving && <Loader2 size={12} className="animate-spin text-[#0f5f8c]" />}
+                </div>
+                <p className="text-xs text-[#607487]">
+                  Choose which AI features may process your records.
+                </p>
+                {isConsentLoading ? (
+                  <div className="space-y-2">
+                    <SkeletonBlock className="h-8 w-full" />
+                    <SkeletonBlock className="h-8 w-full" />
+                    <SkeletonBlock className="h-8 w-full" />
+                    <SkeletonBlock className="h-8 w-full" />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {[
+                      { value: 'scheduling', label: 'Appointment scheduling' },
+                      { value: 'notes_summarisation', label: 'Clinical notes' },
+                      { value: 'reminders', label: 'Appointment reminders' },
+                      { value: 'triage', label: 'Triage assessment' },
+                    ].map((opt) => (
+                      <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="accent-[#143f6b]"
+                          checked={consentFlags.includes(opt.value)}
+                          onChange={() => handleConsentToggle(opt.value)}
+                          disabled={consentSaving}
+                        />
+                        <span className="text-sm text-[#102033]">{opt.label}</span>
+                        {consentFlags.includes(opt.value) ? (
+                          <ShieldCheck size={12} className="text-green-600 ml-auto" />
+                        ) : (
+                          <ShieldAlert size={12} className="text-red-400 ml-auto" />
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {consentError && (
+                  <p className="text-xs text-red-600">{consentError}</p>
+                )}
               </div>
               <ToggleRow title="Share records with GP" description={statusText(shareRecords)} enabled={shareRecords} onChange={setShareRecords} />
               <ToggleRow title="Clinician record access" description={clinicianAccess ? 'Full access enabled' : 'Limited access selected'} enabled={clinicianAccess} onChange={setClinicianAccess} />

@@ -1129,3 +1129,47 @@ export async function fetchSecurityKpis(): Promise<SecurityKpis> {
   if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
   return (await res.json()) as SecurityKpis
 }
+// ── UC11 Consent ──────────────────────────────────────────────────────────────
+
+export interface ConsentFlagsResponse {
+  flags: string[]
+  consent_accepted: boolean
+  flags_set: boolean
+}
+
+export interface ConsentCoverageResponse {
+  total: number
+  fully_consented: number
+  partial: number
+  no_consent: number
+  enforcement_active: boolean
+}
+
+export async function fetchConsentFlags(username: string): Promise<ConsentFlagsResponse> {
+  const res = await fetch('/api/patient/consent-flags', {
+    headers: { 'X-Username': username },
+  })
+  if (!res.ok) throw new Error('Failed to fetch consent flags')
+  return res.json()
+}
+
+export async function updateConsentFlags(
+  username: string,
+  flags: string[]
+): Promise<void> {
+  const res = await fetch('/api/patient/consent-flags', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Username': username,
+    },
+    body: JSON.stringify({ flags }),
+  })
+  if (!res.ok) throw new Error('Failed to update consent flags')
+}
+
+export async function fetchConsentCoverage(): Promise<ConsentCoverageResponse> {
+  const res = await fetch('/api/governance/consent-coverage')
+  if (!res.ok) throw new Error('Failed to fetch consent coverage')
+  return res.json()
+}
