@@ -29,8 +29,8 @@ export function LandingPage() {
               Register securely, schedule clinic appointments, and access your care information through {hospital.name}'s online patient portal.
             </p>
             <div className="mt-6 grid grid-cols-[repeat(2,max-content)] gap-4 max-[720px]:grid-cols-1">
-              <Link className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] px-[15px] font-bold text-white max-[720px]:w-full" to="/patient/register">
-                Register as a new patient <ArrowRight size={18} />
+              <Link className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] bg-[#143A57] px-[15px] font-bold !text-white max-[720px]:w-full" to="/patient/register">
+                Register as a new Patient <ArrowRight size={18} />
               </Link>
               <Link className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full" to="/patient/sign-in">
                 <LockKeyhole size={18} /> Sign in
@@ -41,43 +41,43 @@ export function LandingPage() {
             className="rounded-2xl border border-[#d7d3ca] bg-white p-6"
             aria-label="Hospital information"
           >
-            <h2 className="mb-5 text-lg font-semibold text-[#2b2b2b]">
+            <h2 className="mb-5 text-lg !font-bold text-[#2b2b2b]">
               Available through this portal
             </h2>
 
             <ul className="space-y-4">
-              <li className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e7f3f8]">
-                  <CalendarDays size={16} className="text-[#0397AE]" />
+              <li className="flex items-center gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e7f3f8] text-[#0f5f8c]">
+                  <CalendarDays size={16} />
                 </div>
-                <span className="text-base leading-6 text-[#1f1f1f] mt-2">
+                <span className="text-base leading-6 text-[#1f1f1f]">
                   Appointment scheduling and visit reminders
                 </span>
               </li>
 
-              <li className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e7f3f8]">
-                  <UserRound size={16} className="text-[#0397AE]" />
+              <li className="flex items-center gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e7f3f8] text-[#0f5f8c]">
+                  <UserRound size={16} />
                 </div>
-                <span className="text-base leading-6 text-[#1f1f1f] mt-2">
+                <span className="text-base leading-6 text-[#1f1f1f]">
                   Secure profile and contact management
                 </span>
               </li>
 
-              <li className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e7f3f8]">
-                  <MessageCircle size={16} className="text-[#0397AE]" />
+              <li className="flex items-center gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e7f3f8] text-[#0f5f8c]">
+                  <MessageCircle size={16} />
                 </div>
-                <span className="text-base leading-6 text-[#1f1f1f] mt-2">
+                <span className="text-base leading-6 text-[#1f1f1f]">
                   Clinic messaging for appointments and billing enquiries
                 </span>
               </li>
 
-              <li className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e7f3f8]">
-                  <FileText size={16} className="text-[#0397AE]" />
+              <li className="flex items-center gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e7f3f8] text-[#0f5f8c]">
+                  <FileText size={16} />
                 </div>
-                <span className="text-base leading-6 text-[#1f1f1f] mt-2">
+                <span className="text-base leading-6 text-[#1f1f1f]">
                   Access to visit summaries and referral letters
                 </span>
               </li>
@@ -93,8 +93,8 @@ export function LandingPage() {
             <div className="grid grid-cols-3 gap-4 max-[900px]:grid-cols-1">
               <article className="rounded-xl border border-[#d7d3ca] bg-white p-5">
                 <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e7f3f8]">
-                    <Shield size={16} className="text-[#0397AE]" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e7f3f8] text-[#0f5f8c]">
+                    <Shield size={16} />
                   </div>
 
                   <div>
@@ -113,7 +113,7 @@ export function LandingPage() {
 
               <article className="rounded-xl border border-[#d7d3ca] bg-white p-5">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e7f3f8] text-[#0397AE]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e7f3f8] text-[#0f5f8c]">
                     <ShieldCheck size={16} />
                   </div>
 
@@ -132,7 +132,7 @@ export function LandingPage() {
 
               <article className="rounded-xl border border-[#d7d3ca] bg-white p-5">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e7f3f8] text-[#0397AE]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e7f3f8] text-[#0f5f8c]">
                     <EyeOff size={16} />
                   </div>
 
@@ -173,14 +173,14 @@ export function LandingPage() {
 
                 <div className="flex justify-between border-b border-[#ece7de] pb-2">
                   <span>Sunday</span>
-                  <span className="rounded-full bg-[#fde9e9] px-2 py-0.5 text-xs text-[#b42318]">
+                  <span className="rounded-full bg-[#fde9e9] px-2 py-0.5 text-xs font-bold text-[#b42318]">
                     Closed
                   </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span>Today's status</span>
-                  <span className="rounded-full bg-[#e8f2cf] px-2 py-0.5 text-xs font-semibold text-[#4f6b08]">
+                  <span className="rounded-full bg-emerald-200 px-2 py-0.5 text-xs font-bold text-emerald-700">
                     Open now
                   </span>
                 </div>
@@ -214,7 +214,7 @@ export function LandingPage() {
             </section>
           </div>
         </section>
-        <footer className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-[#d7e5ec] px-4 pt-4 font-semibold text-[#53687b]">
+        {/* <footer className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-[#d7e5ec] px-4 pt-4 font-semibold text-[#53687b]">
           <span>Accessibility statement</span>
           <span>Privacy policy</span>
           <span>Terms of service</span>
@@ -223,7 +223,7 @@ export function LandingPage() {
             <Phone size={15} />
             {hospital.phone}
           </span>
-        </footer>
+        </footer> */}
       </main>
     </PatientShell>
   )

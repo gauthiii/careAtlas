@@ -45,7 +45,7 @@ function StatCard({ label, value, badge, badgeColor, subtitle }: StatCardProps) 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="mt-2 text-3xl font-bold text-slate-900">{value}</div>
+      <div className="mt-2 text-xl font-bold text-slate-900">{value}</div>
       {badge && (
         <div
           className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
@@ -126,7 +126,7 @@ export function DoctorDashboardPage() {
           <button
             type="button"
             onClick={refetch}
-            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c] max-[720px]:w-full"
+            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-[#0397AE] bg-white px-[15px] font-bold text-[#0397AE] max-[720px]:w-full"
           >
             <RefreshCw size={15} />
             Refresh
@@ -178,7 +178,7 @@ export function DoctorDashboardPage() {
                 </button>
               )}
               <Link to="/staff/availability" className="rounded-lg bg-[#143A57] px-3 py-2 text-sm font-semibold !text-white">
-                View availability
+                View Availability
               </Link>
             </div>
           </div>
@@ -233,7 +233,7 @@ export function DoctorDashboardPage() {
                     key={item.date}
                     onClick={() => setSelectedDate(item.date)}
                     title={`Show appointments for ${formatDate(item.date)}`}
-                    className={`rounded-xl border p-2 text-center transition hover:border-[#0397AE] hover:bg-[#f1f9fb] ${
+                    className={`rounded-xl border p-2 text-center transition${
                       isSelected
                         ? 'border-[#143A57] bg-[#143A57] text-white shadow-sm'
                         : isCurrentDay

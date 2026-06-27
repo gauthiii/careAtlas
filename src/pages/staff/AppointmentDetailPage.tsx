@@ -222,7 +222,7 @@ export function AppointmentDetailPage() {
               <button
                 type="button"
                 onClick={() => void loadNotes()}
-                className="inline-flex min-h-[40px] items-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-[15px] font-bold text-[#0f5f8c]"
+                className="inline-flex min-h-[40px] items-center gap-2 rounded-[9px] border border-[#0397AE] bg-white px-[15px] font-bold text-[#0397AE]"
               >
                 <RefreshCw size={15} />
                 Refresh

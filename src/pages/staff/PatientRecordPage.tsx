@@ -220,7 +220,7 @@ export function PatientRecordPage() {
           <button
             type="submit"
             disabled={isSearching || !searchTerm.trim()}
-            className="self-end inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#0f5f8c] px-[15px] font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50 max-[720px]:w-full"
+            className="self-end inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#143A57] px-[15px] font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50 max-[720px]:w-full"
           >
             {isSearching ? <LoaderCircle size={17} className="animate-spin" /> : <Search size={17} />}
             Search

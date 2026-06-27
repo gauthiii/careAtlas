@@ -432,7 +432,7 @@ export function AiAssistantWidget({
           >
             <header className="flex items-center justify-between gap-4 border-b border-[#d7e5ec] px-5 py-4">
               <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-[10px] bg-[#e9fbfd] text-[#0f5f8c]">
+                <span className="grid h-10 w-10 place-items-center rounded-[10px] bg-[#e7f3f8] text-[#0f5f8c]">
                   <Sparkles size={20} aria-hidden="true" />
                 </span>
                 <div>

@@ -210,17 +210,17 @@ export function RegistrationPage() {
       intro="Complete the intake form so the clinic can verify your identity and prepare appointment access."
     >
       <form onSubmit={handleSubmit} className="grid gap-[22px] rounded-[14px] border border-[#d7e5ec] bg-white p-6 shadow-[0_12px_30px_rgba(25,64,93,0.07)] max-[720px]:rounded-xl">
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-[#e7d8f5] bg-gradient-to-r from-[#f6f0fc] to-[#eef5fb] p-4 max-[720px]:grid max-[720px]:grid-cols-1">
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-[#e7d8f5] bg-[#0397AE]/10 p-4 max-[720px]:grid max-[720px]:grid-cols-1">
           <div>
             <h2 className="m-0 flex items-center gap-1.5 text-[1.02rem] tracking-normal text-[#102033]">
-              <Sparkles size={18} className="text-[#8b3fd1]" /> Auto-fill with sample data
+              <Sparkles size={18} className="text-[#0397AE]" /> Auto-fill with sample data
             </h2>
             <p className="mt-1.5 mb-0 leading-normal text-[#607487]">Generate a realistic patient profile to skip manual entry while testing.</p>
           </div>
           <button
             type="button"
             onClick={handleAutoFill}
-            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-transparent bg-gradient-to-r from-[#8b3fd1] to-[#5a55e0] px-[18px] font-bold !text-white shadow-[0_8px_20px_rgba(124,58,209,0.28)] transition-transform hover:-translate-y-px active:translate-y-0"
+            className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#0397AE] px-[18px] !font-semibold !text-white transition-transform hover:-translate-y-px active:translate-y-0"
           >
             <Sparkles size={16} /> Generate fields
           </button>
@@ -308,10 +308,10 @@ export function RegistrationPage() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#143A57] px-[15px] font-bold !text-white disabled:cursor-not-allowed disabled:opacity-70 max-[720px]:w-full"
+          className="inline-flex min-h-[42px] w-max cursor-pointer items-center justify-center gap-2 rounded-[9px] border border-transparent bg-[#143A57] px-[15px] !font-semibold !text-white disabled:cursor-not-allowed disabled:opacity-70 max-[720px]:w-full"
         >
           {isSubmitting ? <LoaderCircle size={17} className="animate-spin" /> : null}
-          {isSubmitting ? 'Creating registration...' : 'Submit registration'}
+          {isSubmitting ? 'Creating registration...' : 'Submit Registration'}
         </button>
       </form>
 

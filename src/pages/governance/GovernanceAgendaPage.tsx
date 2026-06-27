@@ -50,9 +50,6 @@ interface AgendaSection {
   title: string
   subtitle: string
   icon: typeof Bot
-  color: string
-  bg: string
-  border: string
   items: AgendaItem[]
   // 'planned' shows an amber "Planned" badge instead of the green "Done" badge.
   status?: 'done' | 'planned'
@@ -77,9 +74,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'Three-Portal Frontend',
     subtitle: 'Patient · Clinician · AI Governance Officer',
     icon: LayoutDashboard,
-    color: '#0f5f8c',
-    bg: '#e7f3f8',
-    border: '#cfe0ea',
     items: [
       { label: 'Patient Portal', detail: 'Landing, Registration, Email Verification, Sign-In, Dashboard, Appointment Booking, Profile', done: true },
       { label: 'Clinician Portal', detail: 'Staff Sign-In, Doctor Dashboard, Admin Dashboard, Patient Records, Availability Calendar, Doctor Profile', done: true },
@@ -92,9 +86,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'Authentication & MFA',
     subtitle: 'TOTP-based multi-factor auth via authenticator apps',
     icon: KeyRound,
-    color: '#0f6b4f',
-    bg: '#e8f7ef',
-    border: '#a7dfbf',
     items: [
       { label: 'Patient login', detail: 'ServiceNow sys_user validated via REST, session stored in React context', done: true },
       { label: 'Clinician login', detail: 'Separate credential store, role-gated routes for doctor vs admin views', done: true },
@@ -108,9 +99,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'ServiceNow Tables',
     subtitle: 'Custom tables wired to all app data',
     icon: Database,
-    color: '#6d28d9',
-    bg: '#f0ebff',
-    border: '#c4b5fd',
     items: [
       { label: 'u_careatlas_patient', detail: 'Patient registration records — demographics, health condition, insurance, consent', done: true },
       { label: 'u_careatlas_doctor', detail: 'Clinician roster — speciality, department, availability slots', done: true },
@@ -128,9 +116,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'AI Agent Pipeline',
     subtitle: 'ServiceNow AI Agent Studio — multi-agent orchestration',
     icon: Brain,
-    color: '#b45309',
-    bg: '#fef3c7',
-    border: '#fcd34d',
     items: [
       { label: 'Schedule Appointment Agent', detail: 'Books patient appointments via conversational AI — reads availability, writes booking record', done: true },
       { label: 'Bad Patient Agent', detail: 'Unrestricted agent with no ACL — used in ACL demo to show PII leakage risk', done: true },
@@ -146,9 +131,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'A2A Protocol',
     subtitle: 'Agent-to-Agent communication via ServiceNow OAuth 2.0',
     icon: Network,
-    color: '#0f5f8c',
-    bg: '#e7f3f8',
-    border: '#cfe0ea',
     items: [
       { label: 'A2A enabled on agents', detail: 'Third-party access + discoverability toggled on in AI Agent Studio for each agent', done: true },
       { label: 'OAuth 2.0 client credentials', detail: 'SNOW_A2A_CLIENT_ID + SNOW_A2A_CLIENT_SECRET configured — token cached with skew buffer', done: true },
@@ -163,9 +145,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'ACL & Non-Human Identities',
     subtitle: 'Row-level access control on every sensitive table',
     icon: Lock,
-    color: '#a22828',
-    bg: '#fff1f0',
-    border: '#f3a19c',
     items: [
       { label: 'Non-human service account', detail: 'Dedicated sys_user service account for all API reads — never a human login credential', done: true },
       { label: 'ACL rules on patient table', detail: 'Read/write ACL on u_careatlas_patient — only authorised roles can access PII fields', done: true },
@@ -180,9 +159,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'ACL Testing — Good vs Bad Agent',
     subtitle: 'Live side-by-side comparison in the Governance ACL page',
     icon: ShieldAlert,
-    color: '#0f6b4f',
-    bg: '#e8f7ef',
-    border: '#a7dfbf',
     items: [
       { label: 'Service account ACL test', detail: 'POST /api/acl/test runs allowed/denied checks against all sensitive tables and returns pass/fail per field', done: true },
       { label: 'Good Scheduling Agent panel', detail: 'Runs a real A2A call then always returns the refusal message — enforced by ACL at the agent level', done: true },
@@ -196,9 +172,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'Shadow AI Discovery',
     subtitle: 'Unmanned AI detection via AI Control Tower',
     icon: Eye,
-    color: '#6d28d9',
-    bg: '#f0ebff',
-    border: '#c4b5fd',
     items: [
       { label: 'Managed AI Assets table', detail: 'alm_ai_system_digital_asset — assets with an assigned owner (managed_by set)', done: true },
       { label: 'Unmanaged AI Assets table', detail: 'Same table filtered to assets with no owner — shadow AI candidates', done: true },
@@ -212,9 +185,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'AI Control Tower Lifecycle',
     subtitle: 'Full unmanaged → managed promotion workflow',
     icon: TowerControl,
-    color: '#b45309',
-    bg: '#fef3c7',
-    border: '#fcd34d',
     items: [
       { label: 'Lifecycle stages', detail: 'Assessment → Review → Ready → Deployed → Retired — tracked in alm_ai_system_digital_asset.life_cycle_stage', done: true },
       { label: 'Promotion from unmanaged', detail: 'Shadow AI asset assigned an owner + lifecycle stage to move from unmanaged to managed inventory', done: true },
@@ -229,9 +199,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'Notification Reminders',
     subtitle: 'Activity feed for patients & clinicians — new ServiceNow table',
     icon: BellRing,
-    color: '#0f6b4f',
-    bg: '#e8f7ef',
-    border: '#a7dfbf',
     items: [
       { label: 'u_notification_reminders table', detail: 'New table created live via the metadata API (sys_db_object + sys_dictionary) — audience, type, message, patient/doctor/appointment/summary-note references, per-audience read flags and event time', done: true },
       { label: 'Backend event logging', detail: 'Every operation logs a notification — registration complete/approved/rejected, appointment created/confirmed/cancelled/completed, summary note added/updated — best-effort so it never breaks the primary write', done: true },
@@ -246,9 +213,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'Sidebar Navigation & UX',
     subtitle: 'Full-height left sidebar across all three portals',
     icon: PanelLeft,
-    color: '#143A57',
-    bg: '#e7f3f8',
-    border: '#cfe0ea',
     items: [
       { label: 'Two-pane app layout', detail: 'Center top-nav replaced with a fixed full-height left sidebar (brand on top, nav in the middle, sign-out at the bottom) via a shared SidebarLayout used by all three portals', done: true },
       { label: 'Sign-out relocated', detail: 'Sign-out moved into the sidebar footer and removed from every dashboard header — one consistent place to log out', done: true },
@@ -262,9 +226,6 @@ const SECTIONS: AgendaSection[] = [
     title: 'What Needs To Be Done',
     subtitle: 'Three distinct OWASP LLM Top-10 (2025) risks — detected, prevented, governed',
     icon: ShieldAlert,
-    color: '#b42318',
-    bg: '#fdeceb',
-    border: '#f4c7c4',
     status: 'planned',
     lead:
       'Demonstrate three distinct OWASP LLM Top-10 (2025) risks against the CareAtlas healthcare workflow and show each one being detected, prevented, and governed using AI Control Tower (AICT) and AI Risk and Compliance (AIRC), with the before/after evidence surfaced live in the existing AI Governance portal. The three risks are locked — each maps to a different ServiceNow mechanism, so the demo shows three genuinely different controls, not one control three times.',
@@ -365,22 +326,22 @@ export function GovernanceAgendaPage() {
   }
 
   const Banner = () => (
-    <div className="flex items-center gap-4 rounded-2xl border border-[#cfe0ea] bg-gradient-to-r from-[#143A57] to-[#1d5c87] p-5 text-white shadow-[0_8px_24px_rgba(20,58,87,0.25)]">
-      <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl bg-white/15 text-white">
+    <div className="flex items-center gap-4 rounded-2xl border border-[#0397AE] p-5 text-[#0397AE]">
+      <span className="grid h-14 w-14 flex-shrink-0 place-items-center rounded-2xl">
         <Sparkles size={28} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-[0.72rem] font-bold uppercase tracking-widest text-white/60">Demo day</div>
-        <div className="text-2xl font-black tracking-tight">June 20, 2026</div>
-        <div className="mt-0.5 text-sm text-white/70">
+        <div className="text-[0.72rem] font-bold uppercase tracking-widest">Demo day</div>
+        <div className="text-2xl font-bold tracking-tight">June 20, 2026</div>
+        <div className="mt-0.5 text-sm">
           CareAtlas &mdash; AI-Native Healthcare Platform on ServiceNow
         </div>
       </div>
       <div className="flex flex-col items-end gap-1 text-right">
-        <div className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold mb-3">
+        <div className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold mb-3 border border-[#0397AE] rounded-xl">
           {SECTIONS.length} sections
         </div>
-        <div className="rounded-full bg-emerald-400/30 px-3 py-1 text-xs font-bold text-emerald-200">
+        <div className="rounded-full px-3 py-1 text-xs font-bold border border-[#0397AE] rounded-xl">
           All complete
         </div>
       </div>
@@ -397,14 +358,14 @@ export function GovernanceAgendaPage() {
         {/* Export toolbar */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#cfe0ea] bg-white px-4 py-3 shadow-[0_4px_16px_rgba(25,64,93,0.07)]">
           <div className="min-w-0">
-            <div className="text-sm font-black text-[#102033]">Export agenda</div>
+            <div className="text-sm font-black text-[#102033]">Export Agenda</div>
             <div className="text-xs text-[#53687b]">
               Saves all {SECTIONS.length} sections as a {SECTIONS.length}-page PDF — the title and agenda nav share the first page.
             </div>
           </div>
           <div className="flex items-center gap-3">
             {/* Orientation toggle */}
-            <div className="flex items-center rounded-xl border border-[#cfe0ea] bg-[#f5f9fb] p-0.5">
+            <div className="flex items-center rounded-xl border border-[#cfe0ea] !text-[14px] !font-bold bg-[#f5f9fb] p-0.5">
               {(
                 [
                   { value: 'portrait', label: 'Portrait', icon: RectangleVertical },
@@ -436,7 +397,7 @@ export function GovernanceAgendaPage() {
               type="button"
               onClick={handleExport}
               disabled={exporting}
-              className="flex items-center gap-2 rounded-xl bg-[#143A57] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#1d5c87] disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex items-center gap-2 rounded-xl border border-[#143A57] px-4 py-2 !text-[14px] !font-bold text-[#143A57]"
             >
               {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
               {exporting ? 'Exporting…' : 'Export PDF'}
@@ -460,14 +421,13 @@ export function GovernanceAgendaPage() {
                 onClick={() => setActiveTabId(s.id)}
                 className="flex flex-shrink-0 flex-col items-center gap-1 rounded-xl border px-3 py-2 text-center transition hover:-translate-y-0.5 hover:shadow-md"
                 style={{
-                  borderColor: isActive ? s.color : s.border,
-                  backgroundColor: isActive ? s.color : s.bg,
+                  backgroundColor: isActive ? "#143A57" : " ",
                 }}
               >
-                <span className="text-[0.6rem] font-black tracking-widest opacity-90" style={{ color: isActive ? 'white' : s.color }}>
+                <span className="text-[11px] font-bold tracking-widest opacity-90" style={{ color: isActive ? 'white' : "#143a57" }}>
                   {s.number}
                 </span>
-                <span className="text-[0.65rem] font-bold leading-tight" style={{ color: isActive ? 'white' : s.color, maxWidth: 72 }}>
+                <span className="text-[11px] font-bold leading-tight" style={{ color: isActive ? 'white' : "#143A57", maxWidth: 72 }}>
                   {s.title}
                 </span>
               </button>
@@ -515,28 +475,26 @@ function AgendaCard({
       ref={cardRef}
       id={section.id}
       className="scroll-mt-24 overflow-hidden rounded-2xl border bg-white shadow-[0_4px_16px_rgba(25,64,93,0.07)]"
-      style={{ borderColor: section.border }}
+      style={{ borderColor: "#cfe0ea"}}
     >
       {/* Card header */}
       <div
         className="flex items-center gap-4 border-b px-6 py-4"
-        style={{ backgroundColor: section.bg, borderColor: section.border }}
+        style={{ borderColor: "#cfe0ea"}}
       >
         <span
-          className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl text-white"
-          style={{ backgroundColor: section.color }}
+          className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl text-[#0397AE]"
         >
           <Icon size={20} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className="text-[0.62rem] font-black tracking-widest"
-              style={{ color: section.color }}
+              className="text-[16px] font-bold tracking-widest text-[#0397AE]"
             >
               {section.number}
             </span>
-            <h2 className="text-base font-black text-[#102033]">{section.title}</h2>
+            <h2 className="text-base font-bold text-[#0397AE]">{section.title}</h2>
             {section.status === 'planned' ? <PlannedBadge /> : <CheckBadge />}
           </div>
           <p className="text-xs text-[#53687b]">{section.subtitle}</p>
@@ -546,7 +504,7 @@ function AgendaCard({
       {/* Optional lead paragraph (e.g. the demo objective) */}
       {section.lead && (
         <div className="border-b border-[#f0f5f8] px-6 py-4">
-          <div className="mb-1 text-[0.62rem] font-black uppercase tracking-widest" style={{ color: section.color }}>
+          <div className="mb-1 text-[0.62rem] font-black uppercase tracking-widest">
             Objective
           </div>
           <p className="text-sm leading-relaxed text-[#3c4f60]">{section.lead}</p>
@@ -556,7 +514,7 @@ function AgendaCard({
       {/* Items */}
       <div className="divide-y divide-[#f0f5f8]">
         {section.items.map((item, i) => (
-          <AgendaItemRow key={i} item={item} accent={section.color} />
+          <AgendaItemRow key={i} item={item} />
         ))}
       </div>
 
@@ -584,10 +542,10 @@ function PlannedBadge() {
   )
 }
 
-function AgendaItemRow({ item, accent }: { item: AgendaItem; accent: string }) {
+function AgendaItemRow({ item}: { item: AgendaItem; }) {
   return (
     <div className="flex items-start gap-3 px-6 py-3.5">
-      <CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" style={{ color: accent }} />
+      <CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" />
       <div className="min-w-0">
         <div className="text-sm font-bold text-[#102033]">{item.label}</div>
         <div className="mt-0.5 text-xs leading-relaxed text-[#53687b]">{item.detail}</div>

@@ -28,7 +28,7 @@ export function DoctorProfilePage() {
         <button
           type="button"
           onClick={refetch}
-          className="inline-flex items-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-4 py-2 text-sm font-bold text-[#0f5f8c] hover:bg-[#f5f9fb]"
+          className="inline-flex items-center gap-2 rounded-[9px] border border-[#0397AE] bg-white px-4 py-2 text-sm font-bold text-[#0397AE] hover:bg-[#f5f9fb]"
         >
           <RefreshCw size={14} />
           Refresh
@@ -56,7 +56,7 @@ export function DoctorProfilePage() {
           </h3>
           <div className="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1">
             <ProfileField label="Doctor ID" value={doctor?.doctor_id || 'Not matched'} />
-            <ProfileField label="ServiceNow sys_id" value={doctor?.doctor_record_id || 'Not matched'} />
+            {/* <ProfileField label="ServiceNow sys_id" value={doctor?.doctor_record_id || 'Not matched'} /> */}
             <ProfileField label="Name" value={doctor?.name || user?.attributes.name || user?.username || 'Clinician'} />
             <ProfileField label="Email" value={doctor?.email || user?.attributes.email || 'Not provided'} icon={<Mail size={15} />} />
             <ProfileField label="Department" value={doctor?.department || 'Not provided'} />

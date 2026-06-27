@@ -64,7 +64,7 @@ export function DoctorQueuePage() {
             <span>{todays.length} appointments today</span>
           )}
         </div>
-        <button type="button" onClick={refetch} className="inline-flex items-center gap-2 rounded-[9px] border border-[#b7ceda] bg-white px-4 py-2 text-sm font-bold text-[#0f5f8c] hover:bg-[#f5f9fb]">
+        <button type="button" onClick={refetch} className="inline-flex items-center gap-2 rounded-[9px] border border-[#0397ae] bg-white px-4 py-2 text-sm font-bold text-[#0397ae]">
           <RefreshCw size={14} /> Refresh
         </button>
       </div>

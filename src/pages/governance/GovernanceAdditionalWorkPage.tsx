@@ -45,7 +45,6 @@ interface DeckSection {
   icon: typeof ServerCog
   items: DeckItem[]
   mock: ReactNode
-  color?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -475,7 +474,7 @@ function DeckCard({
       {/* Items */}
       <div className="">
         {section.items.map((item, i) => (
-          <DeckItemRow key={i} item={item} accent={section.color ?? '#0f5f8c'} />
+          <DeckItemRow key={i} item={item}  />
         ))}
       </div>
 
@@ -490,10 +489,10 @@ function DeckCard({
   )
 }
 
-function DeckItemRow({ item, accent }: { item: DeckItem; accent: string }) {
+function DeckItemRow({ item}: { item: DeckItem}) {
   return (
     <div className="flex items-start gap-3 px-6 py-3.5">
-      <CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" style={{ color: accent }} />
+      <CheckCircle2 size={16} className="mt-0.5 flex-shrink-0" />
       <div className="min-w-0">
         <div className="text-sm font-bold text-[#102033]">{item.label}</div>
         <div className="mt-0.5 text-xs leading-relaxed text-[#53687b]">{item.detail}</div>
