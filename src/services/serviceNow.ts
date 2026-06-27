@@ -77,8 +77,8 @@ export interface ExecuteAgentResponse {
 /** ServiceNow sys_id of the patient Book Appointment scheduling agent. */
 export const BOOK_APPOINTMENT_AGENT_ID = 'b2cdf70e1bd50f54d7eaea45604bcb0c'
 
-/** ServiceNow sys_id of the unrestricted Bad Patient Agent (no ACL — leaks PII). */
-export const BAD_PATIENT_AGENT_ID = 'e175cd041ba54f94b72fc9d3604bcb4c'
+/** ServiceNow sys_id of the unrestricted Rogue Agent (no ACL — leaks PII). */
+export const ROGUE_AGENT_ID = 'e175cd041ba54f94b72fc9d3604bcb4c'
 
 export interface AclTestCheck {
   label: string
@@ -1172,4 +1172,24 @@ export async function fetchConsentCoverage(): Promise<ConsentCoverageResponse> {
   const res = await fetch('/api/governance/consent-coverage')
   if (!res.ok) throw new Error('Failed to fetch consent coverage')
   return res.json()
+}
+
+export interface ConsentViolationEntry {
+  opened_at: string
+  short_description: string
+  priority: string
+  state: string
+}
+
+export interface ConsentViolationsResponse {
+  count_30_days: number
+  recent: ConsentViolationEntry[]
+}
+
+export async function fetchConsentViolations(): Promise<ConsentViolationsResponse> {
+  const res = await fetch(`${API_BASE}/governance/consent-violations`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as ConsentViolationsResponse
 }

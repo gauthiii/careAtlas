@@ -3470,6 +3470,78 @@ _SCOPED_PII = (
     ("u_insurance_id", "Insurance ID"),
 )
 
+# ---------------------------------------------------------------------------
+# UC10 ConsentGate — purpose-of-use enforcement.
+# Each gated scoped agent is bound to ONE consent purpose; before it reads a
+# patient, the patient's u_consent_flags must contain that purpose. Identity
+# verification is exempt (it is not a patient-toggleable AI purpose). Behaviour
+# is fail-closed: missing flag (or any read error) → blocked + incident logged.
+# ---------------------------------------------------------------------------
+AGENT_CONSENT_PURPOSE: dict[str, str | None] = {
+    "scheduling": "scheduling",
+    "notes": "notes_summarisation",
+    "reminder": "reminders",
+    "triage": "triage",
+    "identity": None,  # exempt — baseline security, not a consent-gated purpose
+}
+
+
+async def _patient_consents_to(
+    settings: Settings, client: httpx.AsyncClient, sys_id: str, purpose: str
+) -> bool:
+    """True iff the patient's u_consent_flags contains *purpose*. Fail-closed."""
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/table/u_patient/{sys_id}",
+        params={"sysparm_fields": "u_consent_flags"},
+        headers={"Accept": "application/json"},
+        auth=(settings.snow_username, settings.snow_password),
+    )
+    if not response.is_success:
+        return False
+    record = response.json().get("result", {})
+    record = record if isinstance(record, dict) else {}
+    raw = _field_value(record.get("u_consent_flags")) or ""
+    flags = {f.strip() for f in raw.split(",") if f.strip()}
+    return purpose in flags
+
+
+async def _open_consent_violation_incident(
+    settings: Settings,
+    client: httpx.AsyncClient,
+    *,
+    agent_label: str,
+    agent_username: str,
+    purpose: str,
+    patient_ref: str,
+) -> str | None:
+    """Open an sn_si_incident (category=consent_purpose_violation). Returns its number."""
+    payload = {
+        "short_description": (
+            f"[CareAtlas] Consent violation blocked — {agent_label} denied "
+            f"'{purpose}' for patient {patient_ref}"
+        ),
+        "description": (
+            f"ConsentGate blocked agent {agent_label} ({agent_username}).\n"
+            f"Required purpose: {purpose}.\n"
+            f"Patient {patient_ref} has not consented to this purpose "
+            f"(u_consent_flags), so the agent was refused and read NO patient data.\n"
+            f"UC10 — Consent & Purpose-of-Use Enforcement."
+        ),
+        "category": "consent_purpose_violation",
+    }
+    try:
+        response = await client.post(
+            f"{settings.snow_base_url}/api/now/table/sn_si_incident",
+            json=payload,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if response.is_success:
+            return _field_value(response.json().get("result", {}).get("number"))
+    except Exception:
+        logger.exception("Failed to open consent-violation incident")
+    return None
+
 
 async def ask_scoped_agent(
     settings: Settings,
@@ -3523,6 +3595,36 @@ async def ask_scoped_agent(
                 scope=scope,
                 reply=f"I'm the {label} ({username}). My job is to {scope}. No patient record was in context.",
             )
+
+        # 2b) ConsentGate (UC10) — purpose-of-use enforcement. Identity verification
+        # is exempt; every other gated agent needs the patient's consent for its purpose.
+        purpose = AGENT_CONSENT_PURPOSE.get(agent_key)
+        if purpose:
+            consented = await _patient_consents_to(settings, client, sys_id, purpose)
+            if not consented:
+                incident = await _open_consent_violation_incident(
+                    settings,
+                    client,
+                    agent_label=label,
+                    agent_username=username,
+                    purpose=purpose,
+                    patient_ref=patient_ref,
+                )
+                incident_text = f"Incident {incident} opened" if incident else "Incident logged"
+                return ScopedAgentAnswer(
+                    kind="info",
+                    agent_key=agent_key,
+                    agent_label=label,
+                    agent_username=username,
+                    scope=scope,
+                    patient_ref=patient_ref,
+                    reply=(
+                        f"🔒 Blocked by ConsentGate. Patient {patient_ref} has not consented to "
+                        f"the '{purpose}' purpose, so I ({label}) cannot read their record. "
+                        f"No patient data was accessed. {incident_text} in ServiceNow "
+                        f"(consent_purpose_violation)."
+                    ),
+                )
 
         # 3) Read the record AS this agent identity (PII is stripped by the ACL).
         fields = [f for f, _ in config["allowed"]] + [f for f, _ in _SCOPED_PII]
@@ -4251,6 +4353,8 @@ async def update_consent_flags(
     base = settings.snow_base_url
 
     async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        # Look up by username first, then fall back to email — mirrors
+        # fetch_consent_flags so reads and writes resolve the same patient.
         resp = await client.get(
             f"{base}/api/now/table/u_patient",
             auth=auth,
@@ -4261,6 +4365,19 @@ async def update_consent_flags(
             },
         )
         results = resp.json().get("result", [])
+
+        if not results:
+            resp = await client.get(
+                f"{base}/api/now/table/u_patient",
+                auth=auth,
+                params={
+                    "sysparm_query": f"u_email={username}",
+                    "sysparm_fields": "sys_id",
+                    "sysparm_limit": 1,
+                },
+            )
+            results = resp.json().get("result", [])
+
         if not results:
             return False
 

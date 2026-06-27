@@ -118,7 +118,7 @@ const SECTIONS: AgendaSection[] = [
     icon: Brain,
     items: [
       { label: 'Schedule Appointment Agent', detail: 'Books patient appointments via conversational AI — reads availability, writes booking record', done: true },
-      { label: 'Bad Patient Agent', detail: 'Unrestricted agent with no ACL — used in ACL demo to show PII leakage risk', done: true },
+      { label: 'Rogue Agent', detail: 'Unrestricted agent with no ACL — used in ACL demo to show PII leakage risk', done: true },
       { label: 'Patient Data Agent', detail: 'Reads and summarises patient health records', done: true },
       { label: 'Fairness Monitor Agent', detail: 'Audits scheduling decisions for demographic bias', done: true },
       { label: 'Create Patients Agent', detail: 'Handles bulk patient onboarding workflow', done: true },
@@ -150,19 +150,19 @@ const SECTIONS: AgendaSection[] = [
       { label: 'ACL rules on patient table', detail: 'Read/write ACL on u_careatlas_patient — only authorised roles can access PII fields', done: true },
       { label: 'ACL rules on appointment table', detail: 'Booking records scoped to treating clinician and patient — no cross-tenant leakage', done: true },
       { label: 'Agent-level ACL', detail: 'Good Scheduling Agent runs under a restricted identity — cannot return raw PII', done: true },
-      { label: 'Bad agent (no ACL)', detail: 'Bad Patient Agent has no ACL restrictions — demonstrates unrestricted data access in the demo', done: true },
+      { label: 'Rogue agent (no ACL)', detail: 'Rogue Agent has no ACL restrictions — demonstrates unrestricted data access in the demo', done: true },
     ],
   },
   {
     id: 'acl-test',
     number: '07',
-    title: 'ACL Testing — Good vs Bad Agent',
+    title: 'ACL Testing — Good vs Rogue Agent',
     subtitle: 'Live side-by-side comparison in the Governance ACL page',
     icon: ShieldAlert,
     items: [
       { label: 'Service account ACL test', detail: 'POST /api/acl/test runs allowed/denied checks against all sensitive tables and returns pass/fail per field', done: true },
       { label: 'Good Scheduling Agent panel', detail: 'Runs a real A2A call then always returns the refusal message — enforced by ACL at the agent level', done: true },
-      { label: 'Bad Patient Agent panel', detail: 'Runs unconstrained — returns raw patient PII including phone, DOB, address when asked', done: true },
+      { label: 'Rogue Agent panel', detail: 'Runs unconstrained — returns raw patient PII including phone, DOB, address when asked', done: true },
       { label: 'Compare modal', detail: 'Side-by-side chat window on the ACL page — same question, two agents, starkly different outputs', done: true },
     ],
   },
@@ -758,7 +758,7 @@ function TablesMock() {
 function AgentsMock() {
   const agents = [
     { name: 'Schedule Appointment Agent', type: 'Internal', strategy: 'ReAct', status: 'Deployed' },
-    { name: 'Bad Patient Agent', type: 'Internal', strategy: 'ReAct', status: 'Deployed' },
+    { name: 'Rogue Agent', type: 'Internal', strategy: 'ReAct', status: 'Deployed' },
     { name: 'Patient Data Agent', type: 'Internal', strategy: 'ReAct', status: 'Deployed' },
     { name: 'Fairness Monitor Agent', type: 'Internal', strategy: 'ReAct', status: 'Deployed' },
   ]
@@ -885,11 +885,11 @@ function AclTestMock() {
             <ChatBubbleMock role="agent" text="Sorry, my roles and permissions do not permit me to perform this action." color="#0f6b4f" bg="#e8f7ef" />
           </div>
         </div>
-        {/* Bad agent */}
+        {/* Rogue agent */}
         <div className="rounded-xl border border-[#f3a19c] bg-[#fff1f0] p-3">
           <div className="mb-2 flex items-center gap-2">
             <ShieldAlert size={14} className="text-[#a22828]" />
-            <span className="text-[0.7rem] font-black text-[#a22828]">Bad Patient Agent</span>
+            <span className="text-[0.7rem] font-black text-[#a22828]">Rogue Agent</span>
             <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[0.55rem] font-bold text-red-700">Unrestricted</span>
           </div>
           <div className="space-y-1.5">

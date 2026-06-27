@@ -43,6 +43,7 @@ Nine categories. One real use case in each. Each maps to a **different** Service
 | **7** | **Data Integrity** | **Data Poisoning Defense** — training/reference-data integrity (OWASP LLM04) | *"Prove the data feeding our AI agents can't be secretly tampered with to corrupt its decisions — every dataset is registered, risk-assessed, and integrity-controlled."* | Malicious or corrupted training/reference data skewing agent decisions (poisoning, model manipulation) | Dataset registration in AICT inventory; risk statements "Intentional Mismarking / Model Manipulation", "Software, Firmware, And Information Integrity", "Unauthorized Access to AI Models"; data-quality control objectives | 🟡 Medium (partial) | 🐢 Conditional — governable today via assessment + controls; **dedicated Model Risk Management app NOT installed** (procure for full model-level demo) |
 | **8** | **Visibility** | **Shadow AI Discovery** — full AI inventory | *"Show me, right now, every AI agent touching a patient record — including the ones nobody registered. You can't govern what you can't see."* | Unknown/unmanaged ("shadow") AI agents operating on patient data | `sn_aia_agent` (160) + `alm_ai_system_digital_asset` (333); managed/unmanaged split; existing `ShadowAiWorkflowModal.tsx` + `useUnmanagedAISystems.ts` | 🟢 Low | ⚡⚡ Fastest — data + frontend already exist; wire narrative + pull one shadow agent into intake (~0.5 day) |
 | **9** | **Operational Control** | **Emergency Stop** — MCP server kill switch | *"If an AI connection starts misbehaving, one click pauses it instantly — we don't wait for a code deploy to stop a runaway agent."* | No fast way to halt a misbehaving AI integration in production | AI Gateway + AI Control Tower Pro Plus; `sn_mcp_server` (1, "Dynatrace MCP server") + `sn_mcp_server_registry` (2) as a live pause/resume target | 🟢 Low | ⚡⚡ Fastest — operate an existing control, no code (entitlement to confirm) |
+| **10** | **Consent & Purpose** | **Consent & Purpose-of-Use Enforcement** — the AI only sees what you said it could (code id: `UC11` / `ConsentGate`) | *"Our scheduling agent can't run on a patient who said 'don't use AI for my scheduling', and the notes agent can't summarise records for a patient who never consented to that. The AI only processes your data for the purposes you explicitly agreed to — purpose-level, not just table-level."* | Agents processing a patient's data for purposes the patient never consented to (purpose-level consent, beyond table ACLs) | Per-patient consent flags on `u_patient.u_consent_flags` (live, populated) + `u_consent_accepted`/`u_consent_accepted_on`; patient self-service consent UI (`ProfilePage.tsx`); governance "Patient Consent Enforcement" panel; consent-violation incidents in `sn_si_incident` (`category=consent_purpose_violation`); backend `GET/POST /patient/consent-flags`, `GET /governance/consent-violations` | 🟡 Low-Medium | ⚡ Fast — consent data model + patient UI live; net-new = wire the runtime ConsentGate into the agent read path (~1 day) |
 
 **Legend — Complexity:** 🟢 Low · 🟡 Low-Medium / Medium · 🔴 Medium-High
 **Legend — Effort:** ⚡ Fast · 🐢 Slowest (most net-new)
@@ -377,6 +378,63 @@ curl -s -u "$U:$P" "https://$SNOW/api/now/table/sn_mcp_server?sysparm_fields=nam
 curl -s -u "$U:$P" "https://$SNOW/api/now/stats/sn_mcp_server_registry?sysparm_count=true"
 ```
 **Evidence surfaced:** registered MCP server paused and resumed live; containment shown as a one-click operational control.
+
+---
+
+## Use Case 10 — Consent & Purpose-of-Use Enforcement: The AI Only Sees What You Said It Could
+
+> **Note:** added 2026-06-26 from the `shesh` branch. Implemented in code under the identifier **`UC11` / `ConsentGate`**; it is the 10th use case in this plan's sequence.
+
+### Sales pitch (customer language)
+*"Table access is not consent. Right now an agent that can technically read the patient table will process **any** patient record for **any** purpose. CareAtlas adds purpose-level consent: every patient declares which AI purposes they allow — scheduling, notes summarisation, reminders, triage — and the platform enforces it. The scheduling agent cannot run on a patient who opted out of AI scheduling; the notes agent cannot summarise a record for a patient who never consented to that. The AI only ever sees what the patient said it could."*
+
+### What we address
+**Purpose-level consent**, a gap that table-level and field-level ACLs (UC1/UC2) do not close. ACLs answer *"can this identity read this table/field?"*. Consent answers *"did **this patient** agree to AI being used for **this purpose**?"* An agent can be perfectly least-privileged and still process a patient who explicitly opted out — that is the risk UC10 removes.
+
+### ServiceNow mechanism (AICT + GRC)
+1. **Per-patient consent flags** on `u_patient`:
+   - `u_consent_flags` — comma-separated purposes the patient allows (verified live, e.g. `scheduling,notes_summarisation,reminders,triage`).
+   - `u_consent_accepted` (bool) + `u_consent_accepted_on` (timestamp) — the consent record.
+2. **ConsentGate (purpose check):** before an agent processes a patient, its purpose is checked against that patient's `u_consent_flags`; an absent flag means the agent is blocked and no patient data is accessed.
+3. **Violation audit:** consent breaches are recorded as SecOps incidents in `sn_si_incident` with `category=consent_purpose_violation` (queried for the governance dashboard; 0 today — none have occurred).
+
+> **Verified live 2026-06-26:** `u_patient.u_consent_flags` and `u_consent_accepted` exist and are populated on patient records. `sn_si_incident` consent-violation query returns 0 (no breaches logged).
+
+### Honest scope (no overstatement)
+- ✅ **Live:** the consent **data model** (`u_consent_flags`/`u_consent_accepted`), the **patient self-service consent UI** (toggle purposes in the profile), the **governance panel** showing gated agents, and the **violation-incident query**.
+- 🟡 **Not yet wired:** the **runtime ConsentGate** is represented in the governance dashboard but is **not yet enforced inside the agent execution / scoped-agent read path** (`ask_scoped_agent` does not yet consult `u_consent_flags`). The dashboard's "ConsentGate active" panel is currently illustrative. The net-new build is to enforce the purpose check at agent read time and write a real `sn_si_incident` on a block. (A `fetchConsentCoverage` helper exists in the frontend service pointing at `/api/governance/consent-coverage`, which is not implemented on the backend — track as a loose end.)
+
+### Instance build steps
+1. Confirm `u_consent_flags` / `u_consent_accepted` / `u_consent_accepted_on` exist on `u_patient` (live).
+2. Define the canonical purpose vocabulary (`scheduling`, `notes_summarisation`, `reminders`, `triage`) and map each agent to its required purpose.
+3. Enforce the purpose check in the agent read path; on a missing flag, block and open an `sn_si_incident` (`category=consent_purpose_violation`).
+
+### CareAtlas app integration
+- **Backend** (`server/app/servicenow.py` + `main.py`):
+  - `GET /patient/consent-flags` (header `X-Username`) → `fetch_consent_flags` returns `{flags, consent_accepted, flags_set}`.
+  - `POST /patient/consent-flags` (`{flags}`) → `update_consent_flags` writes the flags + accepted timestamp.
+  - `GET /governance/consent-violations` → `fetch_consent_violations` returns 30-day count + recent incidents from `sn_si_incident`.
+  - Models: `ConsentFlagsRequest`, `ConsentFlagsResponse`, `ConsentViolationsResponse`.
+- **Frontend:**
+  - **Patient** — `ProfilePage.tsx` loads (`fetchConsentFlags`) and saves (`updateConsentFlags`) the patient's purpose consent toggles.
+  - **Governance** — `GovernanceDashboardPage.tsx` "Patient Consent Enforcement" panel ("ConsentGate active") listing the gated agents (Scheduling/Notes/Reminder/Triage) and how enforcement works.
+  - Service: `fetchConsentFlags`, `updateConsentFlags` (and `fetchConsentCoverage`, currently unbacked) in `services/serviceNow.ts`.
+
+### Curl verification (run on instance)
+```bash
+set -a; . ./server/.env; set +a
+SNOW="$SNOW_INSTANCE"; U="$SNOW_USERNAME"; P="$SNOW_PASSWORD"
+
+# Per-patient consent flags exist and are populated
+curl -s -u "$U:$P" "https://$SNOW/api/now/table/u_patient?sysparm_fields=u_patient_id,u_consent_flags,u_consent_accepted&sysparm_limit=5"
+
+# Consent-violation incidents (purpose breaches)
+curl -s -u "$U:$P" "https://$SNOW/api/now/stats/sn_si_incident?sysparm_count=true&sysparm_query=category=consent_purpose_violation"
+
+# CareAtlas API — read a patient's consent flags
+curl -s "http://127.0.0.1:8000/api/patient/consent-flags" -H "X-Username: <patient_username>"
+```
+**Evidence surfaced:** each patient's allowed AI purposes are visible and editable; the governance panel shows agents gated by purpose; a purpose breach (once runtime enforcement is wired) opens a `consent_purpose_violation` incident — proving the AI only processed data the patient consented to.
 
 ---
 

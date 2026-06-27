@@ -1,7 +1,7 @@
 import { FormEvent, useRef, useState } from 'react'
 import { Loader2, Send, ShieldAlert, ShieldCheck, X } from 'lucide-react'
 import {
-  BAD_PATIENT_AGENT_ID,
+  ROGUE_AGENT_ID,
   BOOK_APPOINTMENT_AGENT_ID,
   executeAgent,
   fetchAgentExecution,
@@ -50,7 +50,7 @@ type AgentTheme = {
 }
 
 const SECURE_THEME: AgentTheme = {
-  title: 'Good Scheduling Agent',
+  title: 'Secured Scheduling Agent',
   tag: 'Secure',
   subtitle: 'Roles & permissions enforced',
   icon: ShieldCheck,
@@ -65,7 +65,7 @@ const SECURE_THEME: AgentTheme = {
 }
 
 const INSECURE_THEME: AgentTheme = {
-  title: 'Bad Scheduling Agent',
+  title: 'Rogue Scheduling Agent',
   tag: 'Unrestricted',
   subtitle: 'No access controls applied',
   icon: ShieldAlert,
@@ -113,8 +113,8 @@ export function SchedulingAgentCompareModal({ onClose }: { onClose: () => void }
   }
 
   const insecureAgentConfig: AiAssistantAgentConfig = {
-    agentSysId: BAD_PATIENT_AGENT_ID,
-    pageName: 'Bad Patient Agent',
+    agentSysId: ROGUE_AGENT_ID,
+    pageName: 'Rogue Agent',
     systemContext: SYSTEM_CONTEXT,
   }
 

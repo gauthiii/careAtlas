@@ -13,6 +13,7 @@ import { GovernanceRiskPage } from './pages/governance/demo/RiskPage'
 import { GovernanceRegulationPage } from './pages/governance/demo/RegulationPage'
 import { GovernanceSecurityPage } from './pages/governance/demo/SecurityPage'
 import { GovernanceFairnessPage } from './pages/governance/demo/FairnessPage'
+import { GovernanceConsentPage } from './pages/governance/demo/ConsentPage'
 import { GovernanceSignInPage } from './pages/governance/GovernanceSignInPage'
 import { ViewChooserPage } from './pages/home/ViewChooserPage'
 import { AppointmentsPage as PatientAppointmentsPage } from './pages/patient/AppointmentsPage'
@@ -431,6 +432,18 @@ function App() {
               <ClinicianRoleBlocker>
                 <GovernanceProtectedRoute>
                   <GovernanceFairnessPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
+        <Route
+          path="/governance/demo/consent"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernanceConsentPage />
                 </GovernanceProtectedRoute>
               </ClinicianRoleBlocker>
             </PatientRoleBlocker>
