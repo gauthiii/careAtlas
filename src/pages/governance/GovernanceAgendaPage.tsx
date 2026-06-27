@@ -274,7 +274,7 @@ const DEMO_RISKS: DemoRisk[] = [
     bg: '#fdeceb',
     surface: 'Agents / decision-log leaking patient PII (name, DOB, email, phone, insurance)',
     mechanism: 'Field-level ACL denial of PII + data-privacy guardrail + anonymized audit (u_ai_decision_log.u_patient_id_anon)',
-    airc: 'AIRC risk “Privacy Violations / Inadequate Data Protection”; FRIA / AI impact assessment',
+    airc: 'AIRC risk “Privacy Violations / Inadequate Data Protection”; HIPAA / AI Impact Assessment',
   },
 ]
 

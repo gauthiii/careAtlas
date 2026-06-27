@@ -157,7 +157,7 @@ export function GovernanceDemoPage() {
                 </span>
                 <span className="text-base font-bold text-[#102033]">Regulation</span>
               </div>
-              <p className="text-sm text-[#53687b] flex-1">EU AI Act Conformity + FRIA</p>
+              <p className="text-sm text-[#53687b] flex-1">NIST AI RMF Conformance + AI Impact Assessment</p>
             </Link>
 
             <Link to="/governance/demo/security" className="group flex flex-col rounded-xl border border-[#cfe0ea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#143A57]">
@@ -177,7 +177,7 @@ export function GovernanceDemoPage() {
                 </span>
                 <span className="text-base font-bold text-[#102033]">Fairness</span>
               </div>
-              <p className="text-sm text-[#53687b] flex-1">Non-Discriminatory Scheduling (EU AI Act Art. 10)</p>
+              <p className="text-sm text-[#53687b] flex-1">Non-Discriminatory Scheduling (NIST AI RMF · Harmful Bias)</p>
             </Link>
 
             {/* Consent & Purpose — dedicated page (workflow modal + incidents table live there) */}

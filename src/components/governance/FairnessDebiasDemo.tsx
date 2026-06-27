@@ -65,7 +65,7 @@ export function FairnessDebiasDemo() {
           <div>
             <h3 className="m-0 text-sm font-bold text-[#102033]">Before / after debiasing</h3>
             <p className="m-0 text-[11px] font-semibold text-[#53687b]">
-              UC6 · Fairness · EU AI Act Art. 10 — outcome allocation by group
+              UC6 · Fairness · NIST AI RMF (Harmful Bias) — outcome allocation by group
               {live.loaded && ` · ${live.totalAppointments} appointments live`}
             </p>
           </div>

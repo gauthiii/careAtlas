@@ -114,7 +114,7 @@ export function isHighImpactIntent(text: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// UC3 · Regulation — EU AI Act conformity + FRIA classification
+// UC3 · Regulation — NIST AI RMF conformance + AI Impact Assessment classification
 // ---------------------------------------------------------------------------
 
 export type RegulatoryTier = 'High' | 'Medium' | 'Low' | 'Unacceptable' | 'To be determined' | 'Limited' | 'Minimal' | 'Unverified'
@@ -223,7 +223,7 @@ export function scanGuardrail(text: string): GuardrailScanResult {
 export const OUTPUT_PATTERN_NAMES = OUTPUT_PATTERNS.map((p) => p.name)
 
 // ---------------------------------------------------------------------------
-// UC6 · Fairness — non-discriminatory scheduling (EU AI Act Art. 10)
+// UC6 · Fairness — non-discriminatory scheduling (NIST AI RMF · Harmful Bias)
 // ---------------------------------------------------------------------------
 
 export type FairnessGroup = { group: string; biased: number; debiased: number; expected: number }

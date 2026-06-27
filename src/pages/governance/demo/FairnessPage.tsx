@@ -23,7 +23,7 @@ export function GovernanceFairnessPage() {
           Fairness — Non-Discriminatory Scheduling
         </div>
       }
-      intro="EU AI Act Art. 10: Continuously measure fairness across gender, age and ethnicity. Run the interactive debiasing demo below, or view the end-to-end animated workflow."
+      intro="NIST AI RMF (Harmful Bias & Fairness): Continuously measure fairness across gender, age and ethnicity. Run the interactive debiasing demo below, or view the end-to-end animated workflow."
     >
       <section className="px-6 pb-6">
         <button

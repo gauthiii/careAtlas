@@ -214,7 +214,7 @@ export function GovernanceDashboardPage() {
                   <th>Status</th>
                   <th>Identity</th>
                   <th>Risk</th>
-                  <th>EU AI Act</th>
+                  <th>NIST AI RMF</th>
                 </tr>
               </thead>
 
