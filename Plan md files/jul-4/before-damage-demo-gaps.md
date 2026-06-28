@@ -32,8 +32,8 @@ Today the demo mostly jumps to the *after* (the control working). This is the ch
 
 ## Remaining companions (not the "before" demo itself)
 
-1. **UC6 raise-remediation-incident button** — the controlled human response to a skew alert (needs backend S4).
-2. **UC10 live doctor-side block** — seed a representative patient with consent OFF (A7/S6) so the block is live, not only simulated.
+1. **UC6 raise-remediation-incident button** — the controlled human response to a skew alert (needs backend S4). ⬜ pending.
+2. ~~UC10 live doctor-side block~~ — ✅ **Done (A7)**: dedicated opted-out patient (*Giuseppe Hernandez*, `8e93bda2…`, `notes_summarisation` off) + `DoctorConsentBlockDemo` on the consent page — Notes agent blocks live (real `consent_purpose_violation` incident), Scheduling agent works. Targeted by sys_id, so the representative-patient demos are unaffected.
 
 ## Guardrails for building the "before" safely
 - The "before" runs are **demo simulations** of the unguarded path — do **not** disable live ACLs,

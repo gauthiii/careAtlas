@@ -29,7 +29,7 @@ Verifying what is *actually* running today — two material changes since the Ju
 | Evidence (table) | June 22/26 plan | **Today (2026-06-27)** | Meaning |
 |---|---|---|---|
 | `sn_ai_case_mgmt_ai_case` | 0 | **25** | ✅ UC5 prompt-injection **is now auto-creating AI Cases live** (was "demo creates first row") |
-| `sn_si_incident` (`consent_purpose_violation`) | 0 | **4** | ✅ UC10 **runtime ConsentGate is now firing real incidents** — UC10 is effectively complete, not "in progress" |
+| `sn_si_incident` (`consent_purpose_violation`) | 0 | **5+ (grows)** | ✅ UC10 **runtime ConsentGate fires real incidents** (patient- *and* now doctor-side); count grows each time the A7 doctor-side block demo runs — UC10 complete |
 | `sn_grc_ai_gov_ai_system` | 111 | 111 | Governed AI systems present |
 | `sys_gen_ai_filter` (active) | 3 | **6** | More content filters active |
 | `sys_user` (`svc-*`) | 9 | **11** | Scoped agent identities present |
@@ -115,8 +115,8 @@ Massachusetts"). Kuppusami: *"that's your 42 CFR Part 2 use case."*
 | A3 | Wire **42 CFR Part 2 / HIPAA** as the consent regulatory basis on the consent demo page | UC10 | React | ⬜ |
 | A4 | Decide + execute **UC1 Wall-2 PII output filter**: wire at runtime *or* frame as platform-native (record is active, not invoked) | UC1 | server (or talk-track) | ⬜ Decision |
 | A5 | Add **UC6 manual-remediation path** (incident/case raised from a skew alert) so the boundary has a visible answer | UC6 | React + server | ⬜ |
-| A6 | Fix loose end: `fetchConsentCoverage` → `/api/governance/consent-coverage` is **unbacked** (404) — implement or remove | UC10 | server/React | ⬜ |
-| A7 | UC10 doctor-side block needs a **representative patient pre-seeded** with `notes_summarisation` off for a live block | UC10 | data/setup | ⬜ |
+| A6 | Fix loose end: `fetchConsentCoverage` → `/api/governance/consent-coverage` is **unbacked** (404) — implement or remove | UC10 | server/React | ✅ **Done** — removed the dead `fetchConsentCoverage()` + `ConsentCoverageResponse` (unused; clean delete) |
+| A7 | UC10 doctor-side block — live ConsentGate block on the clinician side | UC10 | data + React | ✅ **Done** — dedicated patient *Giuseppe Hernandez* (`8e93bda2…`) seeded with `notes_summarisation` **off** (rest on); new `DoctorConsentBlockDemo` on the consent page runs Notes (🔒 blocked + incident) vs Scheduling (works) live, by sys_id, so other doctor demos are unaffected |
 | A8 | Confirm UC3 **role/version** prereqs: `ai_risk_and_compliance_manager` on demo user + AIRC 22.0.3+ to (re)run NA assessment cleanly | UC3 | ServiceNow config | ⬜ Verify |
 | A9 | Terminology: scrub "SUD" from talk-track; resolve **queue vs case load** and apply | UC1, clinician UI | copy | ⬜ |
 | A10 | *(Optional enhancement)* Activate the **Prompt Injection dashboard** in Now Assist Center for live monitoring evidence | UC5 | ServiceNow config | ⬜ Optional |

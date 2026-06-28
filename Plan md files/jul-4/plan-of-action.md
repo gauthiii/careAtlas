@@ -33,9 +33,10 @@
 | R8 | ⬜ | **Retire EU AI Act → NIST AI RMF + HIPAA + 42 CFR Part 2** in all UI copy (badges, demo data, agenda) | `RegulatoryClassificationBadge.tsx`, `data/useCaseDemoData.ts`, `GovernanceAgenda26Page.tsx`, `demo/RegulationPage.tsx`, `services/serviceNow.ts` | 0.5 d | — |
 | R9 | ⬜ | **Terminology:** remove any "SUD" from labels; align "queue" wording per resolved term | `data/*`, `staff/DoctorQueuePage.tsx`, agenda pages | 0.25 d | A9 decision |
 | R10 | ⬜ | **Consent regulatory basis** copy: surface 42 CFR Part 2 / HIPAA on consent demo page | `demo/ConsentPage.tsx`, `ConsentEnforcementPanel.tsx` | 0.25 d | R8 |
-| R11 | ⬜ | Fix `fetchConsentCoverage` loose end (wire to new endpoint or remove the dead call) | `services/serviceNow.ts` | 0.25 d | S5 |
+| R11 | ✅ Done | **A6** — removed the dead `fetchConsentCoverage()` + `ConsentCoverageResponse` (unused). | `services/serviceNow.ts` | 0.25 d | — |
+| R12 | ✅ Done | **A7** — `DoctorConsentBlockDemo` on the consent page: live Notes-agent block vs Scheduling-agent allow on a dedicated opted-out patient (by sys_id). | `components/governance/DoctorConsentBlockDemo.tsx` (new), `demo/ConsentPage.tsx` | 0.25 d | A7 seed |
 
-**React subtotal: ~4.5 dev-days · done: R1–R4, R6, R7 (+R5 partial) ≈ 3.5 d · remaining: R5 button, R8–R11 ≈ 1 d.**
+**React subtotal: done: R1–R4, R6, R7, R11, R12 (+R5 partial) · remaining: R5 button, R8–R10 ≈ 0.75 d.**
 
 ---
 
@@ -47,8 +48,8 @@
 | S2 | **Re-frame UC3 assessment as NA:** use AI Impact Assessment + NIST-aligned questionnaire (not EU AI Act/FRIA); confirm `Triage Appointment DG1` = High-risk, AIA attached, tasks present | AIRC Assessment Workspace + `server/app/servicenow.py` regulation evidence | 0.5 d | Live count today: 111 AI systems; verify DG1 fields |
 | S3 | **UC4-style decision (UC1 Wall-2):** either activate the `sys_gen_ai_filter` "CareAtlas PII Output Guard" on a runtime output path, OR formally scope it as platform-native (record active, not invoked) | `sys_gen_ai_filter` + `server/app/servicenow.py` | 0.5 d | Recommend: scope as platform-native for July 1; wire later. Avoids risky last-minute runtime change |
 | S4 | **UC6 manual remediation endpoint:** raise an incident/case from a fairness skew alert (the controlled human workflow) | `server/app/main.py` + `servicenow.py` (`sn_si_incident` or case) | 0.5 d | Directly answers "no auto-correct" boundary |
-| S5 | **Implement `GET /api/governance/consent-coverage`** (or remove caller) | `server/app/main.py`, `servicenow.py` | 0.25 d | Pairs with R11 |
-| S6 | **Seed UC10 doctor-side representative patient** with `notes_summarisation` consent OFF for a live block | `u_patient` data | 0.25 d | Pairs with R6/A7 |
+| S5 | ~~Implement `GET /api/governance/consent-coverage`~~ | — | — | ✅ **Resolved (A6)** — caller removed instead (it was dead code); no endpoint needed |
+| S6 | **Seed UC10 opted-out patient** with `notes_summarisation` OFF for a live doctor-side block | `u_patient` data | 0.25 d | ✅ **Done (A7)** — *Giuseppe Hernandez* (`8e93bda2…`) set to `scheduling,reminders,triage`; verified Notes blocked / Scheduling allowed |
 | S7 | **Retire EU AI Act in backend models/strings** | `server/app/models.py`, `servicenow.py` | 0.25 d | Pairs with R8 |
 | S8 | *(Optional)* Activate **Prompt Injection dashboard** in Now Assist Center | ServiceNow config | 0.25 d | UC5 enhancement only |
 | S9 | **Freeze verification:** re-run read-only probe script; lock the live numbers quoted in the story | `server/scripts/*audit*readonly.sh` | 0.25 d | On Jul 1 |

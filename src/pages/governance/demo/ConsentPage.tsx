@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, ShieldCheck, Siren, Loader2, RefreshCw } from 'l
 import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { ConsentEnforcementPanel } from '../../../components/governance/ConsentEnforcementPanel'
+import { DoctorConsentBlockDemo } from '../../../components/governance/DoctorConsentBlockDemo'
 import { BeforeAfterDemo, SimChat } from '../../../components/governance/BeforeAfterDemo'
 import { fetchConsentViolations, type ConsentViolationsResponse } from '../../../services/serviceNow'
 
@@ -107,7 +108,12 @@ export function GovernanceConsentPage() {
                 ]}
               />
             }
-            after={<ConsentEnforcementPanel />}
+            after={
+              <div className="space-y-6">
+                <ConsentEnforcementPanel />
+                <DoctorConsentBlockDemo onIncident={load} />
+              </div>
+            }
           />
         </div>
 

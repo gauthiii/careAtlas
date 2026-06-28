@@ -1137,14 +1137,6 @@ export interface ConsentFlagsResponse {
   flags_set: boolean
 }
 
-export interface ConsentCoverageResponse {
-  total: number
-  fully_consented: number
-  partial: number
-  no_consent: number
-  enforcement_active: boolean
-}
-
 export async function fetchConsentFlags(username: string): Promise<ConsentFlagsResponse> {
   const res = await fetch('/api/patient/consent-flags', {
     headers: { 'X-Username': username },
@@ -1166,12 +1158,6 @@ export async function updateConsentFlags(
     body: JSON.stringify({ flags }),
   })
   if (!res.ok) throw new Error('Failed to update consent flags')
-}
-
-export async function fetchConsentCoverage(): Promise<ConsentCoverageResponse> {
-  const res = await fetch('/api/governance/consent-coverage')
-  if (!res.ok) throw new Error('Failed to fetch consent coverage')
-  return res.json()
 }
 
 export interface ConsentViolationEntry {
