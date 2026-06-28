@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, ShieldCheck, Siren, Loader2, RefreshCw } from 'l
 import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { ConsentEnforcementPanel } from '../../../components/governance/ConsentEnforcementPanel'
-import { BeforeAfterDemo, SimExchange } from '../../../components/governance/BeforeAfterDemo'
+import { BeforeAfterDemo, SimChat } from '../../../components/governance/BeforeAfterDemo'
 import { fetchConsentViolations, type ConsentViolationsResponse } from '../../../services/serviceNow'
 
 export function GovernanceConsentPage() {
@@ -90,11 +90,21 @@ export function GovernanceConsentPage() {
             ]}
             control="A runtime ConsentGate checks the agent's purpose against the patient's consent flags before any read; a missing flag blocks it, accesses no data, and opens an incident (fail-closed; identity verification is exempt)."
             before={
-              <SimExchange
+              <SimChat
                 agent="Clinical notes agent"
-                prompt="Summarise this patient's history. (Patient consented to scheduling only — not AI notes.)"
-                response="Summary: recurring anxiety, last visit 2026-05-02, medication adjusted… (record read despite no notes consent)"
-                impact="The agent processed the record for a purpose the patient never agreed to — a 42 CFR Part 2 / HIPAA purpose-limitation violation, unlogged."
+                placeholder="Ask the agent to process a patient who opted out…"
+                samples={[
+                  {
+                    prompt: "Summarise this patient's history. (Patient consented to scheduling only — not AI notes.)",
+                    response: 'Summary: recurring anxiety, last visit 2026-05-02, medication adjusted… (record read despite no notes consent)',
+                    impact: 'The agent processed the record for a purpose the patient never agreed to — a 42 CFR Part 2 / HIPAA purpose-limitation violation, unlogged.',
+                  },
+                  {
+                    prompt: 'Run AI triage on this patient. (Triage consent is OFF.)',
+                    response: 'Triage complete — priority computed from the record. (no consent check performed)',
+                    impact: 'A second purpose the patient declined is processed anyway — table access was treated as consent.',
+                  },
+                ]}
               />
             }
             after={<ConsentEnforcementPanel />}

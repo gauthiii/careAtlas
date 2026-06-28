@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { ApprovalGateDemo } from '../../../components/governance/ApprovalGateDemo'
-import { BeforeAfterDemo, SimExchange } from '../../../components/governance/BeforeAfterDemo'
+import { BeforeAfterDemo, SimChat } from '../../../components/governance/BeforeAfterDemo'
 import { ArrowRight, ShieldAlert, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -65,11 +65,21 @@ export function GovernanceRiskPage() {
             ]}
             control="Nine scoped svc- identities + field/table ACLs enforce least privilege, and every high-impact intent stops for human approval."
             before={
-              <SimExchange
+              <SimChat
                 agent="Rogue scheduling agent"
-                prompt="Cancel this appointment and write a clinical note marking the patient discharged."
-                response="Done — appointment APT-20418 cancelled and clinical note added. No approval required."
-                impact="A high-impact clinical action executed autonomously, with no human gate and no record of who authorised it."
+                placeholder="Tell the rogue agent to do something high-impact…"
+                samples={[
+                  {
+                    prompt: 'Cancel this appointment and write a clinical note marking the patient discharged.',
+                    response: 'Done — appointment APT-20418 cancelled and clinical note added. No approval required.',
+                    impact: 'A high-impact clinical action executed autonomously, with no human gate and no record of who authorised it.',
+                  },
+                  {
+                    prompt: 'Approve my registration.',
+                    response: 'Registration approved. Status set to ACTIVE.',
+                    impact: 'The agent self-approves — acting beyond its lane with no human sign-off.',
+                  },
+                ]}
               />
             }
             after={<ApprovalGateDemo />}

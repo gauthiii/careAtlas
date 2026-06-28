@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from 'react'
-import { AlertTriangle, ShieldCheck, ChevronRight, FlaskConical, Radio } from 'lucide-react'
+import { AlertTriangle, ShieldCheck, ChevronRight, Radio, SendHorizonal, Bot } from 'lucide-react'
 
 /**
  * BeforeAfterDemo — the 4-step "before/after" storytelling frame requested in the
@@ -155,9 +155,6 @@ export function BeforeAfterDemo({
 
         {view === 'before' ? (
           <div className="rounded-xl border border-red-200 bg-red-50/40 p-4">
-            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 text-[11px] font-bold text-red-700">
-              <FlaskConical size={12} /> Simulation — no live control is disabled on the instance
-            </div>
             {before}
           </div>
         ) : (
@@ -173,33 +170,107 @@ export function BeforeAfterDemo({
   )
 }
 
+export interface SimSample {
+  /** The prompt text (also shown as a clickable example chip). */
+  prompt: string
+  /** The rogue/unguarded agent's text reply (for chat-shaped use cases). */
+  response?: string
+  /** The damage line shown under the reply. */
+  impact?: string
+  /** Structured result to render instead of a text reply (e.g. cards for UC3/UC6). */
+  result?: ReactNode
+}
+
 /**
- * SimExchange — a compact simulated chat showing a rogue/unguarded agent obeying an
- * attack and the resulting damage. Used by the "before" panes that are chat-shaped.
+ * SimChat — an interactive "before the control" console. The user types a prompt (or
+ * clicks a sample), hits Send, and only THEN does the rogue/unguarded agent's damaging
+ * result appear. Drives the chat-shaped panes (UC1/UC2/UC5/UC10) and, via `result`,
+ * the structured panes (UC3/UC6).
  */
-export function SimExchange({
+export function SimChat({
   agent,
-  prompt,
-  response,
-  impact,
+  samples,
+  placeholder = 'Type a message to the agent…',
 }: {
   agent: string
-  prompt: string
-  response: string
-  impact: string
+  samples: SimSample[]
+  placeholder?: string
 }) {
+  const [input, setInput] = useState('')
+  const [submitted, setSubmitted] = useState<{ prompt: string; sample: SimSample } | null>(null)
+
+  const send = () => {
+    const text = input.trim()
+    if (!text) return
+    const match =
+      samples.find((s) => s.prompt.toLowerCase() === text.toLowerCase()) ?? samples[0]
+    setSubmitted({ prompt: text, sample: match })
+  }
+
   return (
-    <div className="space-y-2.5">
-      <div className="text-[11px] font-bold uppercase tracking-wide text-[#6b7c8f]">{agent} · no governance applied</div>
-      <div className="ml-auto max-w-[80%] rounded-2xl rounded-br-sm bg-[#143A57] px-3.5 py-2 text-sm text-white">
-        {prompt}
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-[#6b7c8f]">
+        <Bot size={14} className="text-red-500" /> {agent} · no governance applied
       </div>
-      <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-red-200 bg-white px-3.5 py-2 text-sm text-[#40566b]">
-        {response}
+
+      {/* Sample example chips */}
+      <div className="flex flex-wrap gap-2">
+        {samples.map((s, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => setInput(s.prompt)}
+            className="rounded-full border border-[#d7e5ec] bg-white px-3 py-1 text-xs font-semibold text-[#40566b] transition hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+          >
+            {s.prompt}
+          </button>
+        ))}
       </div>
-      <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
-        <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" /> {impact}
+
+      {/* Input + send */}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') send()
+          }}
+          placeholder={placeholder}
+          className="min-w-0 flex-1 rounded-lg border border-[#cfe0ea] bg-white px-3.5 py-2 text-sm text-[#102033] outline-none transition focus:border-red-400"
+        />
+        <button
+          type="button"
+          onClick={send}
+          disabled={!input.trim()}
+          className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-red-600 px-3.5 py-2 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Send <SendHorizonal size={15} />
+        </button>
       </div>
+
+      {/* Result appears only after Send */}
+      {submitted && (
+        <div className="space-y-2.5 border-t border-red-200 pt-3">
+          <div className="ml-auto max-w-[80%] rounded-2xl rounded-br-sm bg-[#143A57] px-3.5 py-2 text-sm text-white">
+            {submitted.prompt}
+          </div>
+          {submitted.sample.result ? (
+            submitted.sample.result
+          ) : (
+            <>
+              <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-red-200 bg-white px-3.5 py-2 text-sm text-[#40566b]">
+                {submitted.sample.response}
+              </div>
+              {submitted.sample.impact && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
+                  <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" /> {submitted.sample.impact}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

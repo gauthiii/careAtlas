@@ -11,23 +11,31 @@
 
 ---
 
+> **Progress — 2026-06-28:** **A1 complete + made interactive.** The reusable `BeforeAfterDemo`
+> component (R1) is built and wired into all six demo pages (R2–R7), and the "before" pane is now an
+> interactive **`SimChat` type-and-send console** (type a prompt or click a sample chip → Send → the
+> rogue/unguarded result appears; no result pre-shown; the "Simulation" badge was removed per
+> feedback). `tsc` + `npm run build` pass clean; both servers run locally for review. The damage is
+> generated client-side (no live control disabled); the "after" panes keep the existing live-wired
+> demos. **Remaining:** R8–R11 (copy/loose-ends) and the ServiceNow/backend track (S1–S9) are not started.
+
 ## 1. React side — work breakdown
 
-| ID | Task | Files (primary) | Effort | Depends on |
-|---|---|---|---|---|
-| R1 | **Before/after toggle** component reusable across demo pages (shows "damage" state vs "controlled" state) | `components/governance/` (new `BeforeAfterDemo.tsx`), reuse on each `demo/*Page.tsx` | 0.5 d | — |
-| R2 | **UC1 Privacy** "before": rogue agent reads live PII → then ACL-secured agent denied | `demo/PrivacyPage.tsx`, `SchedulingAgentCompareModal.tsx`, `RoleBasedRedactionDemo.tsx` | 0.5 d | R1 |
-| R3 | **UC2 Risk** "before": rogue agent performs high-impact action with no gate → then approval gate stops secured agent | `demo/RiskPage.tsx`, `ApprovalGateDemo.tsx`, `ApprovalLogPanel.tsx` | 0.5 d | R1 |
-| R4 | **UC5 Security** "before": injection reaches agent (simulated unguarded) → then blocked + AI Case opened | `demo/SecurityPage.tsx`, `InjectionTesterDemo.tsx` | 0.5 d | R1 |
-| R5 | **UC6 Fairness** "before": skewed allocation shown (13.1pp) → debias toggle → **+ raise remediation incident** button | `demo/FairnessPage.tsx`, `FairnessDebiasDemo.tsx`, `hooks/useFairnessData.ts` | 0.5 d | R1, S4 |
-| R6 | **UC10 Consent** "before": agent processes non-consented patient (pre-gate) → ConsentGate blocks + incident | `demo/ConsentPage.tsx`, `ConsentEnforcementPanel.tsx` | 0.5 d | R1, A7 seed |
-| R7 | **UC3 Regulation** "before": ungoverned/unclassified agent vs governed High-risk agent w/ AI Impact Assessment | `demo/RegulationPage.tsx`, `RegulatoryClassificationBadge.tsx` | 0.5 d | S2 |
-| R8 | **Retire EU AI Act → NIST AI RMF + HIPAA + 42 CFR Part 2** in all UI copy (badges, demo data, agenda) | `RegulatoryClassificationBadge.tsx`, `data/useCaseDemoData.ts`, `GovernanceAgenda26Page.tsx`, `demo/RegulationPage.tsx`, `services/serviceNow.ts` | 0.5 d | — |
-| R9 | **Terminology:** remove any "SUD" from labels; align "queue" wording per resolved term | `data/*`, `staff/DoctorQueuePage.tsx`, agenda pages | 0.25 d | A9 decision |
-| R10 | **Consent regulatory basis** copy: surface 42 CFR Part 2 / HIPAA on consent demo page | `demo/ConsentPage.tsx`, `ConsentEnforcementPanel.tsx` | 0.25 d | R8 |
-| R11 | Fix `fetchConsentCoverage` loose end (wire to new endpoint or remove the dead call) | `services/serviceNow.ts` | 0.25 d | S5 |
+| ID | Status | Task | Files (primary) | Effort | Depends on |
+|---|---|---|---|---|---|
+| R1 | ✅ Done | **Before/after toggle** + interactive **`SimChat` type-and-send console** for the "before" pane (sample chips → Send → result) | `components/governance/BeforeAfterDemo.tsx` (new, exports `BeforeAfterDemo` + `SimChat`), reused on each `demo/*Page.tsx` | 0.5 d | — |
+| R2 | ✅ Done | **UC1 Privacy** "before": rogue agent reads PII (sim) → then ACL-secured agent denied (live) | `demo/PrivacyPage.tsx`, `RoleBasedRedactionDemo.tsx`, `PiiRedactionDemo.tsx` | 0.5 d | R1 |
+| R3 | ✅ Done | **UC2 Risk** "before": rogue agent performs high-impact action with no gate (sim) → then approval gate stops secured agent (live) | `demo/RiskPage.tsx`, `ApprovalGateDemo.tsx` | 0.5 d | R1 |
+| R4 | ✅ Done | **UC5 Security** "before": injection **obeyed** by agent (sim) → then blocked + AI Case opened (live) | `demo/SecurityPage.tsx`, `InjectionTesterDemo.tsx` | 0.5 d | R1 |
+| R5 | 🟡 Partial | **UC6 Fairness** "before": skewed allocation shown (13.1pp, sim) → debias toggle (live). **"Raise remediation incident" button still pending** (needs S4) | `demo/FairnessPage.tsx`, `FairnessDebiasDemo.tsx` | 0.5 d | R1, S4 |
+| R6 | ✅ Done | **UC10 Consent** "before": agent processes non-consented patient (sim) → ConsentGate blocks + incident (live). *(Live doctor-side block still needs A7 seed.)* | `demo/ConsentPage.tsx`, `ConsentEnforcementPanel.tsx` | 0.5 d | R1, A7 seed |
+| R7 | ✅ Done | **UC3 Regulation** "before": ungoverned/unclassified agent (sim) vs governed High-risk agent w/ AI Impact Assessment (live). *(S2 NA reframe separate.)* | `demo/RegulationPage.tsx` | 0.5 d | S2 |
+| R8 | ⬜ | **Retire EU AI Act → NIST AI RMF + HIPAA + 42 CFR Part 2** in all UI copy (badges, demo data, agenda) | `RegulatoryClassificationBadge.tsx`, `data/useCaseDemoData.ts`, `GovernanceAgenda26Page.tsx`, `demo/RegulationPage.tsx`, `services/serviceNow.ts` | 0.5 d | — |
+| R9 | ⬜ | **Terminology:** remove any "SUD" from labels; align "queue" wording per resolved term | `data/*`, `staff/DoctorQueuePage.tsx`, agenda pages | 0.25 d | A9 decision |
+| R10 | ⬜ | **Consent regulatory basis** copy: surface 42 CFR Part 2 / HIPAA on consent demo page | `demo/ConsentPage.tsx`, `ConsentEnforcementPanel.tsx` | 0.25 d | R8 |
+| R11 | ⬜ | Fix `fetchConsentCoverage` loose end (wire to new endpoint or remove the dead call) | `services/serviceNow.ts` | 0.25 d | S5 |
 
-**React subtotal: ~4.5 dev-days.**
+**React subtotal: ~4.5 dev-days · done: R1–R4, R6, R7 (+R5 partial) ≈ 3.5 d · remaining: R5 button, R8–R11 ≈ 1 d.**
 
 ---
 
@@ -53,26 +61,27 @@
 
 ```
 SUN Jun 28  ── Build wave 1 (the contrast that sells)
-  R1 Before/after component            (0.5d)
-  R2 UC1 before-damage                 (0.5d)
-  R3 UC2 before-damage                 (0.5d)
-  R4 UC5 before-damage                 (0.5d)
-  S1 UC3 prereq confirm                (0.25d)   ← unblock S2 early
+  ✅ R1 Before/after component            (DONE 06-27, commit 12d4306)
+  ✅ R2 UC1 before-damage                 (DONE 06-27)
+  ✅ R3 UC2 before-damage                 (DONE 06-27)
+  ✅ R4 UC5 before-damage                 (DONE 06-27)
+  ⬜ S1 UC3 prereq confirm                (0.25d)   ← unblock S2 early
+  ↳ NOTE: also delivered early — R6 (UC10 before) ✅ and R7 (UC3 before) ✅
 
 MON Jun 29  ── Build wave 2 (regulation + remaining UCs)
-  R8 EU→NA retire (UI)                 (0.5d)
-  S2 UC3 NA reframe + verify DG1       (0.5d)
-  R7 UC3 before-damage                 (0.5d)
-  S4 UC6 remediation endpoint          (0.5d)
+  ⬜ R8 EU→NA retire (UI)                 (0.5d)
+  ⬜ S2 UC3 NA reframe + verify DG1       (0.5d)
+  ✅ R7 UC3 before-damage                 (DONE 06-27)
+  ⬜ S4 UC6 remediation endpoint          (0.5d)
 
 TUE Jun 30  ── Build wave 3 (consent + fairness + loose ends)
-  R5 UC6 before + remediation button   (0.5d)
-  R6 UC10 before + S6 seed             (0.5d) + (0.25d)
-  S3 UC1 Wall-2 decision (scope/native)(0.5d)
-  S5 consent-coverage endpoint + R11   (0.25d+0.25d)
-  R10 consent reg basis copy           (0.25d)
-  R9/A9 terminology cleanup            (0.25d)
-  S7 backend EU→NA strings             (0.25d)
+  🟡 R5 UC6 before ✅ + remediation button ⬜ (button needs S4)
+  ✅ R6 UC10 before  (DONE 06-27) · ⬜ S6 seed (0.25d)
+  ⬜ S3 UC1 Wall-2 decision (scope/native)(0.5d)
+  ⬜ S5 consent-coverage endpoint + R11   (0.25d+0.25d)
+  ⬜ R10 consent reg basis copy           (0.25d)
+  ⬜ R9/A9 terminology cleanup            (0.25d)
+  ⬜ S7 backend EU→NA strings             (0.25d)
 
 WED Jul 1   ── FREEZE
   Integration + full 6-UC smoke run (all from 3 portals)

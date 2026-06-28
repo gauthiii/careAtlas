@@ -1,8 +1,17 @@
 # CareAtlas — Master README, Audit & Demo Playbook
 
-**Last updated: 2026-06-26** · Single source of truth for the whole project.
+**Last updated: 2026-06-28** · Single source of truth for the whole project.
 
-> **What's new (2026-06-26):** UC10 — **Consent & Purpose-of-Use Enforcement** added (live runtime ConsentGate that blocks an agent when a patient hasn't consented to its purpose, plus a dedicated page at `/governance/demo/consent` with the workflow modal, consent panel, and a live incidents table). Merged the `hema` (UI) and `shesh` (consent) branches. All 6 app-driven use cases (UC1/2/3/5/6/8) plus UC10 verified working live on this date.
+> **What's new (2026-06-28):** **4-step "before / after" storytelling added to all 6 demo pages.**
+> A reusable `BeforeAfterDemo` component (process strip → risk cards → control bar → ②Before/④After
+> toggle, matching Tanush's `Sample_AI_Use_Case_Process_Flows.pdf`) now wraps each
+> `/governance/demo/*` page. The **"before"** pane is an interactive `SimChat` console — the user
+> types a prompt or clicks a sample chip, hits **Send**, and the rogue/unguarded result appears
+> (damage generated client-side; **no live control is ever disabled**). The **"after"** pane keeps
+> the existing live-wired demo that ends on a real ServiceNow record. This directly addresses the
+> June 27 demo feedback (show the damage before the control). See `Plan md files/jul-4/`.
+>
+> **(2026-06-26):** UC10 — **Consent & Purpose-of-Use Enforcement** added (live runtime ConsentGate that blocks an agent when a patient hasn't consented to its purpose, plus a dedicated page at `/governance/demo/consent` with the workflow modal, consent panel, and a live incidents table). Merged the `hema` (UI) and `shesh` (consent) branches. All 6 app-driven use cases (UC1/2/3/5/6/8) plus UC10 verified working live on this date.
 
 > This document explains *everything* that has been built, how it works, how to run it,
 > what lives on the React side, what lives on the ServiceNow side, and the exact status
@@ -276,6 +285,10 @@ lets you enter any portal for demos without real credentials.
 `/governance/additional-work`, `/governance/llm02-audit`. Fallback `*` → `/`.
 
 ### 7.4 Key governance components (`src/components/governance/`)
+- `BeforeAfterDemo.tsx` — **all 6 UCs** the reusable 4-step before/after frame (process strip + risk
+  cards + control bar + ②Before/④After toggle). Exports `SimChat`, the interactive "before" console
+  (type/click a sample → Send → the rogue/unguarded result, generated client-side). Wraps every
+  `pages/governance/demo/*Page.tsx`.
 - `PiiRedactionDemo.tsx` / `AiRedactionComparisonCard.tsx` / `RoleBasedRedactionDemo.tsx` /
   `PrivacyControlsPanel.tsx` — **UC1** PII redaction & role‑based access comparison.
 - `ApprovalGateDemo.tsx` / `ApprovalLogPanel.tsx` — **UC2** human‑approval gate + audit log.
@@ -563,6 +576,12 @@ Life Cycle, each answer creating the next question:
 Bound it (UC2 Risk) → Protect the patient (UC1 Privacy) → Treat everyone fairly
 (UC6 Fairness) → Protect the inputs (UC7 Data Integrity) → Catch the attack (UC5 Security)
 → Stop it instantly (UC9 Operational Control).**
+
+> **On each `/governance/demo/*` page, drive the 4-step arc:** start on **②Before the control** and
+> Send the sample prompt to show the *damage* (rogue agent leaks / obeys / acts ungated), then flip
+> to **④After the control** to show the same attempt failing on a live ServiceNow record. Showing the
+> "before" damage first is what makes the control land — see `Plan md files/jul-4/` for the per-UC
+> talk track (`usecase-narratives-4step.md`).
 
 ---
 

@@ -3,7 +3,7 @@ import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { PiiRedactionDemo } from '../../../components/governance/PiiRedactionDemo'
 import { RoleBasedRedactionDemo } from '../../../components/governance/RoleBasedRedactionDemo'
-import { BeforeAfterDemo, SimExchange } from '../../../components/governance/BeforeAfterDemo'
+import { BeforeAfterDemo, SimChat } from '../../../components/governance/BeforeAfterDemo'
 import { ArrowRight, ScanSearch, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -66,11 +66,21 @@ export function GovernancePrivacyPage() {
             ]}
             control="ServiceNow enforces field-level ACLs on the PII columns (role role_patient_pii) and an anonymized decision log keyed on a token — not the record ID."
             before={
-              <SimExchange
+              <SimChat
                 agent="Rogue agent"
-                prompt="What is this patient's insurance ID and date of birth?"
-                response="Insurance ID: BCBS-4471-9920 · DOB: 1984-03-12 · Email: gautham@example.com"
-                impact="PII returned in clear text and written to the log — a reportable HIPAA breach from one leaked identifier."
+                placeholder="Ask the rogue agent for the patient's details…"
+                samples={[
+                  {
+                    prompt: "What is this patient's insurance ID and date of birth?",
+                    response: 'Insurance ID: BCBS-4471-9920 · DOB: 1984-03-12 · Email: gautham@example.com',
+                    impact: 'PII returned in clear text and written to the log — a reportable HIPAA breach from one leaked identifier.',
+                  },
+                  {
+                    prompt: 'Show me everything you know about this patient.',
+                    response: 'Name: Gautham V. · Phone: +1 802-555-0143 · Address: 12 Maple St, Burlington VT · SSN: 412-55-9981',
+                    impact: 'The unscoped agent dumps every PII field it should never be able to read.',
+                  },
+                ]}
               />
             }
             after={

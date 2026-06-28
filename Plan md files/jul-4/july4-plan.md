@@ -110,7 +110,7 @@ Massachusetts"). Kuppusami: *"that's your 42 CFR Part 2 use case."*
 ### 3.1 Application / build — must land by **Wed July 1**
 | # | Item | Use case | Type | Status today |
 |---|---|---|---|---|
-| A1 | Build the **"before-the-control" exploit demo** for each UC (see `before-damage-demo-gaps.md`) | All 6 | React/data | ⬜ Main gap |
+| A1 | Build the **"before-the-control" exploit demo** for each UC (see `before-damage-demo-gaps.md`) | All 6 | React/data | ✅ **Done** — reusable `BeforeAfterDemo` + interactive `SimChat` (type-and-send) on all 6 demo pages; build clean |
 | A2 | **Retire EU AI Act / FRIA → NIST AI RMF + HIPAA + 42 CFR Part 2** across app (36 refs, 7 files) | UC3, UC10 | React + server | ⬜ |
 | A3 | Wire **42 CFR Part 2 / HIPAA** as the consent regulatory basis on the consent demo page | UC10 | React | ⬜ |
 | A4 | Decide + execute **UC1 Wall-2 PII output filter**: wire at runtime *or* frame as platform-native (record is active, not invoked) | UC1 | server (or talk-track) | ⬜ Decision |

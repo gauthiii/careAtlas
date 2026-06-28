@@ -3,7 +3,7 @@ import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { ArrowRight, Scale, FileText, ArrowLeft, AlertTriangle, CheckCircle2, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { BeforeAfterDemo } from '../../../components/governance/BeforeAfterDemo'
+import { BeforeAfterDemo, SimChat } from '../../../components/governance/BeforeAfterDemo'
 import {
   fetchRegulatoryAiSystems,
   fetchRegulatoryEvidence,
@@ -101,29 +101,45 @@ export function GovernanceRegulationPage() {
           ]}
           control="ServiceNow RAM auto-classifies the agent (High/Med/Low) from the Use & Purpose answers and generates the AI Impact Assessment; Post Assessment Actions auto-map risk statements and control objectives."
           before={
-            <div className="space-y-3">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-[#6b7c8f]">
-                Ungoverned agent · no assessment run
-              </div>
-              <div className="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
-                {[
-                  { k: 'Risk classification', v: 'To be determined' },
-                  { k: 'AI Impact Assessment', v: 'None attached' },
-                  { k: 'Assessment tasks', v: '0' },
-                  { k: 'Mapped risk/controls', v: 'None' },
-                ].map((m) => (
-                  <div key={m.k} className="rounded-lg border border-red-200 bg-white px-4 py-3">
-                    <div className="text-[11px] font-bold uppercase tracking-wide text-[#6b7c8f]">{m.k}</div>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-red-700">
-                      <XCircle size={14} /> {m.v}
+            <SimChat
+              agent="Governance assistant"
+              placeholder="Ask about this agent's regulatory status…"
+              samples={[
+                {
+                  prompt: "What's the risk tier and impact assessment for the Triage agent?",
+                  result: (
+                    <div className="space-y-3">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[#6b7c8f]">
+                        Ungoverned agent · no assessment run
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
+                        {[
+                          { k: 'Risk classification', v: 'To be determined' },
+                          { k: 'AI Impact Assessment', v: 'None attached' },
+                          { k: 'Assessment tasks', v: '0' },
+                          { k: 'Mapped risk/controls', v: 'None' },
+                        ].map((m) => (
+                          <div key={m.k} className="rounded-lg border border-red-200 bg-white px-4 py-3">
+                            <div className="text-[11px] font-bold uppercase tracking-wide text-[#6b7c8f]">{m.k}</div>
+                            <div className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-red-700">
+                              <XCircle size={14} /> {m.v}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
+                        <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" /> Only a bare system record exists — the agent runs with no defensible NIST AI RMF classification and no impact-assessment evidence.
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
-                <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" /> Only a bare system record exists — the agent runs with no defensible NIST AI RMF classification and no impact-assessment evidence.
-              </div>
-            </div>
+                  ),
+                },
+                {
+                  prompt: 'Is this agent approved to deploy?',
+                  response: 'No classification on file and no impact assessment — but nothing is stopping deployment either.',
+                  impact: 'An unclassified, unassessed agent could ship with zero regulatory evidence behind it.',
+                },
+              ]}
+            />
           }
           after={(
             <>
