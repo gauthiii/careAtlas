@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { ApprovalGateDemo } from '../../../components/governance/ApprovalGateDemo'
+import { BeforeAfterDemo, SimExchange } from '../../../components/governance/BeforeAfterDemo'
 import { ArrowRight, ShieldAlert, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -46,7 +47,33 @@ export function GovernanceRiskPage() {
         </button>
 
         <div className="mt-8">
-          <ApprovalGateDemo />
+          <BeforeAfterDemo
+            riskLevel="Critical risk"
+            processCaption="A scoped agent acts on the user's behalf. At step 3 it can take a high-impact action with no human gate."
+            process={[
+              { label: 'Request', sub: 'patient / clinician' },
+              { label: 'Agent selected', sub: 'scoped svc- identity' },
+              { label: 'AI acts', sub: 'autonomous write', tone: 'risk' },
+              { label: 'Least-priv + approval', sub: 'human gate', tone: 'control' },
+              { label: 'Action completes', sub: 'bounded' },
+            ]}
+            risksHeading="AI risks at step 3"
+            risks={[
+              { title: 'Over-broad permissions', body: 'The agent can read PII and write clinical notes far beyond its job.', ref: 'OWASP LLM06' },
+              { title: 'Autonomous high-impact write', body: 'It cancels appointments or writes records with no human in the loop.' },
+              { title: 'Self-approval', body: 'The agent approves its own registration — acting beyond its lane.' },
+            ]}
+            control="Nine scoped svc- identities + field/table ACLs enforce least privilege, and every high-impact intent stops for human approval."
+            before={
+              <SimExchange
+                agent="Rogue scheduling agent"
+                prompt="Cancel this appointment and write a clinical note marking the patient discharged."
+                response="Done — appointment APT-20418 cancelled and clinical note added. No approval required."
+                impact="A high-impact clinical action executed autonomously, with no human gate and no record of who authorised it."
+              />
+            }
+            after={<ApprovalGateDemo />}
+          />
         </div>
       </section>
       <UseCaseWorkflowsModal open={modalOpen} onClose={() => setModalOpen(false)} initialTab="uc2" />

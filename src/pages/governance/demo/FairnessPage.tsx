@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { FairnessDebiasDemo } from '../../../components/governance/FairnessDebiasDemo'
-import { ArrowRight, Activity, ArrowLeft } from 'lucide-react'
+import { BeforeAfterDemo } from '../../../components/governance/BeforeAfterDemo'
+import { ArrowRight, Activity, ArrowLeft, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export function GovernanceFairnessPage() {
@@ -46,7 +47,50 @@ export function GovernanceFairnessPage() {
         </button>
 
         <div className="mt-8">
-          <FairnessDebiasDemo />
+          <BeforeAfterDemo
+            riskLevel="High risk"
+            processCaption="Every booking is one outcome data point. At step 3 the scheduling agent can systematically skew allocation across groups."
+            process={[
+              { label: 'Appointments booked', sub: 'patient outcomes' },
+              { label: 'Outcomes aggregated', sub: 'by group' },
+              { label: 'AI allocation skews', sub: 'demographic bias', tone: 'risk' },
+              { label: 'Monitor + remediate', sub: 'human workflow', tone: 'control' },
+              { label: 'Equitable outcomes', sub: 'tracked' },
+            ]}
+            risksHeading="AI risks at step 3"
+            risks={[
+              { title: 'Bias across groups', body: 'Worse slots for patients by ethnicity, gender, or age — discrimination at scale.', ref: 'NIST Harmful Bias' },
+              { title: 'Invisible individually', body: 'No single patient sees a score; the skew only shows in the aggregate.' },
+              { title: 'Continuous drift', body: 'A one-time fairness check misses skew that emerges over time.' },
+            ]}
+            control="21 fairness metrics + bias risk statements monitor outcomes continuously and flag skew the moment it appears. AIRC does not auto-correct — remediation is a controlled human workflow (raise an incident/case)."
+            before={
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-[#6b7c8f]">
+                  Scheduling outcomes · last 90 appointments · no monitoring
+                </div>
+                <div className="grid grid-cols-3 gap-3 max-[560px]:grid-cols-1">
+                  {[
+                    { g: 'White', v: '+13.1pp', bad: true },
+                    { g: 'Black', v: '−7.4pp', bad: true },
+                    { g: 'Asian', v: '−5.7pp', bad: true },
+                  ].map((c) => (
+                    <div key={c.g} className="rounded-lg border border-red-200 bg-white px-4 py-3">
+                      <div className="text-xs font-semibold text-[#53687b]">{c.g}</div>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-lg font-bold text-red-700">
+                        <TrendingUp size={16} /> {c.v}
+                      </div>
+                      <div className="text-[11px] text-[#7a3b3b]">priority-slot allocation vs fair share</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
+                  13.1pp over-allocation to the white cohort goes undetected — no alert, no owner, no remediation.
+                </div>
+              </div>
+            }
+            after={<FairnessDebiasDemo />}
+          />
         </div>
       </section>
       <UseCaseWorkflowsModal open={modalOpen} onClose={() => setModalOpen(false)} initialTab="uc6" />

@@ -3,6 +3,7 @@ import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { PiiRedactionDemo } from '../../../components/governance/PiiRedactionDemo'
 import { RoleBasedRedactionDemo } from '../../../components/governance/RoleBasedRedactionDemo'
+import { BeforeAfterDemo, SimExchange } from '../../../components/governance/BeforeAfterDemo'
 import { ArrowRight, ScanSearch, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -47,11 +48,38 @@ export function GovernancePrivacyPage() {
         </button>
 
         <div className="mt-8">
-          <RoleBasedRedactionDemo />
-        </div>
-
-        <div className="mt-8">
-          <PiiRedactionDemo />
+          <BeforeAfterDemo
+            riskLevel="Critical risk"
+            processCaption="A patient asks an on-page AI assistant about their record. The agent reads the patient at step 3 — that step can leak PII."
+            process={[
+              { label: 'Patient asks', sub: 'on-page assistant' },
+              { label: 'Agent invoked', sub: 'scoped svc- identity' },
+              { label: 'AI reads record', sub: 'PII in scope', tone: 'risk' },
+              { label: 'ACL + redaction', sub: 'fields denied', tone: 'control' },
+              { label: 'Answer returned', sub: 'PII-free' },
+            ]}
+            risksHeading="AI risks at step 3"
+            risks={[
+              { title: 'PII in model output', body: 'The agent returns name, DOB, or insurance ID — a single identifier is a reportable HIPAA breach.', ref: 'OWASP LLM02' },
+              { title: 'Re-identification via the log', body: 'The audit log stores the raw patient ID, so the trail itself re-identifies the patient.' },
+              { title: 'Over-broad agent identity', body: 'An unscoped agent reads every sensitive field it was never meant to see.' },
+            ]}
+            control="ServiceNow enforces field-level ACLs on the PII columns (role role_patient_pii) and an anonymized decision log keyed on a token — not the record ID."
+            before={
+              <SimExchange
+                agent="Rogue agent"
+                prompt="What is this patient's insurance ID and date of birth?"
+                response="Insurance ID: BCBS-4471-9920 · DOB: 1984-03-12 · Email: gautham@example.com"
+                impact="PII returned in clear text and written to the log — a reportable HIPAA breach from one leaked identifier."
+              />
+            }
+            after={
+              <div className="space-y-8">
+                <RoleBasedRedactionDemo />
+                <PiiRedactionDemo />
+              </div>
+            }
+          />
         </div>
       </section>
       <UseCaseWorkflowsModal open={modalOpen} onClose={() => setModalOpen(false)} initialTab="uc1" />

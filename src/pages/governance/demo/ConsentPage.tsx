@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, ShieldCheck, Siren, Loader2, RefreshCw } from 'l
 import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { ConsentEnforcementPanel } from '../../../components/governance/ConsentEnforcementPanel'
+import { BeforeAfterDemo, SimExchange } from '../../../components/governance/BeforeAfterDemo'
 import { fetchConsentViolations, type ConsentViolationsResponse } from '../../../services/serviceNow'
 
 export function GovernanceConsentPage() {
@@ -69,9 +70,35 @@ export function GovernanceConsentPage() {
           </span>
         </button>
 
-        {/* Replicated consent enforcement panel */}
+        {/* Before/after: agent processes a non-consented patient (sim) → ConsentGate blocks (live) */}
         <div className="mb-8">
-          <ConsentEnforcementPanel />
+          <BeforeAfterDemo
+            riskLevel="Critical risk"
+            processCaption="A patient sets which AI purposes they allow. At step 3 an agent can read the record regardless of that choice — table access is not consent."
+            process={[
+              { label: 'Patient sets consent', sub: 'per purpose' },
+              { label: 'Agent invoked', sub: 'for a purpose' },
+              { label: 'AI reads anyway', sub: 'ignores consent', tone: 'risk' },
+              { label: 'ConsentGate check', sub: 'purpose match', tone: 'control' },
+              { label: 'Processed if allowed', sub: 'else blocked' },
+            ]}
+            risksHeading="AI risks at step 3"
+            risks={[
+              { title: 'Processing without consent', body: 'The notes agent summarises a record for a patient who opted out of AI notes.', ref: '42 CFR Part 2 / HIPAA' },
+              { title: 'Table access ≠ consent', body: 'Field/table ACLs allow the read, but the patient never agreed to this purpose.' },
+              { title: 'No auditable proof', body: 'Nothing records that only consented purposes were processed.' },
+            ]}
+            control="A runtime ConsentGate checks the agent's purpose against the patient's consent flags before any read; a missing flag blocks it, accesses no data, and opens an incident (fail-closed; identity verification is exempt)."
+            before={
+              <SimExchange
+                agent="Clinical notes agent"
+                prompt="Summarise this patient's history. (Patient consented to scheduling only — not AI notes.)"
+                response="Summary: recurring anxiety, last visit 2026-05-02, medication adjusted… (record read despite no notes consent)"
+                impact="The agent processed the record for a purpose the patient never agreed to — a 42 CFR Part 2 / HIPAA purpose-limitation violation, unlogged."
+              />
+            }
+            after={<ConsentEnforcementPanel />}
+          />
         </div>
 
         {/* Consent violation incidents table */}
