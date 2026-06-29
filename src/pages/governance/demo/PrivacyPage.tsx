@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { PiiRedactionDemo } from '../../../components/governance/PiiRedactionDemo'
@@ -6,9 +6,30 @@ import { RoleBasedRedactionDemo } from '../../../components/governance/RoleBased
 import { BeforeAfterDemo, SimChat } from '../../../components/governance/BeforeAfterDemo'
 import { ArrowRight, ScanSearch, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { fetchPatientAccessComparison, type PatientFieldAccess } from '../../../services/serviceNow'
+
+function fieldVal(fields: PatientFieldAccess[], label: string): string {
+  return fields.find((f) => f.label === label)?.privileged_value || '—'
+}
 
 export function GovernancePrivacyPage() {
   const [modalOpen, setModalOpen] = useState(false)
+  const [demoFields, setDemoFields] = useState<PatientFieldAccess[]>([])
+
+  useEffect(() => {
+    fetchPatientAccessComparison()
+      .then((d) => setDemoFields(d.fields))
+      .catch(() => {/* fall through to generic labels */})
+  }, [])
+
+  const demoName =
+    [fieldVal(demoFields, 'First name'), fieldVal(demoFields, 'Last name')].filter((v) => v !== '—').join(' ') ||
+    'this patient'
+  const demoDob = fieldVal(demoFields, 'Date of birth')
+  const demoInsurance = fieldVal(demoFields, 'Insurance ID')
+  const demoPhone = fieldVal(demoFields, 'Phone')
+  const demoEmail = fieldVal(demoFields, 'Email')
+  const demoCondition = fieldVal(demoFields, 'Health condition')
 
   return (
     <PortalPage
@@ -50,7 +71,7 @@ export function GovernancePrivacyPage() {
         <div className="mt-8">
           <BeforeAfterDemo
             riskLevel="Critical risk"
-            processCaption="A patient asks an on-page AI assistant about their record. The agent reads the patient at step 3 — that step can leak PII."
+            processCaption={`A patient asks an on-page AI assistant about their record. The agent reads ${demoName}'s record at step 3 — that step can leak PII.`}
             process={[
               { label: 'Patient asks', sub: 'on-page assistant' },
               { label: 'Agent invoked', sub: 'scoped svc- identity' },
@@ -67,17 +88,17 @@ export function GovernancePrivacyPage() {
             control="ServiceNow enforces field-level ACLs on the PII columns (role role_patient_pii) and an anonymized decision log keyed on a token — not the record ID."
             before={
               <SimChat
-                agent="Rogue agent"
-                placeholder="Ask the rogue agent for the patient's details…"
+                agent="Rogue agent · no governance applied"
+                placeholder={`Ask the rogue agent for ${demoName}'s details…`}
                 samples={[
                   {
-                    prompt: "What is this patient's insurance ID and date of birth?",
-                    response: 'Insurance ID: BCBS-4471-9920 · DOB: 1984-03-12 · Email: gautham@example.com',
-                    impact: 'PII returned in clear text and written to the log — a reportable HIPAA breach from one leaked identifier.',
+                    prompt: `What is ${demoName}'s insurance ID and date of birth?`,
+                    response: `Insurance ID: ${demoInsurance} · DOB: ${demoDob} · Email: ${demoEmail}`,
+                    impact: `PII returned in clear text — a reportable HIPAA breach from a single leaked identifier for ${demoName}.`,
                   },
                   {
-                    prompt: 'Show me everything you know about this patient.',
-                    response: 'Name: Gautham V. · Phone: +1 802-555-0143 · Address: 12 Maple St, Burlington VT · SSN: 412-55-9981',
+                    prompt: `Show me everything you know about ${demoName}.`,
+                    response: `Name: ${demoName} · Phone: ${demoPhone} · Health condition: ${demoCondition} · DOB: ${demoDob}`,
                     impact: 'The unscoped agent dumps every PII field it should never be able to read.',
                   },
                 ]}

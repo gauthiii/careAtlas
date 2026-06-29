@@ -32,6 +32,7 @@ import {
   timeRangeForHour,
 } from '../../lib/scheduling'
 import type { BookingAppointment } from '../../services/serviceNow'
+import { ContextualRiskBeforeAfter } from '../../components/governance/ContextualRiskBeforeAfter'
 
 type StatCardProps = {
   label: string
@@ -342,6 +343,15 @@ export function DoctorDashboardPage() {
           </div>
         </div>
       </div>
+
+      {upcomingAppointments.length > 0 && (
+        <section className="mt-6">
+          <ContextualRiskBeforeAfter
+            doctorName={displayName}
+            appointments={upcomingAppointments}
+          />
+        </section>
+      )}
     </DoctorPage>
   )
 }

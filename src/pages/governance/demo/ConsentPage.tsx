@@ -7,13 +7,34 @@ import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWor
 import { ConsentEnforcementPanel } from '../../../components/governance/ConsentEnforcementPanel'
 import { DoctorConsentBlockDemo } from '../../../components/governance/DoctorConsentBlockDemo'
 import { BeforeAfterDemo, SimChat } from '../../../components/governance/BeforeAfterDemo'
-import { fetchConsentViolations, type ConsentViolationsResponse } from '../../../services/serviceNow'
+import {
+  fetchConsentViolations,
+  fetchPatientAccessComparison,
+  type ConsentViolationsResponse,
+  type PatientFieldAccess,
+} from '../../../services/serviceNow'
+
+function fieldVal(fields: PatientFieldAccess[], label: string): string {
+  return fields.find((f) => f.label === label)?.privileged_value || '—'
+}
 
 export function GovernanceConsentPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [data, setData] = useState<ConsentViolationsResponse | null>(null)
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading')
   const [errorMsg, setErrorMsg] = useState('')
+  const [demoFields, setDemoFields] = useState<PatientFieldAccess[]>([])
+
+  useEffect(() => {
+    fetchPatientAccessComparison()
+      .then((d) => setDemoFields(d.fields))
+      .catch(() => {/* fall through to generic labels */})
+  }, [])
+
+  const demoName =
+    [fieldVal(demoFields, 'First name'), fieldVal(demoFields, 'Last name')].filter((v) => v !== '—').join(' ') ||
+    'this patient'
+  const demoCondition = fieldVal(demoFields, 'Health condition')
 
   const load = () => {
     setState('loading')
@@ -75,7 +96,7 @@ export function GovernanceConsentPage() {
         <div className="mb-8">
           <BeforeAfterDemo
             riskLevel="Critical risk"
-            processCaption="A patient sets which AI purposes they allow. At step 3 an agent can read the record regardless of that choice — table access is not consent."
+            processCaption={`${demoName} has set which AI purposes they allow. At step 3 an agent can read their record regardless of that choice — table access is not consent.`}
             process={[
               { label: 'Patient sets consent', sub: 'per purpose' },
               { label: 'Agent invoked', sub: 'for a purpose' },
@@ -85,25 +106,25 @@ export function GovernanceConsentPage() {
             ]}
             risksHeading="AI risks at step 3"
             risks={[
-              { title: 'Processing without consent', body: 'The notes agent summarises a record for a patient who opted out of AI notes.', ref: '42 CFR Part 2 / HIPAA' },
-              { title: 'Table access ≠ consent', body: 'Field/table ACLs allow the read, but the patient never agreed to this purpose.' },
-              { title: 'No auditable proof', body: 'Nothing records that only consented purposes were processed.' },
+              { title: 'Processing without consent', body: `The notes agent summarises ${demoName}'s record even though they opted out of AI notes.`, ref: '42 CFR Part 2 / HIPAA' },
+              { title: 'Table access ≠ consent', body: `Field/table ACLs allow the read of ${demoName}'s record, but they never agreed to this purpose.` },
+              { title: 'No auditable proof', body: `Nothing records that only ${demoName}'s consented purposes were processed.` },
             ]}
             control="A runtime ConsentGate checks the agent's purpose against the patient's consent flags before any read; a missing flag blocks it, accesses no data, and opens an incident (fail-closed; identity verification is exempt)."
             before={
               <SimChat
-                agent="Clinical notes agent"
-                placeholder="Ask the agent to process a patient who opted out…"
+                agent="Clinical notes agent · no consent gate applied"
+                placeholder={`Ask the agent to process ${demoName} who opted out…`}
                 samples={[
                   {
-                    prompt: "Summarise this patient's history. (Patient consented to scheduling only — not AI notes.)",
-                    response: 'Summary: recurring anxiety, last visit 2026-05-02, medication adjusted… (record read despite no notes consent)',
-                    impact: 'The agent processed the record for a purpose the patient never agreed to — a 42 CFR Part 2 / HIPAA purpose-limitation violation, unlogged.',
+                    prompt: `Summarise ${demoName}'s history. (${demoName} consented to scheduling only — not AI notes.)`,
+                    response: `Summary for ${demoName}: ${demoCondition !== '—' ? demoCondition + ', ' : ''}last visit 2026-05-02, medication adjusted… (record read despite no notes consent)`,
+                    impact: `The agent processed ${demoName}'s record for a purpose they never agreed to — a 42 CFR Part 2 / HIPAA purpose-limitation violation, unlogged.`,
                   },
                   {
-                    prompt: 'Run AI triage on this patient. (Triage consent is OFF.)',
-                    response: 'Triage complete — priority computed from the record. (no consent check performed)',
-                    impact: 'A second purpose the patient declined is processed anyway — table access was treated as consent.',
+                    prompt: `Run AI triage on ${demoName}. (Triage consent is OFF.)`,
+                    response: `Triage complete for ${demoName} — priority computed from the record. (no consent check performed)`,
+                    impact: `A second purpose ${demoName} declined is processed anyway — table access was treated as consent.`,
                   },
                 ]}
               />
