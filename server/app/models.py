@@ -780,3 +780,11 @@ class ConsentViolationEntry(BaseModel):
 class ConsentViolationsResponse(BaseModel):
     count_30_days: int = 0
     recent: list[ConsentViolationEntry] = []
+
+
+class FairnessRemediationResponse(BaseModel):
+    """UC6 Fairness — response from raising a remediation incident."""
+
+    number: str
+    sys_id: str
+    state: str

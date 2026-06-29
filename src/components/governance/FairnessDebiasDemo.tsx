@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Activity, ShieldCheck, Siren } from 'lucide-react'
+import { Activity, ShieldCheck, Siren, AlertTriangle } from 'lucide-react'
+import { raiseFairnessRemediationIncident } from '../../services/serviceNow'
 import {
   FAIRNESS_BY_AGE,
   FAIRNESS_BY_ETHNICITY,
@@ -38,6 +39,9 @@ const DIMENSIONS: Dimension[] = [
 export function FairnessDebiasDemo() {
   const [dimKey, setDimKey] = useState<DimKey>('ethnicity')
   const [mode, setMode] = useState<'biased' | 'debiased'>('biased')
+  const [remediating, setRemediating] = useState(false)
+  const [remediationResult, setRemediationResult] = useState<{ number: string; sys_id: string } | null>(null)
+  const [remediationError, setRemediationError] = useState<string | null>(null)
 
   const live = useFairnessData()
 
@@ -161,6 +165,54 @@ export function FairnessDebiasDemo() {
           <span>Within tolerance — max deviation {skew}pp. Outcomes balanced after debiasing.</span>
         )}
       </div>
+
+      {tripped && (
+        <div className="mt-4 rounded-xl border border-[#f3a19c] bg-[#fff4f3] p-4">
+          <p className="mb-3 text-xs font-semibold text-[#a22828]">
+            AIRC does not auto-correct — remediation is a controlled human workflow. Raise a live
+            incident in ServiceNow to start the response.
+          </p>
+          {remediationResult ? (
+            <div className="flex items-center gap-2 rounded-lg border border-[#a7dfbf] bg-[#f0fbf5] px-3 py-2 text-xs font-semibold text-[#0f6b4f]">
+              <ShieldCheck size={15} />
+              Remediation incident raised —{' '}
+              <a
+                href={`https://ven04690.service-now.com/nav_to.do?uri=sn_si_incident.do?sys_id=${remediationResult.sys_id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                {remediationResult.number}
+              </a>{' '}
+              · Live in ServiceNow
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={remediating}
+              onClick={async () => {
+                setRemediating(true)
+                setRemediationError(null)
+                try {
+                  const r = await raiseFairnessRemediationIncident()
+                  setRemediationResult({ number: r.number, sys_id: r.sys_id })
+                } catch (e) {
+                  setRemediationError(e instanceof Error ? e.message : 'Failed to raise incident')
+                } finally {
+                  setRemediating(false)
+                }
+              }}
+              className="flex items-center gap-2 rounded-lg bg-[#a22828] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#831f1f] disabled:opacity-60"
+            >
+              <AlertTriangle size={14} />
+              {remediating ? 'Raising incident…' : 'Raise remediation incident (live)'}
+            </button>
+          )}
+          {remediationError && (
+            <p className="mt-2 text-[11px] font-semibold text-[#a22828]">{remediationError}</p>
+          )}
+        </div>
+      )}
     </section>
   )
 }

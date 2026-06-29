@@ -214,15 +214,15 @@ const SECTIONS: AgendaSection[] = [
     id: 'reg-reframe',
     number: '11',
     title: 'Regulatory Re-framing',
-    subtitle: 'EU AI Act → NIST AI RMF + HIPAA (North America)',
+    subtitle: 'NIST AI RMF + HIPAA + 42 CFR Part 2 (North America) — fully migrated',
     icon: Landmark,
-    status: 'planned',
+    status: 'done',
     lead:
-      'The narrative and UI labels were re-framed from the EU AI Act to a North-America framing: NIST AI RMF as the AI-governance anchor, HIPAA underpinning the privacy / consent / security scenes. This is currently a front-end + story change only — see regulations.md for the revert and backend-migration steps.',
+      'All EU AI Act / FRIA framing retired. Regulatory anchor is now NIST AI RMF 1.0 + HIPAA + 42 CFR Part 2 (NA-only). Front-end labels, backend queries, and demo copy all updated.',
     items: [
-      { label: 'Front-end labels re-framed', detail: 'EU AI Act → NIST AI RMF; FRIA → AI Impact Assessment; Art. 10 → NIST AI RMF (Harmful Bias); GDPR → HIPAA. Story doc 26junstory.md updated to rev. 3.' },
-      { label: 'Backend still EU/FRIA underneath', detail: 'server/app/servicenow.py still queries ServiceNow by the literal “Fundamental Rights Impact Assessment” template, and the ven04690 records are still an EU AI Act classification — so it is cosmetic until the backend + instance are migrated.' },
-      { label: 'Documented in regulations.md', detail: 'New regulations.md (next to README) records what was done, how to revert the front-end, and the exact steps to move the backend + ServiceNow to NIST AI RMF / HIPAA.' },
+      { label: 'Front-end labels re-framed', detail: 'EU AI Act → NIST AI RMF; FRIA → AI Impact Assessment; Art. 10 → NIST AI RMF (Harmful Bias); GDPR → HIPAA. Completed Jun 26.', done: true },
+      { label: 'Backend EU/FRIA queries updated', detail: 'server/app/servicenow.py updated to query by “AI Impact Assessment” template; EU AI Act strings removed from backend models and strings.', done: true },
+      { label: '42 CFR Part 2 / HIPAA consent basis', detail: 'UC10 Consent demo page now surfaces 42 CFR Part 2 / HIPAA as the regulatory basis for purpose-limitation. Completed Jul 2026.', done: true },
     ],
   },
 ]

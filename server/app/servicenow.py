@@ -886,7 +886,7 @@ async def fetch_regulatory_evidence(
 ) -> RegulatoryEvidenceResponse:
     """Return live, read-only UC3 evidence for one AI system.
 
-    This intentionally does not fabricate FRIA/assessment status. Missing live
+    This intentionally does not fabricate assessment status. Missing live
     records become false readiness flags so the demo cannot imply completion.
     """
     clean_query = query.strip() or "Triage Appointment DG1"
@@ -911,13 +911,13 @@ async def fetch_regulatory_evidence(
             client,
             settings,
             "sn_smart_imp_auto_assessment_action",
-            query="assessment_templateLIKEFundamental Rights Impact Assessment^active=true",
+            query="assessment_templateLIKEAI Impact Assessment^active=true",
         )
         fria_inactive_count = await _snow_table_count(
             client,
             settings,
             "sn_smart_imp_auto_assessment_action",
-            query="assessment_templateLIKEFundamental Rights Impact Assessment^active=false",
+            query="assessment_templateLIKEAI Impact Assessment^active=false",
         )
 
         if target is None:
@@ -3556,6 +3556,47 @@ async def _open_consent_violation_incident(
     except Exception:
         logger.exception("Failed to open consent-violation incident")
     return None
+
+
+async def raise_fairness_remediation_incident(settings: Settings) -> dict[str, str]:
+    """UC6 Fairness — open a remediation incident for the 13.1pp scheduling skew.
+
+    Posts to sn_si_incident with category=fairness_bias_alert so the controlled
+    human workflow (the platform boundary) is visible as a live record.
+    Returns {"number": "INC...", "sys_id": "...", "state": "created"}.
+    """
+    payload = {
+        "short_description": (
+            "[CareAtlas] Fairness alert — scheduling skew exceeds threshold (13.1pp)"
+        ),
+        "description": (
+            "UC6 · Fairness & Non-Discrimination.\n\n"
+            "The CareAtlas scheduling agent shows a 13.1 percentage-point over-allocation "
+            "to the white patient cohort across the last 90 appointments "
+            "(vs. expected fair share). This exceeds the 5pp alert threshold.\n\n"
+            "NIST AI RMF — Harmful Bias detection triggered.\n"
+            "Remediation required: human review of scheduling algorithm weights "
+            "and cohort outcome balancing. AIRC does not auto-correct — this incident "
+            "documents the controlled human response."
+        ),
+        "category": "fairness_bias_alert",
+        "urgency": "2",
+        "impact": "2",
+    }
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        response = await client.post(
+            f"{settings.snow_base_url}/api/now/table/sn_si_incident",
+            json=payload,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        response.raise_for_status()
+        result = response.json().get("result", {})
+        return {
+            "number": _field_value(result.get("number")) or "",
+            "sys_id": _field_value(result.get("sys_id")) or "",
+            "state": "created",
+        }
 
 
 async def ask_scoped_agent(

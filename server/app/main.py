@@ -85,6 +85,7 @@ from .models import (
     ConsentFlagsRequest,
     ConsentFlagsResponse,
     ConsentViolationsResponse,
+    FairnessRemediationResponse,
 )
 from .notifications import fetch_notifications, mark_notification_read
 from .pwned_passwords import PwnedPasswordsError, check_pwned_password
@@ -95,6 +96,7 @@ from .servicenow import (
     SummaryNoteAppointmentNotFoundError,
     create_agent,
     fetch_fairness_outcomes,
+    raise_fairness_remediation_incident,
     create_clinician_appointment,
     create_doctor,
     create_guardrail_audit_log,
@@ -686,6 +688,23 @@ async def get_governance_fairness(
     try:
         return await fetch_fairness_outcomes(settings)
     except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.post("/governance/fairness/remediation", response_model=FairnessRemediationResponse)
+async def post_fairness_remediation(
+    settings: Settings = Depends(get_settings),
+) -> FairnessRemediationResponse:
+    """UC6 Fairness — raise a remediation incident for the scheduling skew.
+
+    Opens an sn_si_incident (category=fairness_bias_alert) documenting the
+    controlled human-workflow response to the detected 13.1pp demographic skew.
+    This is the platform boundary: AIRC detects and governs; remediation is manual.
+    """
+    try:
+        result = await raise_fairness_remediation_incident(settings)
+        return FairnessRemediationResponse(**result)
+    except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 

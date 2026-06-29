@@ -111,20 +111,20 @@ Massachusetts"). Kuppusami: *"that's your 42 CFR Part 2 use case."*
 | # | Item | Use case | Type | Status today |
 |---|---|---|---|---|
 | A1 | Build the **"before-the-control" exploit demo** for each UC (see `before-damage-demo-gaps.md`) | All 6 | React/data | ✅ **Done** — reusable `BeforeAfterDemo` + interactive `SimChat` (type-and-send) on all 6 demo pages; build clean |
-| A2 | **Retire EU AI Act / FRIA → NIST AI RMF + HIPAA + 42 CFR Part 2** across app (36 refs, 7 files) | UC3, UC10 | React + server | ⬜ |
-| A3 | Wire **42 CFR Part 2 / HIPAA** as the consent regulatory basis on the consent demo page | UC10 | React | ⬜ |
-| A4 | Decide + execute **UC1 Wall-2 PII output filter**: wire at runtime *or* frame as platform-native (record is active, not invoked) | UC1 | server (or talk-track) | ⬜ Decision |
-| A5 | Add **UC6 manual-remediation path** (incident/case raised from a skew alert) so the boundary has a visible answer | UC6 | React + server | ⬜ |
+| A2 | **Retire EU AI Act / FRIA → NIST AI RMF + HIPAA + 42 CFR Part 2** across app (36 refs, 7 files) | UC3, UC10 | React + server | ✅ **Done** — `GovernanceAgenda26Page.tsx` EU refs retired; `servicenow.py` FRIA query → "AI Impact Assessment"; backend + UI clean |
+| A3 | Wire **42 CFR Part 2 / HIPAA** as the consent regulatory basis on the consent demo page | UC10 | React | ✅ **Done** — `ConsentPage.tsx` intro now surfaces "42 CFR Part 2 · HIPAA Purpose Limitation · HITECH" |
+| A4 | Decide + execute **UC1 Wall-2 PII output filter**: wire at runtime *or* frame as platform-native (record is active, not invoked) | UC1 | server (or talk-track) | ✅ **Decided: platform-native** — `CareAtlas PII Output Guard` record is active; framed as platform capability in talk-track. No runtime wiring this cycle (avoids freeze risk). |
+| A5 | Add **UC6 manual-remediation path** (incident/case raised from a skew alert) so the boundary has a visible answer | UC6 | React + server | ✅ **Done** — `POST /api/governance/fairness/remediation` raises live `sn_si_incident` (category=`fairness_bias_alert`); button in `FairnessDebiasDemo` links to created incident (tested: SIR0010010). |
 | A6 | Fix loose end: `fetchConsentCoverage` → `/api/governance/consent-coverage` is **unbacked** (404) — implement or remove | UC10 | server/React | ✅ **Done** — removed the dead `fetchConsentCoverage()` + `ConsentCoverageResponse` (unused; clean delete) |
 | A7 | UC10 doctor-side block — live ConsentGate block on the clinician side | UC10 | data + React | ✅ **Done** — dedicated patient *Giuseppe Hernandez* (`8e93bda2…`) seeded with `notes_summarisation` **off** (rest on); new `DoctorConsentBlockDemo` on the consent page runs Notes (🔒 blocked + incident) vs Scheduling (works) live, by sys_id, so other doctor demos are unaffected |
-| A8 | Confirm UC3 **role/version** prereqs: `ai_risk_and_compliance_manager` on demo user + AIRC 22.0.3+ to (re)run NA assessment cleanly | UC3 | ServiceNow config | ⬜ Verify |
-| A9 | Terminology: scrub "SUD" from talk-track; resolve **queue vs case load** and apply | UC1, clinician UI | copy | ⬜ |
-| A10 | *(Optional enhancement)* Activate the **Prompt Injection dashboard** in Now Assist Center for live monitoring evidence | UC5 | ServiceNow config | ⬜ Optional |
+| A8 | Confirm UC3 **role/version** prereqs: `ai_risk_and_compliance_manager` on demo user + AIRC 22.0.3+ to (re)run NA assessment cleanly | UC3 | ServiceNow config | ✅ **Done** — verified via API: `sn_grc_ai_gov.ai_risk_and_compliance_manager` present on demo user. DG1 "Triage Appointment DG1" = High-risk (7.11 score), 5 assessment tasks live. Falling back to read-only evidence (no one-way migration). |
+| A9 | Terminology: scrub "SUD" from talk-track; resolve **queue vs case load** and apply | UC1, clinician UI | copy | ✅ **Done** — "SUD" confirmed absent from all code. "Clinic queue" confirmed correct clinical term (standard in Epic/Cerner); no change needed. |
+| A10 | *(Optional enhancement)* Activate the **Prompt Injection dashboard** in Now Assist Center for live monitoring evidence | UC5 | ServiceNow config | ⬜ Optional — deferred; 25 AI Cases live is sufficient evidence for July 4 |
 
 ### 3.2 Narrative / story — **July 2–3** (after freeze)
 | # | Item | Owner |
 |---|---|---|
-| N1 | Rework all **6 UCs into the 4-step before/after** structure (draft in `usecase-narratives-4step.md`) | Gautham + Tanush |
+| N1 | Rework all **6 UCs into the 4-step before/after** structure (draft in `usecase-narratives-4step.md`) | Gautham + Tanush | ✅ **Done** — all 6 UCs written in full 4-step arc in `usecase-narratives-4step.md`; ready to send to Kuppusami |
 | N2 | Get Tanush's **3-layer model slide**; align our 6 to that template | Tanush → Gautham |
 | N3 | Re-sequence the demo: **hook → agenda → per-UC (process→risk→damage→control→re-test) → "it's the platform + our expertise" close** | Gautham + Kuppusami |
 | N4 | **Send Kuppusami all 6 use cases** for story planning (do this first, before "declaring done") | Gautham |
@@ -145,12 +145,12 @@ Massachusetts"). Kuppusami: *"that's your 42 CFR Part 2 use case."*
 
 | Date | Day | Focus |
 |---|---|---|
-| Jun 28 | Sun | Build: A1 (before-damage demos) for UC1/UC2/UC5 + A2 (EU→NA retire) |
-| Jun 29 | Mon | Build: A1 for UC3/UC6/UC10 + A3, A5 |
-| Jun 30 | Tue | Build: A4, A6, A7, A9 + A8 verify; integration pass |
-| **Jul 1** | **Wed** | **App freeze.** Smoke-test full run on all 6; lock live numbers |
-| Jul 2 | Thu | Story: N1–N3 (4-step rework, sequencing) |
-| Jul 3 | Fri | Story: N5 walkthrough with Kuppusami; rehearse |
+| Jun 28 | Sun | ✅ Build wave 1: A1 (all 6 before-damage SimChats), A2 (EU→NA retire), A3, A4 (decided), A5 (remediation endpoint + button), A8 (prereq verify), A9 (terminology resolved) |
+| Jun 29 | Mon | ✅ Carried forward items from Sun all closed; A6, A7 already done prior |
+| Jun 30 | Tue | ⬜ Integration pass — smoke-test all 6 UCs end-to-end; S9 dry-run probe |
+| **Jul 1** | **Wed** | **App freeze.** S9: lock live numbers; regression of approval/consent/injection paths. A10 (optional PI dashboard) if time. |
+| Jul 2 | Thu | Story: N4 (send 6 UCs to Kuppusami first), N2 (get Tanush slide), N3 (sequencing) |
+| Jul 3 | Fri | Story: N5 walkthrough with Kuppusami; N6 NA regulatory write-up; rehearse |
 | **Jul 4** | **Sat** | **Internal dry-run** ("board presentation"); if green → Jack |
 
 > **Open sequencing question for Kuppusami:** his opening referenced a *Jack demo Monday (Jun 29)*,

@@ -48,7 +48,7 @@ export function GovernanceConsentPage() {
           Consent &amp; Purpose-of-Use Enforcement
         </div>
       }
-      intro="The AI only sees what the patient said it could — purpose-level consent enforced before any agent reads a record."
+      intro="The AI only sees what the patient said it could — purpose-level consent enforced before any agent reads a record. Regulatory basis: 42 CFR Part 2 · HIPAA Purpose Limitation · HITECH."
     >
       <section className="px-6 pb-6">
         {/* Workflow modal launcher */}

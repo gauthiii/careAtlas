@@ -1081,6 +1081,21 @@ export async function fetchFairnessData(): Promise<FairnessData> {
   return (await res.json()) as FairnessData
 }
 
+export interface FairnessRemediationResult {
+  number: string
+  sys_id: string
+  state: string
+}
+
+export async function raiseFairnessRemediationIncident(): Promise<FairnessRemediationResult> {
+  const res = await fetch(`${API_BASE}/governance/fairness/remediation`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as FairnessRemediationResult
+}
+
 // ---------------------------------------------------------------------------
 // UC5 Security — Prompt-Injection Defense + Output-Pattern Detection
 // ---------------------------------------------------------------------------

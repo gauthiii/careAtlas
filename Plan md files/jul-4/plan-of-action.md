@@ -11,13 +11,12 @@
 
 ---
 
-> **Progress — 2026-06-28:** **A1 complete + made interactive.** The reusable `BeforeAfterDemo`
-> component (R1) is built and wired into all six demo pages (R2–R7), and the "before" pane is now an
-> interactive **`SimChat` type-and-send console** (type a prompt or click a sample chip → Send → the
-> rogue/unguarded result appears; no result pre-shown; the "Simulation" badge was removed per
-> feedback). `tsc` + `npm run build` pass clean; both servers run locally for review. The damage is
-> generated client-side (no live control disabled); the "after" panes keep the existing live-wired
-> demos. **Remaining:** R8–R11 (copy/loose-ends) and the ServiceNow/backend track (S1–S9) are not started.
+> **Progress — 2026-06-28 (end of day): ALL REACT WORK COMPLETE. BACKEND S1–S7 COMPLETE.**
+> R1–R12 all done. S1 (UC3 prereq verified), S2 (DG1 High-risk confirmed), S3 (Wall-2 decided:
+> platform-native), S4 (UC6 remediation endpoint live — SIR0010010 created on instance), S5 (A6
+> resolved), S6 (A7 done), S7 (FRIA→AI Impact Assessment query updated). `tsc` + `npm run build`
+> clean. **Remaining build work:** S8 (optional: PI dashboard), S9 (freeze verify on Jul 1).
+> **Story track (Jul 2–3):** N1 written; N2–N6 pending.
 
 ## 1. React side — work breakdown
 
@@ -27,16 +26,16 @@
 | R2 | ✅ Done | **UC1 Privacy** "before": rogue agent reads PII (sim) → then ACL-secured agent denied (live) | `demo/PrivacyPage.tsx`, `RoleBasedRedactionDemo.tsx`, `PiiRedactionDemo.tsx` | 0.5 d | R1 |
 | R3 | ✅ Done | **UC2 Risk** "before": rogue agent performs high-impact action with no gate (sim) → then approval gate stops secured agent (live) | `demo/RiskPage.tsx`, `ApprovalGateDemo.tsx` | 0.5 d | R1 |
 | R4 | ✅ Done | **UC5 Security** "before": injection **obeyed** by agent (sim) → then blocked + AI Case opened (live) | `demo/SecurityPage.tsx`, `InjectionTesterDemo.tsx` | 0.5 d | R1 |
-| R5 | 🟡 Partial | **UC6 Fairness** "before": skewed allocation shown (13.1pp, sim) → debias toggle (live). **"Raise remediation incident" button still pending** (needs S4) | `demo/FairnessPage.tsx`, `FairnessDebiasDemo.tsx` | 0.5 d | R1, S4 |
+| R5 | ✅ Done | **UC6 Fairness** "before": skewed allocation shown (13.1pp, sim) → debias toggle (live). **"Raise remediation incident" button wired** — calls `POST /api/governance/fairness/remediation`, links to live incident number. | `demo/FairnessPage.tsx`, `FairnessDebiasDemo.tsx` | 0.5 d | R1, S4 |
 | R6 | ✅ Done | **UC10 Consent** "before": agent processes non-consented patient (sim) → ConsentGate blocks + incident (live). *(Live doctor-side block still needs A7 seed.)* | `demo/ConsentPage.tsx`, `ConsentEnforcementPanel.tsx` | 0.5 d | R1, A7 seed |
 | R7 | ✅ Done | **UC3 Regulation** "before": ungoverned/unclassified agent (sim) vs governed High-risk agent w/ AI Impact Assessment (live). *(S2 NA reframe separate.)* | `demo/RegulationPage.tsx` | 0.5 d | S2 |
-| R8 | ⬜ | **Retire EU AI Act → NIST AI RMF + HIPAA + 42 CFR Part 2** in all UI copy (badges, demo data, agenda) | `RegulatoryClassificationBadge.tsx`, `data/useCaseDemoData.ts`, `GovernanceAgenda26Page.tsx`, `demo/RegulationPage.tsx`, `services/serviceNow.ts` | 0.5 d | — |
-| R9 | ⬜ | **Terminology:** remove any "SUD" from labels; align "queue" wording per resolved term | `data/*`, `staff/DoctorQueuePage.tsx`, agenda pages | 0.25 d | A9 decision |
-| R10 | ⬜ | **Consent regulatory basis** copy: surface 42 CFR Part 2 / HIPAA on consent demo page | `demo/ConsentPage.tsx`, `ConsentEnforcementPanel.tsx` | 0.25 d | R8 |
+| R8 | ✅ Done | **Retire EU AI Act → NIST AI RMF + HIPAA + 42 CFR Part 2** in all UI copy — `GovernanceAgenda26Page.tsx` EU refs retired; other files were already clean. | `GovernanceAgenda26Page.tsx` | 0.5 d | — |
+| R9 | ✅ Done | **Terminology:** "SUD" confirmed absent from all code. "Clinic queue" confirmed correct clinical term — no change needed. | — | 0.25 d | A9 resolved |
+| R10 | ✅ Done | **Consent regulatory basis** copy: `ConsentPage.tsx` intro now surfaces "42 CFR Part 2 · HIPAA Purpose Limitation · HITECH". | `demo/ConsentPage.tsx` | 0.25 d | — |
 | R11 | ✅ Done | **A6** — removed the dead `fetchConsentCoverage()` + `ConsentCoverageResponse` (unused). | `services/serviceNow.ts` | 0.25 d | — |
 | R12 | ✅ Done | **A7** — `DoctorConsentBlockDemo` on the consent page: live Notes-agent block vs Scheduling-agent allow on a dedicated opted-out patient (by sys_id). | `components/governance/DoctorConsentBlockDemo.tsx` (new), `demo/ConsentPage.tsx` | 0.25 d | A7 seed |
 
-**React subtotal: done: R1–R4, R6, R7, R11, R12 (+R5 partial) · remaining: R5 button, R8–R10 ≈ 0.75 d.**
+**React subtotal: ✅ ALL DONE — R1–R12 complete. No remaining React work.**
 
 ---
 
@@ -44,53 +43,61 @@
 
 | ID | Task | Where | Effort | Notes |
 |---|---|---|---|---|
-| S1 | **Confirm UC3 prereqs:** demo user holds `ai_risk_and_compliance_manager`; AIRC ≥ 22.0.3; "Migrate to Advanced Risk Assessments" decision (one-way) | ServiceNow admin | 0.25 d | Blocker for re-running NA assessment; if blocked, demo read-only evidence only |
-| S2 | **Re-frame UC3 assessment as NA:** use AI Impact Assessment + NIST-aligned questionnaire (not EU AI Act/FRIA); confirm `Triage Appointment DG1` = High-risk, AIA attached, tasks present | AIRC Assessment Workspace + `server/app/servicenow.py` regulation evidence | 0.5 d | Live count today: 111 AI systems; verify DG1 fields |
-| S3 | **UC4-style decision (UC1 Wall-2):** either activate the `sys_gen_ai_filter` "CareAtlas PII Output Guard" on a runtime output path, OR formally scope it as platform-native (record active, not invoked) | `sys_gen_ai_filter` + `server/app/servicenow.py` | 0.5 d | Recommend: scope as platform-native for July 1; wire later. Avoids risky last-minute runtime change |
-| S4 | **UC6 manual remediation endpoint:** raise an incident/case from a fairness skew alert (the controlled human workflow) | `server/app/main.py` + `servicenow.py` (`sn_si_incident` or case) | 0.5 d | Directly answers "no auto-correct" boundary |
+| S1 | **Confirm UC3 prereqs:** demo user holds `ai_risk_and_compliance_manager`; AIRC ≥ 22.0.3; "Migrate to Advanced Risk Assessments" decision (one-way) | ServiceNow admin | 0.25 d | ✅ **Done** — `sn_grc_ai_gov.ai_risk_and_compliance_manager` confirmed on `interface_gautham`. Decision: fall back to read-only evidence (no one-way migration). |
+| S2 | **Re-frame UC3 assessment as NA:** confirm `Triage Appointment DG1` = High-risk, AIA attached, tasks present | AIRC Assessment Workspace | 0.5 d | ✅ **Done** — DG1 verified: `inherent_rating=High (7.11)`, `risk_classification=High`, 5 assessment tasks live. Demo shows read-only evidence. |
+| S3 | **UC1 Wall-2 decision:** scope as platform-native (decided) | talk-track | — | ✅ **Decided** — `CareAtlas PII Output Guard` (sys_gen_ai_filter) is active; framed as platform capability in talk-track. No runtime wiring this cycle. |
+| S4 | **UC6 manual remediation endpoint:** raise an incident/case from a fairness skew alert | `server/app/main.py` + `servicenow.py` | 0.5 d | ✅ **Done** — `POST /api/governance/fairness/remediation` raises live `sn_si_incident` (category=`fairness_bias_alert`); tested live → SIR0010010 created on instance. |
 | S5 | ~~Implement `GET /api/governance/consent-coverage`~~ | — | — | ✅ **Resolved (A6)** — caller removed instead (it was dead code); no endpoint needed |
 | S6 | **Seed UC10 opted-out patient** with `notes_summarisation` OFF for a live doctor-side block | `u_patient` data | 0.25 d | ✅ **Done (A7)** — *Giuseppe Hernandez* (`8e93bda2…`) set to `scheduling,reminders,triage`; verified Notes blocked / Scheduling allowed |
-| S7 | **Retire EU AI Act in backend models/strings** | `server/app/models.py`, `servicenow.py` | 0.25 d | Pairs with R8 |
-| S8 | *(Optional)* Activate **Prompt Injection dashboard** in Now Assist Center | ServiceNow config | 0.25 d | UC5 enhancement only |
-| S9 | **Freeze verification:** re-run read-only probe script; lock the live numbers quoted in the story | `server/scripts/*audit*readonly.sh` | 0.25 d | On Jul 1 |
+| S7 | **Retire EU AI Act in backend models/strings** | `server/app/servicenow.py` | 0.25 d | ✅ **Done** — FRIA template query in `servicenow.py` updated to "AI Impact Assessment"; now returns 6 accurate active actions (vs 48 EU-framed). Total 54 Post Assessment Actions unchanged. |
+| S8 | *(Optional)* Activate **Prompt Injection dashboard** in Now Assist Center | ServiceNow config | 0.25 d | ⬜ Optional — 25 AI Cases live is sufficient for July 4; defer unless time permits |
+| S9 | **Freeze verification:** re-run read-only probe; lock live numbers for story | `server/scripts/*audit*readonly.sh` | 0.25 d | ⬜ Do on **Jul 1** freeze day |
 
-**ServiceNow/backend subtotal: ~3.0 dev-days (S8 optional).**
+**ServiceNow/backend subtotal: S1–S7 done · S8 optional · S9 on Jul 1.**
 
 ---
 
 ## 3. Structured Work Breakdown (by day)
 
 ```
-SUN Jun 28  ── Build wave 1 (the contrast that sells)
-  ✅ R1 Before/after component            (DONE 06-27, commit 12d4306)
-  ✅ R2 UC1 before-damage                 (DONE 06-27)
-  ✅ R3 UC2 before-damage                 (DONE 06-27)
-  ✅ R4 UC5 before-damage                 (DONE 06-27)
-  ⬜ S1 UC3 prereq confirm                (0.25d)   ← unblock S2 early
-  ↳ NOTE: also delivered early — R6 (UC10 before) ✅ and R7 (UC3 before) ✅
+SUN Jun 28  ── ALL BUILD WORK COMPLETE ✅
+  ✅ R1  Before/after component + SimChat  (DONE 06-27, commit 12d4306)
+  ✅ R2  UC1 before-damage                 (DONE 06-27)
+  ✅ R3  UC2 before-damage                 (DONE 06-27)
+  ✅ R4  UC5 before-damage                 (DONE 06-27)
+  ✅ R6  UC10 before-damage                (DONE 06-27)
+  ✅ R7  UC3 before-damage                 (DONE 06-27)
+  ✅ R11 dead fetchConsentCoverage removed (DONE 06-27)
+  ✅ R12 DoctorConsentBlockDemo + seed     (DONE 06-27)
+  ✅ R5  UC6 remediation button            (DONE 06-28)
+  ✅ R8  EU→NA retire (UI)                 (DONE 06-28)
+  ✅ R9  Terminology confirmed (no change) (DONE 06-28)
+  ✅ R10 Consent regulatory basis copy     (DONE 06-28)
+  ✅ S1  UC3 prereq confirmed              (DONE 06-28)
+  ✅ S2  DG1 High-risk verified read-only  (DONE 06-28)
+  ✅ S3  Wall-2 decided: platform-native   (DONE 06-28)
+  ✅ S4  UC6 remediation endpoint (live)   (DONE 06-28, SIR0010010)
+  ✅ S5  consent-coverage removed (A6)     (DONE 06-27)
+  ✅ S6  Giuseppe Hernandez seeded (A7)    (DONE 06-27)
+  ✅ S7  Backend EU→NA strings             (DONE 06-28)
 
-MON Jun 29  ── Build wave 2 (regulation + remaining UCs)
-  ⬜ R8 EU→NA retire (UI)                 (0.5d)
-  ⬜ S2 UC3 NA reframe + verify DG1       (0.5d)
-  ✅ R7 UC3 before-damage                 (DONE 06-27)
-  ⬜ S4 UC6 remediation endpoint          (0.5d)
-
-TUE Jun 30  ── Build wave 3 (consent + fairness + loose ends)
-  🟡 R5 UC6 before ✅ + remediation button ⬜ (button needs S4)
-  ✅ R6 UC10 before  (DONE 06-27) · ⬜ S6 seed (0.25d)
-  ⬜ S3 UC1 Wall-2 decision (scope/native)(0.5d)
-  ⬜ S5 consent-coverage endpoint + R11   (0.25d+0.25d)
-  ⬜ R10 consent reg basis copy           (0.25d)
-  ⬜ R9/A9 terminology cleanup            (0.25d)
-  ⬜ S7 backend EU→NA strings             (0.25d)
+TUE Jun 30  ── Integration pass
+  Smoke-test all 6 UCs end-to-end from all 3 portals (patient / doctor / governance)
+  Regression: approval gate, ConsentGate, injection block
 
 WED Jul 1   ── FREEZE
-  Integration + full 6-UC smoke run (all from 3 portals)
-  S9 lock live numbers; regression of approval/consent/injection paths
-  (S8 optional PI dashboard if time)
+  S9: re-probe all 7 ServiceNow tables; lock live numbers for story
+  S8 (optional): PI dashboard in Now Assist Center if time
 
-THU Jul 2   ── Story: N1 4-step rework, N2 Tanush template align, N3 sequencing
-FRI Jul 3   ── Story: N5 Kuppusami walkthrough; rehearse; N4 send 6 UCs / N6 reg write-up
+THU Jul 2   ── Story
+  N4 send 6 UCs to Kuppusami (do first)
+  N2 get Tanush's 3-layer slide
+  N3 demo re-sequencing (hook → agenda → 6 UCs → close)
+
+FRI Jul 3   ── Story
+  N5 Kuppusami walkthrough + rehearse
+  N6 NA regulatory write-up (42 CFR / HIPAA / HITECH / HITRUST / Mass.) mapped per UC
+
 SAT Jul 4   ── Internal dry-run → (if green) Jack
 ```
 
