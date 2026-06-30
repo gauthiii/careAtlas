@@ -1176,10 +1176,11 @@ export async function updateConsentFlags(
 }
 
 export interface ConsentViolationEntry {
+  number: string
   opened_at: string
   short_description: string
+  risk_score: string
   priority: string
-  state: string
 }
 
 export interface ConsentViolationsResponse {
@@ -1193,4 +1194,25 @@ export async function fetchConsentViolations(): Promise<ConsentViolationsRespons
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
   return (await res.json()) as ConsentViolationsResponse
+}
+
+export interface FairnessIncidentEntry {
+  number: string
+  opened_at: string
+  short_description: string
+  risk_score: string
+  priority: string
+}
+
+export interface FairnessIncidentsResponse {
+  count_30_days: number
+  recent: FairnessIncidentEntry[]
+}
+
+export async function fetchFairnessIncidents(): Promise<FairnessIncidentsResponse> {
+  const res = await fetch(`${API_BASE}/governance/fairness/incidents`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as FairnessIncidentsResponse
 }

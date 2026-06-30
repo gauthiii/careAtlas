@@ -36,7 +36,7 @@ const DIMENSIONS: Dimension[] = [
  * "After"  = deterministic debiased view (each group nudged to expected ± 1pp).
  * Falls back to static demo data if the API is unreachable.
  */
-export function FairnessDebiasDemo() {
+export function FairnessDebiasDemo({ onIncident }: { onIncident?: () => void } = {}) {
   const [dimKey, setDimKey] = useState<DimKey>('ethnicity')
   const [mode, setMode] = useState<'biased' | 'debiased'>('biased')
   const [remediating, setRemediating] = useState(false)
@@ -196,6 +196,7 @@ export function FairnessDebiasDemo() {
                 try {
                   const r = await raiseFairnessRemediationIncident()
                   setRemediationResult({ number: r.number, sys_id: r.sys_id })
+                  onIncident?.()
                 } catch (e) {
                   setRemediationError(e instanceof Error ? e.message : 'Failed to raise incident')
                 } finally {

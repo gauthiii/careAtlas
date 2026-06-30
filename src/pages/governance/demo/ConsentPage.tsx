@@ -13,6 +13,7 @@ import {
   type ConsentViolationsResponse,
   type PatientFieldAccess,
 } from '../../../services/serviceNow'
+import { PriorityBadge } from '../../../components/governance/SnowIncidentBadges'
 
 function fieldVal(fields: PatientFieldAccess[], label: string): string {
   return fields.find((f) => f.label === label)?.privileged_value || '—'
@@ -148,7 +149,7 @@ export function GovernanceConsentPage() {
               <div>
                 <h3 className="text-lg font-bold text-[#102033]">Consent Violation Incidents</h3>
                 <p className="mt-0.5 text-sm text-[#53687b]">
-                  Live <code className="text-xs">sn_si_incident</code> records ·{' '}
+                  Live Security Incidents ·{' '}
                   <code className="text-xs">category=consent_purpose_violation</code>
                   {state === 'ok' && data ? ` · ${data.count_30_days} in last 30 days` : ''}
                 </p>
@@ -187,19 +188,21 @@ export function GovernanceConsentPage() {
               <table className="w-full border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-[#e5eef3] text-[0.68rem] font-bold uppercase tracking-[0.08em] text-[#6b7c8f]">
+                    <th className="px-3 py-2">Number</th>
                     <th className="px-3 py-2">Opened</th>
                     <th className="px-3 py-2">Short description</th>
+                    <th className="px-3 py-2">Risk score</th>
                     <th className="px-3 py-2">Priority</th>
-                    <th className="px-3 py-2">State</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.recent.map((row, i) => (
                     <tr key={i} className="border-b border-[#eef3f7] last:border-0">
+                      <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs font-bold text-[#143A57]">{row.number || '—'}</td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-[#53687b]">{row.opened_at || '—'}</td>
                       <td className="px-3 py-2.5 font-semibold text-[#102033]">{row.short_description || '—'}</td>
-                      <td className="px-3 py-2.5 text-[#53687b]">{row.priority || '—'}</td>
-                      <td className="px-3 py-2.5 text-[#53687b]">{row.state || '—'}</td>
+                      <td className="px-3 py-2.5 text-[#53687b]">{row.risk_score || '—'}</td>
+                      <td className="px-3 py-2.5"><PriorityBadge priority={row.priority} /></td>
                     </tr>
                   ))}
                 </tbody>

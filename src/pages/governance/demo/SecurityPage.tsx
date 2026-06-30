@@ -6,23 +6,7 @@ import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWor
 import { InjectionTesterDemo } from '../../../components/governance/InjectionTesterDemo'
 import { BeforeAfterDemo, SimChat } from '../../../components/governance/BeforeAfterDemo'
 import { fetchSecurityKpis, type SecurityKpis } from '../../../services/serviceNow'
-
-const PRIORITY_LABEL: Record<string, { label: string; cls: string }> = {
-  '1': { label: 'Critical', cls: 'border-red-300 bg-red-50 text-red-700' },
-  '2': { label: 'High', cls: 'border-orange-300 bg-orange-50 text-orange-700' },
-  '3': { label: 'Moderate', cls: 'border-amber-300 bg-amber-50 text-amber-700' },
-  '4': { label: 'Low', cls: 'border-blue-200 bg-blue-50 text-blue-700' },
-  '5': { label: 'Planning', cls: 'border-slate-200 bg-slate-50 text-slate-600' },
-}
-
-function PriorityBadge({ priority }: { priority: string }) {
-  const p = PRIORITY_LABEL[priority] ?? { label: priority, cls: 'border-slate-200 bg-slate-50 text-slate-600' }
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${p.cls}`}>
-      {p.label}
-    </span>
-  )
-}
+import { PriorityBadge } from '../../../components/governance/SnowIncidentBadges'
 
 function formatDate(iso: string) {
   if (!iso) return '—'

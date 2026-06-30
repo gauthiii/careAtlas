@@ -1,13 +1,36 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { FairnessDebiasDemo } from '../../../components/governance/FairnessDebiasDemo'
 import { BeforeAfterDemo, SimChat } from '../../../components/governance/BeforeAfterDemo'
-import { ArrowRight, Activity, ArrowLeft, TrendingUp } from 'lucide-react'
+import { ArrowRight, Activity, ArrowLeft, TrendingUp, Siren, Loader2, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { fetchFairnessIncidents, type FairnessIncidentsResponse } from '../../../services/serviceNow'
+import { PriorityBadge } from '../../../components/governance/SnowIncidentBadges'
 
 export function GovernanceFairnessPage() {
   const [modalOpen, setModalOpen] = useState(false)
+  const [incidents, setIncidents] = useState<FairnessIncidentsResponse | null>(null)
+  const [incState, setIncState] = useState<'loading' | 'ok' | 'error'>('loading')
+  const [incError, setIncError] = useState('')
+
+  const loadIncidents = () => {
+    setIncState('loading')
+    setIncError('')
+    fetchFairnessIncidents()
+      .then((d) => {
+        setIncidents(d)
+        setIncState('ok')
+      })
+      .catch((e: Error) => {
+        setIncError(e.message)
+        setIncState('error')
+      })
+  }
+
+  useEffect(() => {
+    loadIncidents()
+  }, [])
 
   return (
     <PortalPage
@@ -105,9 +128,80 @@ export function GovernanceFairnessPage() {
                 ]}
               />
             }
-            after={<FairnessDebiasDemo />}
+            after={<FairnessDebiasDemo onIncident={loadIncidents} />}
           />
         </div>
+
+        {/* Fairness remediation incidents table */}
+        <section className="mt-8 rounded-xl border border-[#d7e5ec] bg-white p-6 shadow-sm">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-9 w-9 place-items-center rounded-[9px] bg-[#fdecec] text-[#c0392b]">
+                <Siren size={18} />
+              </span>
+              <div>
+                <h3 className="text-lg font-bold text-[#102033]">Fairness Remediation Incidents</h3>
+                <p className="mt-0.5 text-sm text-[#53687b]">
+                  Live Security Incidents ·{' '}
+                  <code className="text-xs">short_description STARTSWITH [CareAtlas] Fairness alert</code>
+                  {incState === 'ok' && incidents ? ` · ${incidents.count_30_days} in last 30 days` : ''}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={loadIncidents}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[#cfe0ea] bg-white px-3 py-1.5 text-xs font-bold text-[#0f5f8c] transition-colors hover:border-[#0f5f8c] hover:bg-[#f5f9fb]"
+            >
+              <RefreshCw size={13} /> Refresh
+            </button>
+          </div>
+
+          {incState === 'loading' && (
+            <div className="flex items-center gap-2 py-8 text-sm text-[#53687b]">
+              <Loader2 size={16} className="animate-spin" /> Loading incidents from ServiceNow...
+            </div>
+          )}
+
+          {incState === 'error' && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              Could not load fairness incidents. {incError}
+            </div>
+          )}
+
+          {incState === 'ok' && incidents && incidents.recent.length === 0 && (
+            <div className="rounded-lg border border-[#d7e5ec] bg-[#f8fbfc] px-4 py-6 text-center text-sm text-[#53687b]">
+              No fairness remediation incidents yet. When a skew alert is triggered and an incident is raised, it appears here.
+            </div>
+          )}
+
+          {incState === 'ok' && incidents && incidents.recent.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#e5eef3] text-[0.68rem] font-bold uppercase tracking-[0.08em] text-[#6b7c8f]">
+                    <th className="px-3 py-2">Number</th>
+                    <th className="px-3 py-2">Opened</th>
+                    <th className="px-3 py-2">Short description</th>
+                    <th className="px-3 py-2">Risk score</th>
+                    <th className="px-3 py-2">Priority</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {incidents.recent.map((row, i) => (
+                    <tr key={i} className="border-b border-[#eef3f7] last:border-0">
+                      <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs font-bold text-[#143A57]">{row.number || '—'}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[#53687b]">{row.opened_at || '—'}</td>
+                      <td className="px-3 py-2.5 font-semibold text-[#102033]">{row.short_description || '—'}</td>
+                      <td className="px-3 py-2.5 text-[#53687b]">{row.risk_score || '—'}</td>
+                      <td className="px-3 py-2.5"><PriorityBadge priority={row.priority} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </section>
       <UseCaseWorkflowsModal open={modalOpen} onClose={() => setModalOpen(false)} initialTab="uc6" />
     </PortalPage>

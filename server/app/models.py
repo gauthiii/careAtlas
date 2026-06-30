@@ -771,10 +771,11 @@ class ConsentFlagsRequest(BaseModel):
 
 
 class ConsentViolationEntry(BaseModel):
+    number: str = ""
     opened_at: str = ""
     short_description: str = ""
+    risk_score: str = ""
     priority: str = ""
-    state: str = ""
 
 
 class ConsentViolationsResponse(BaseModel):
@@ -787,4 +788,16 @@ class FairnessRemediationResponse(BaseModel):
 
     number: str
     sys_id: str
-    state: str
+
+
+class FairnessIncidentEntry(BaseModel):
+    number: str = ""
+    opened_at: str = ""
+    short_description: str = ""
+    risk_score: str = ""
+    priority: str = ""
+
+
+class FairnessIncidentsResponse(BaseModel):
+    count_30_days: int = 0
+    recent: list[FairnessIncidentEntry] = []

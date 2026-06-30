@@ -86,6 +86,7 @@ from .models import (
     ConsentFlagsResponse,
     ConsentViolationsResponse,
     FairnessRemediationResponse,
+    FairnessIncidentsResponse,
 )
 from .notifications import fetch_notifications, mark_notification_read
 from .pwned_passwords import PwnedPasswordsError, check_pwned_password
@@ -96,6 +97,7 @@ from .servicenow import (
     SummaryNoteAppointmentNotFoundError,
     create_agent,
     fetch_fairness_outcomes,
+    fetch_fairness_incidents,
     raise_fairness_remediation_incident,
     create_clinician_appointment,
     create_doctor,
@@ -705,6 +707,18 @@ async def post_fairness_remediation(
         result = await raise_fairness_remediation_incident(settings)
         return FairnessRemediationResponse(**result)
     except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/fairness/incidents", response_model=FairnessIncidentsResponse)
+async def get_fairness_incidents(
+    settings: Settings = Depends(get_settings),
+) -> FairnessIncidentsResponse:
+    """UC6 Fairness — fetch fairness bias alert incidents from ServiceNow."""
+    try:
+        result = await fetch_fairness_incidents(settings)
+        return FairnessIncidentsResponse(**result)
+    except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 

@@ -4453,6 +4453,56 @@ async def update_consent_flags(
         return True
 
 
+async def fetch_fairness_incidents(settings: Settings) -> dict:
+    """Fetch fairness bias alert SecOps incidents for the governance dashboard."""
+    from datetime import datetime, timezone, timedelta
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+    thirty_days_ago = (
+        datetime.now(timezone.utc) - timedelta(days=30)
+    ).strftime("%Y-%m-%d %H:%M:%S")
+    # Filter by short_description prefix — fairness_bias_alert is not a valid
+    # sn_si_incident category choice on this instance, so category is silently dropped.
+    desc_filter = "short_descriptionSTARTSWITH[CareAtlas] Fairness alert"
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        count_resp = await client.get(
+            f"{base}/api/now/table/sn_si_incident",
+            auth=auth,
+            params={
+                "sysparm_query": f"{desc_filter}^opened_at>={thirty_days_ago}",
+                "sysparm_fields": "sys_id",
+                "sysparm_limit": 1000,
+            },
+        )
+        count = len(count_resp.json().get("result", []))
+
+        recent_resp = await client.get(
+            f"{base}/api/now/table/sn_si_incident",
+            auth=auth,
+            params={
+                "sysparm_query": f"{desc_filter}^ORDERBYDESCopened_at",
+                "sysparm_fields": "number,opened_at,short_description,risk_score,priority",
+                "sysparm_limit": 20,
+            },
+        )
+        recent = recent_resp.json().get("result", [])
+
+        return {
+            "count_30_days": count,
+            "recent": [
+                {
+                    "number": r.get("number", ""),
+                    "opened_at": r.get("opened_at", ""),
+                    "short_description": r.get("short_description", ""),
+                    "risk_score": r.get("risk_score", ""),
+                    "priority": r.get("priority", ""),
+                }
+                for r in recent
+            ],
+        }
+
+
 async def fetch_consent_violations(settings: Settings) -> dict:
     """Fetch consent violation SecOps incidents for the governance dashboard."""
     from datetime import datetime, timezone, timedelta
@@ -4482,7 +4532,7 @@ async def fetch_consent_violations(settings: Settings) -> dict:
             auth=auth,
             params={
                 "sysparm_query": "category=consent_purpose_violation^ORDERBYDESCopened_at",
-                "sysparm_fields": "opened_at,short_description,priority,state",
+                "sysparm_fields": "number,opened_at,short_description,risk_score,priority",
                 "sysparm_limit": 20,
             },
         )
@@ -4492,10 +4542,11 @@ async def fetch_consent_violations(settings: Settings) -> dict:
             "count_30_days": count,
             "recent": [
                 {
+                    "number": r.get("number", ""),
                     "opened_at": r.get("opened_at", ""),
                     "short_description": r.get("short_description", ""),
+                    "risk_score": r.get("risk_score", ""),
                     "priority": r.get("priority", ""),
-                    "state": r.get("state", ""),
                 }
                 for r in recent
             ],
