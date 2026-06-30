@@ -797,3 +797,17 @@ class FairnessIncidentEntry(BaseModel):
 class FairnessIncidentsResponse(BaseModel):
     count_30_days: int = 0
     recent: list[FairnessIncidentEntry] = []
+
+
+# ── UC13 Hallucination Detection ──────────────────────────────────────────
+
+class HallucinationFlagRequest(BaseModel):
+    original_input: str
+    llm_raw_output: str
+    consistency_score: float
+    urgency_input: str
+    urgency_claimed: str
+    specialty_input: str
+    specialty_claimed: str
+    matched_patterns: str
+    action_taken: str  # "passed" | "held" | "blocked"

@@ -4356,24 +4356,36 @@ CONSENT_FLAGS_FIELDS = [
     "u_email",
 ]
 
-
 async def fetch_consent_flags(username: str, settings: Settings) -> dict:
-    """Read consent flags for a patient looked up by username or email."""
+    """Read consent flags for a patient looked up by sys_id or username."""
     auth = (settings.snow_username, settings.snow_password)
     base = settings.snow_base_url
 
     async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
-        # Try username first
+        # Try sys_id first (direct lookup)
         resp = await client.get(
             f"{base}/api/now/table/u_patient",
             auth=auth,
             params={
-                "sysparm_query": f"u_username={username}",
+                "sysparm_query": f"sys_id={username}",
                 "sysparm_fields": ",".join(CONSENT_FLAGS_FIELDS),
                 "sysparm_limit": 1,
             },
         )
         results = resp.json().get("result", [])
+
+        # Fall back to username
+        if not results:
+            resp = await client.get(
+                f"{base}/api/now/table/u_patient",
+                auth=auth,
+                params={
+                    "sysparm_query": f"u_username={username}",
+                    "sysparm_fields": ",".join(CONSENT_FLAGS_FIELDS),
+                    "sysparm_limit": 1,
+                },
+            )
+            results = resp.json().get("result", [])
 
         # Fall back to email
         if not results:
@@ -4404,7 +4416,7 @@ async def fetch_consent_flags(username: str, settings: Settings) -> dict:
 async def update_consent_flags(
     username: str, flags: list[str], settings: Settings
 ) -> bool:
-    """Write consent flags for a patient looked up by username."""
+    """Write consent flags for a patient looked up by sys_id or username."""
     auth = (settings.snow_username, settings.snow_password)
     base = settings.snow_base_url
 
@@ -4415,7 +4427,7 @@ async def update_consent_flags(
             f"{base}/api/now/table/u_patient",
             auth=auth,
             params={
-                "sysparm_query": f"u_username={username}",
+                "sysparm_query": f"sys_id={username}",
                 "sysparm_fields": "sys_id",
                 "sysparm_limit": 1,
             },
@@ -4546,4 +4558,73 @@ async def fetch_consent_violations(settings: Settings) -> dict:
                 }
                 for r in recent
             ],
+        }
+
+# ── UC13 Hallucination Log ────────────────────────────────────────
+
+HALLUCINATION_LOG_TABLE = "u_hallucination_log"
+
+async def sn_create_hallucination_log(settings: Settings, payload: dict) -> dict:
+    """Insert one record into u_hallucination_log (immutable after insert)."""
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        resp = await client.post(
+            f"{base}/api/now/table/{HALLUCINATION_LOG_TABLE}",
+            auth=auth,
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json().get("result", {})
+
+
+async def sn_fetch_hallucination_log(settings: Settings, limit: int = 25) -> list[dict]:
+    """Fetch recent hallucination log entries, newest first."""
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        resp = await client.get(
+            f"{base}/api/now/table/{HALLUCINATION_LOG_TABLE}",
+            auth=auth,
+            params={
+                "sysparm_limit": limit,
+                "sysparm_orderby": "u_timestamp^DESC",
+                "sysparm_fields": (
+                    "sys_id,u_log_id,u_timestamp,u_original_input,u_llm_raw_output,"
+                    "u_consistency_score,u_urgency_input,u_urgency_claimed,"
+                    "u_specialty_input,u_specialty_claimed,u_matched_patterns,"
+                    "u_action_taken,u_hold_resolved_by,u_patient_id_anon"
+                ),
+            },
+        )
+        resp.raise_for_status()
+        return resp.json().get("result", [])
+
+
+async def sn_fetch_hallucination_stats(settings: Settings) -> dict:
+    """Aggregate counts from u_hallucination_log for the last 30 days."""
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        resp = await client.get(
+            f"{base}/api/now/table/{HALLUCINATION_LOG_TABLE}",
+            auth=auth,
+            params={
+                "sysparm_limit": 1000,
+                "sysparm_fields": "u_action_taken",
+                "sysparm_query": "u_timestamp>=javascript:gs.daysAgoStart(30)",
+            },
+        )
+        resp.raise_for_status()
+        rows = resp.json().get("result", [])
+        total = len(rows)
+        held = sum(1 for r in rows if r.get("u_action_taken") == "held")
+        blocked = sum(1 for r in rows if r.get("u_action_taken") == "blocked")
+        passed = sum(1 for r in rows if r.get("u_action_taken") == "passed")
+        return {
+            "total": total,
+            "held": held,
+            "blocked": blocked,
+            "passed": passed,
+            "pass_rate": round((passed / total * 100) if total > 0 else 100, 1),
         }

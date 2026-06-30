@@ -254,3 +254,173 @@ export const FAIRNESS_BY_AGE: FairnessGroup[] = [
 export function maxSkew(groups: FairnessGroup[], mode: 'biased' | 'debiased'): number {
   return Math.max(...groups.map((g) => Math.abs(g[mode] - g.expected)))
 }
+
+// ---------------------------------------------------------------------------
+// UC13 · Security – AI Output Integrity & Hallucination Detection (OWASP LLM09)
+// ---------------------------------------------------------------------------
+
+export type HallucinationVerdict = 'passed' | 'held' | 'blocked'
+
+export type HallucinationMatch = {
+  rule: string
+  explanation: string
+}
+
+export type HallucinationScanResult = {
+  verdict: HallucinationVerdict
+  consistencyScore: number
+  matchedRules: HallucinationMatch[]
+  action: string
+  inputUrgency: string
+  outputUrgency: string
+  inputSpecialty: string
+  outputSpecialty: string
+}
+
+export const HALLUCINATION_PRESETS = [
+  {
+    label: 'Sample 1 — Urgency fabrication',
+    input: 'I have been feeling a bit tired lately and want a general check-up.',
+    reasonCategory: 'general_checkup',
+    llmOutput: '{"urgency":"high","specialty":"oncology","appointment_type":"in_person"}',
+  },
+  {
+    label: 'Sample 2 — Specialty mismatch',
+    input: 'I need a routine follow-up after my last visit.',
+    reasonCategory: 'follow_up',
+    llmOutput: '{"urgency":"medium","specialty":"cardiothoracic_surgery","appointment_type":"in_person"}',
+  },
+  {
+    label: 'Sample 3 — Malformed JSON',
+    input: 'I would like to see someone about my anxiety.',
+    reasonCategory: 'mental_health',
+    llmOutput: 'Sure! I recommend cardiology immediately for your anxiety. Urgency: critical.',
+  },
+  {
+    label: 'Sample 4 — Clean output (should pass)',
+    input: 'I need a routine appointment to check my blood pressure.',
+    reasonCategory: 'general_checkup',
+    llmOutput: '{"urgency":"low","specialty":"general_practice","appointment_type":"in_person"}',
+  },
+]
+
+const SPECIALTY_MAP: Record<string, string> = {
+  general_checkup: 'general_practice',
+  follow_up: 'general_practice',
+  urgent: 'general_practice',
+  mental_health: 'mental_health',
+  chronic: 'general_practice',
+  specialist: 'specialist',
+}
+
+const HIGH_ACUITY = ['oncology', 'neurosurgery', 'cardiothoracic', 'cardiothoracic_surgery', 'transplant']
+
+const URGENCY_KEYWORDS = /pain|urgent|severe|emergency|worried|scared|chest|breathing|collapse/i
+
+function inferUrgency(input: string, category: string): string {
+  if (/chest pain|can't breathe|breathing|severe|emergency|collapse/i.test(input)) return 'high'
+  if (category === 'urgent') return 'high'
+  if (category === 'chronic' || category === 'mental_health') return 'medium'
+  return 'low'
+}
+
+export function scanHallucination(
+  inputText: string,
+  llmOutput: string,
+  reasonCategory: string,
+): HallucinationScanResult {
+  const rules: HallucinationMatch[] = []
+  let score = 0.0
+
+  const expectedUrgency = inferUrgency(inputText, reasonCategory)
+  const expectedSpecialty = SPECIALTY_MAP[reasonCategory] ?? 'general_practice'
+
+  let outputUrgency = ''
+  let outputSpecialty = ''
+
+  // Rule 1: JSON structure
+  let parsed: Record<string, string> | null = null
+  try {
+    const clean = llmOutput.replace(/```json|```/g, '').trim()
+    parsed = JSON.parse(clean)
+  } catch {
+    score = Math.max(score, 0.90)
+    rules.push({ rule: 'Malformed JSON', explanation: 'LLM output is not valid JSON — cannot be safely acted upon.' })
+  }
+
+  if (parsed) {
+    outputUrgency = (parsed.urgency ?? '').toLowerCase()
+    outputSpecialty = (parsed.specialty ?? '').toLowerCase()
+
+    // Rule 2: Missing required fields
+    if (!parsed.urgency || !parsed.specialty || !parsed.appointment_type) {
+      score = Math.max(score, 0.75)
+      rules.push({ rule: 'Missing required fields', explanation: 'urgency, specialty, or appointment_type absent from LLM response.' })
+    }
+
+    // Rule 3: Urgency escalation without input evidence
+    if (outputUrgency === 'high' && expectedUrgency === 'low') {
+      const hasKeywords = URGENCY_KEYWORDS.test(inputText)
+      const bump = hasKeywords ? 0.55 : 0.82
+      score = Math.max(score, bump)
+      rules.push({
+        rule: 'Urgency escalation',
+        explanation: hasKeywords
+          ? 'LLM claimed high urgency; input contains some concerning words but category is low-urgency.'
+          : 'LLM claimed high urgency with no supporting keywords in the patient input.',
+      })
+    }
+
+    // Rule 4: High-acuity specialty without clinical evidence
+    if (HIGH_ACUITY.some(s => outputSpecialty.includes(s))) {
+      score = Math.max(score, 0.80)
+      rules.push({
+        rule: 'High-acuity specialty fabricated',
+        explanation: `LLM returned "${outputSpecialty}" — a high-acuity specialty very unlikely to match a portal booking input.`,
+      })
+    }
+
+    // Rule 5: General specialty mismatch
+    if (expectedSpecialty !== 'specialist' && outputSpecialty && outputSpecialty !== expectedSpecialty) {
+      if (!HIGH_ACUITY.some(s => outputSpecialty.includes(s))) {
+        score = Math.max(score, 0.55)
+        rules.push({
+          rule: 'Specialty mismatch',
+          explanation: `Expected "${expectedSpecialty}" for category "${reasonCategory}" but LLM returned "${outputSpecialty}".`,
+        })
+      }
+    }
+  }
+
+  let verdict: HallucinationVerdict
+  let action: string
+  if (score >= 0.85) {
+    verdict = 'blocked'
+    action = 'Output blocked. Scheduling fallback to default specialty for this reason category. SecOps incident raised.'
+  } else if (score >= 0.60) {
+    verdict = 'held'
+    action = 'Output held for human review. Scheduling proceeded with safe defaults. Governance officer notified.'
+  } else {
+    verdict = 'passed'
+    action = 'Output passed semantic validation. Scheduling logic received LLM response.'
+  }
+
+  return {
+    verdict,
+    consistencyScore: score,
+    matchedRules: rules,
+    action,
+    inputUrgency: expectedUrgency,
+    outputUrgency: outputUrgency || '(not parsed)',
+    inputSpecialty: expectedSpecialty,
+    outputSpecialty: outputSpecialty || '(not parsed)',
+  }
+}
+
+export const HALLUCINATION_RULE_NAMES = [
+  'Malformed JSON',
+  'Missing required fields',
+  'Urgency escalation',
+  'High-acuity specialty fabricated',
+  'Specialty mismatch',
+]

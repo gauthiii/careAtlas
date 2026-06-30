@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 
 import { PortalPage } from '../../components/portal/PortalShell'
 import { PatientLifecycleModal } from '../../components/governance/PatientLifecycleModal'
+import { HallucinationDetectorDemo } from '../../components/governance/HallucinationDetectionDemo'
 
 const SNOW_BASE = 'https://ven04690.service-now.com'
 
@@ -139,7 +140,7 @@ export function GovernanceDemoPage() {
               </div>
               <p className="text-sm text-[#53687b] flex-1">Sensitive Information Disclosure (OWASP LLM02)</p>
             </Link>
-            
+
             <Link to="/governance/demo/risk" className="group flex flex-col rounded-xl border border-[#cfe0ea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#143A57]">
               <div className="flex items-center gap-3 mb-3">
                 <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-[#e7f3f8] text-[#0f5f8c]">
@@ -190,6 +191,10 @@ export function GovernanceDemoPage() {
               </div>
               <p className="text-sm text-[#53687b] flex-1">Consent &amp; Purpose-of-Use Enforcement — the AI only sees what you said it could</p>
             </Link>
+          </div>
+
+          <div className="mt-6">
+            <HallucinationDetectorDemo />
           </div>
         </div>
 
