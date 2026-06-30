@@ -1,5 +1,5 @@
 # CareAtlas — Master README, Audit & Demo Playbook
-
+ 
 **Last updated: 2026-06-30** · Single source of truth for the whole project.
 
 > **What's new (2026-06-30):** **UC13 — AI Output Integrity & Hallucination Detection** added.
