@@ -774,8 +774,6 @@ class ConsentViolationEntry(BaseModel):
     number: str = ""
     opened_at: str = ""
     short_description: str = ""
-    risk_score: str = ""
-    priority: str = ""
 
 
 class ConsentViolationsResponse(BaseModel):
@@ -794,8 +792,6 @@ class FairnessIncidentEntry(BaseModel):
     number: str = ""
     opened_at: str = ""
     short_description: str = ""
-    risk_score: str = ""
-    priority: str = ""
 
 
 class FairnessIncidentsResponse(BaseModel):

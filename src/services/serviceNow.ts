@@ -1179,8 +1179,6 @@ export interface ConsentViolationEntry {
   number: string
   opened_at: string
   short_description: string
-  risk_score: string
-  priority: string
 }
 
 export interface ConsentViolationsResponse {
@@ -1200,8 +1198,6 @@ export interface FairnessIncidentEntry {
   number: string
   opened_at: string
   short_description: string
-  risk_score: string
-  priority: string
 }
 
 export interface FairnessIncidentsResponse {

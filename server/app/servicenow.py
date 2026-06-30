@@ -4482,7 +4482,7 @@ async def fetch_fairness_incidents(settings: Settings) -> dict:
             auth=auth,
             params={
                 "sysparm_query": f"{desc_filter}^ORDERBYDESCopened_at",
-                "sysparm_fields": "number,opened_at,short_description,risk_score,priority",
+                "sysparm_fields": "number,opened_at,short_description",
                 "sysparm_limit": 20,
             },
         )
@@ -4495,8 +4495,6 @@ async def fetch_fairness_incidents(settings: Settings) -> dict:
                     "number": r.get("number", ""),
                     "opened_at": r.get("opened_at", ""),
                     "short_description": r.get("short_description", ""),
-                    "risk_score": r.get("risk_score", ""),
-                    "priority": r.get("priority", ""),
                 }
                 for r in recent
             ],
@@ -4532,7 +4530,7 @@ async def fetch_consent_violations(settings: Settings) -> dict:
             auth=auth,
             params={
                 "sysparm_query": "category=consent_purpose_violation^ORDERBYDESCopened_at",
-                "sysparm_fields": "number,opened_at,short_description,risk_score,priority",
+                "sysparm_fields": "number,opened_at,short_description",
                 "sysparm_limit": 20,
             },
         )
@@ -4545,8 +4543,6 @@ async def fetch_consent_violations(settings: Settings) -> dict:
                     "number": r.get("number", ""),
                     "opened_at": r.get("opened_at", ""),
                     "short_description": r.get("short_description", ""),
-                    "risk_score": r.get("risk_score", ""),
-                    "priority": r.get("priority", ""),
                 }
                 for r in recent
             ],

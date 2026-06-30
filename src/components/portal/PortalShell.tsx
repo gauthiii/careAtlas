@@ -36,7 +36,7 @@ const governanceNavDefs = [
   { label: 'Agenda — June 20', to: '/governance/agenda', icon: CalendarDays, end: true },
   { label: 'Agenda — June 26', to: '/governance/agenda-26', icon: CalendarDays, end: true },
   { label: 'Additional Work', to: '/governance/additional-work', icon: ServerCog, end: true },
-  { label: 'Audit log for LLM02', to: '/governance/llm02-audit', icon: ShieldAlert, end: true },
+  { label: 'Audit Log', to: '/governance/llm02-audit', icon: ShieldAlert, end: true },
 ] as const
 
 const signedOutGovernanceNavDefs = [

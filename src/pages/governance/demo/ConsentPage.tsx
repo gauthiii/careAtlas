@@ -13,7 +13,6 @@ import {
   type ConsentViolationsResponse,
   type PatientFieldAccess,
 } from '../../../services/serviceNow'
-import { PriorityBadge } from '../../../components/governance/SnowIncidentBadges'
 
 function fieldVal(fields: PatientFieldAccess[], label: string): string {
   return fields.find((f) => f.label === label)?.privileged_value || '—'
@@ -191,8 +190,7 @@ export function GovernanceConsentPage() {
                     <th className="px-3 py-2">Number</th>
                     <th className="px-3 py-2">Opened</th>
                     <th className="px-3 py-2">Short description</th>
-                    <th className="px-3 py-2">Risk score</th>
-                    <th className="px-3 py-2">Priority</th>
+                    <th className="px-3 py-2">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -201,8 +199,9 @@ export function GovernanceConsentPage() {
                       <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs font-bold text-[#143A57]">{row.number || '—'}</td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-[#53687b]">{row.opened_at || '—'}</td>
                       <td className="px-3 py-2.5 font-semibold text-[#102033]">{row.short_description || '—'}</td>
-                      <td className="px-3 py-2.5 text-[#53687b]">{row.risk_score || '—'}</td>
-                      <td className="px-3 py-2.5"><PriorityBadge priority={row.priority} /></td>
+                      <td className="px-3 py-2.5">
+                        <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">In Progress</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -19,7 +19,6 @@ import {
   PortalPage,
 } from '../../components/portal/PortalShell'
 import { SchedulingAgentCompareModal } from '../../components/governance/SchedulingAgentCompareModal'
-import { ApprovalLogPanel } from '../../components/governance/ApprovalLogPanel'
 import { DENIED_WRITE_PROBES } from '../../data/useCaseDemoData'
 
 import {
@@ -114,8 +113,6 @@ export function GovernanceAclPage() {
             ))}
           </div>
         </div>
-
-        <ApprovalLogPanel />
 
         <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
           {nonHumanIdentities.map((nhi) => (

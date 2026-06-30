@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { ApprovalGateDemo } from '../../../components/governance/ApprovalGateDemo'
+import { ApprovalLogPanel } from '../../../components/governance/ApprovalLogPanel'
 import { BeforeAfterDemo, SimChat } from '../../../components/governance/BeforeAfterDemo'
 import { ArrowRight, ShieldAlert, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -84,6 +85,10 @@ export function GovernanceRiskPage() {
             }
             after={<ApprovalGateDemo />}
           />
+        </div>
+
+        <div className="mt-8">
+          <ApprovalLogPanel />
         </div>
       </section>
       <UseCaseWorkflowsModal open={modalOpen} onClose={() => setModalOpen(false)} initialTab="uc2" />
