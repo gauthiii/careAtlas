@@ -1,60 +1,40 @@
-import { useState } from 'react'
-import { Activity, ShieldAlert, ShieldCheck, Siren } from 'lucide-react'
-import {
-  HALLUCINATION_PRESETS,
-  HALLUCINATION_RULE_NAMES,
-  scanHallucination,
-  type HallucinationScanResult,
-} from '../../data/useCaseDemoData'
-import { flagHallucinationEvent } from '../../services/serviceNow'
-import { DemoTag } from './DemoTag'
+import { FormEvent, useState } from 'react'
+import { Activity, Loader2, Send, ShieldAlert, ShieldCheck, Siren } from 'lucide-react'
+import { checkHallucinationLive, type HallucinationLiveCheckResponse } from '../../services/serviceNow'
+import { HALLUCINATION_RULE_NAMES } from '../../data/useCaseDemoData'
 
-export function HallucinationDetectorDemo({ onFlagged }: { onFlagged?: () => void } = {}) {
-  const [selectedPreset, setSelectedPreset] = useState(0)
-  const [customInput, setCustomInput] = useState(HALLUCINATION_PRESETS[0].input)
-  const [customOutput, setCustomOutput] = useState(HALLUCINATION_PRESETS[0].llmOutput)
-  const [reasonCategory, setReasonCategory] = useState(HALLUCINATION_PRESETS[0].reasonCategory)
-  const [result, setResult] = useState<HallucinationScanResult | null>(null)
-  const [logging, setLogging] = useState(false)
-  const [logged, setLogged] = useState(false)
+const REASON_CATEGORIES = [
+  'general_checkup', 'follow_up', 'urgent', 'mental_health', 'chronic', 'specialist',
+]
 
-  function applyPreset(index: number) {
-    const p = HALLUCINATION_PRESETS[index]
-    setSelectedPreset(index)
-    setCustomInput(p.input)
-    setCustomOutput(p.llmOutput)
-    setReasonCategory(p.reasonCategory)
+const HINTS = [
+  'I have been feeling a bit tired lately and want a general check-up.',
+  'I need a routine follow-up after my last visit.',
+  'I would like to see someone about my anxiety.',
+  'I have had chest pains for the past two days.',
+]
+
+export function HallucinationDetectorDemo() {
+  const [input, setInput] = useState(HINTS[0])
+  const [reasonCategory, setReasonCategory] = useState(REASON_CATEGORIES[0])
+  const [result, setResult] = useState<HallucinationLiveCheckResponse | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    const text = input.trim()
+    if (!text) return
+    setBusy(true)
+    setError('')
     setResult(null)
-    setLogged(false)
-  }
-
-  function runScan() {
-    const r = scanHallucination(customInput, customOutput, reasonCategory)
-    setResult(r)
-    setLogged(false)
-  }
-
-  async function logToServiceNow() {
-    if (!result) return
-    setLogging(true)
     try {
-      await flagHallucinationEvent({
-        original_input: customInput,
-        llm_raw_output: customOutput,
-        consistency_score: result.consistencyScore,
-        urgency_input: result.inputUrgency,
-        urgency_claimed: result.outputUrgency,
-        specialty_input: result.inputSpecialty,
-        specialty_claimed: result.outputSpecialty,
-        matched_patterns: result.matchedRules.map(r => r.rule).join(', '),
-        action_taken: result.verdict,
-      })
-      setLogged(true)
-      onFlagged?.()
+      setResult(await checkHallucinationLive(text, reasonCategory))
     } catch (err) {
-      console.error('Hallucination log failed:', err)
+      setError(err instanceof Error ? err.message : 'Check failed')
+    } finally {
+      setBusy(false)
     }
-    setLogging(false)
   }
 
   const verdictStyle =
@@ -72,51 +52,16 @@ export function HallucinationDetectorDemo({ onFlagged }: { onFlagged?: () => voi
             <Activity size={18} />
           </span>
           <div>
-            <h3 className="m-0 text-sm font-bold text-[#102033]">Test LLM output integrity</h3>
+            <h3 className="m-0 text-sm font-bold text-[#102033]">AI output integrity check</h3>
             <p className="m-0 text-[11px] font-semibold text-[#53687b]">
-              UC13 · Security · OWASP LLM09 — semantic consistency scan on scheduling agent output
+              UC13 · Security · OWASP LLM09 — live scheduling agent · real-time semantic scan
             </p>
           </div>
         </div>
-        <DemoTag />
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#e7f7ef] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0f6b4f]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" /> Live · ServiceNow
+        </span>
       </div>
-
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        {HALLUCINATION_PRESETS.map((p, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => applyPreset(i)}
-            className={`rounded-full border px-2.5 py-1 text-[10.5px] font-semibold transition ${
-              selectedPreset === i
-                ? 'border-[#143A57] bg-[#143A57] text-white'
-                : 'border-[#cbdde6] bg-slate-50 text-[#53687b] hover:bg-slate-100'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#6b7c8f]">
-        Patient input (reason text)
-      </label>
-      <textarea
-        value={customInput}
-        onChange={e => { setCustomInput(e.target.value); setResult(null) }}
-        rows={2}
-        className="mb-3 w-full resize-none rounded-lg border border-[#cbdde6] bg-white px-3 py-2 text-sm text-[#102033] outline-none focus:border-[#0f5f8c]"
-      />
-
-      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#6b7c8f]">
-        LLM raw output (JSON)
-      </label>
-      <textarea
-        value={customOutput}
-        onChange={e => { setCustomOutput(e.target.value); setResult(null) }}
-        rows={2}
-        className="mb-3 w-full resize-none rounded-lg border border-[#cbdde6] bg-[#f8fcff] px-3 py-2 font-mono text-xs text-[#102033] outline-none focus:border-[#0f5f8c]"
-      />
 
       <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#6b7c8f]">
         Reason category
@@ -126,66 +71,122 @@ export function HallucinationDetectorDemo({ onFlagged }: { onFlagged?: () => voi
         onChange={e => { setReasonCategory(e.target.value); setResult(null) }}
         className="mb-3 w-full rounded-lg border border-[#cbdde6] bg-white px-3 py-2 text-sm text-[#102033] outline-none focus:border-[#0f5f8c]"
       >
-        {['general_checkup', 'follow_up', 'urgent', 'mental_health', 'chronic', 'specialist'].map(c => (
+        {REASON_CATEGORIES.map(c => (
           <option key={c} value={c}>{c}</option>
         ))}
       </select>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={runScan}
-          className="inline-flex items-center gap-2 rounded-md bg-[#143A57] px-3 py-2 text-xs font-bold text-white hover:bg-[#1d4d73]"
-        >
-          <Activity size={14} /> Scan output
-        </button>
-        {result && result.verdict !== 'passed' && (
+      <form onSubmit={submit}>
+        <div className="flex items-end gap-2 rounded-lg border border-[#cbdde6] bg-white p-2 focus-within:border-[#0f5f8c]">
+          <textarea
+            value={input}
+            onChange={e => { setInput(e.target.value); setResult(null) }}
+            rows={2}
+            className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-2 py-1 text-sm text-[#102033] outline-none"
+            placeholder="Type a reason for visit…"
+          />
           <button
-            type="button"
-            onClick={logToServiceNow}
-            disabled={logging || logged}
-            className="inline-flex items-center gap-2 rounded-md border border-[#cbdde6] bg-white px-3 py-2 text-xs font-bold text-[#0f5f8c] hover:bg-[#edf5fa] disabled:opacity-50"
+            type="submit"
+            disabled={!input.trim() || busy}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-[#143A57] text-white hover:bg-[#1d4d73] disabled:opacity-45"
           >
-            {logged ? '✓ Logged to ServiceNow' : logging ? 'Logging…' : 'Log to ServiceNow'}
+            {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
           </button>
-        )}
+        </div>
+      </form>
+
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {HINTS.map(h => (
+          <button
+            key={h}
+            type="button"
+            onClick={() => { setInput(h); setResult(null) }}
+            className="rounded-full border border-[#cbdde6] bg-slate-50 px-2.5 py-1 text-[10.5px] font-semibold text-[#53687b] hover:bg-slate-100"
+          >
+            {h.length > 40 ? `${h.slice(0, 40)}…` : h}
+          </button>
+        ))}
       </div>
 
+      {error && (
+        <div className="mt-4 rounded-lg border border-[#f3a19c] bg-[#fff4f3] p-3 text-xs font-semibold text-[#a22828]">
+          {error}
+        </div>
+      )}
+
       {result && (
-        <div className={`mt-4 rounded-lg border p-3 ${verdictStyle.wrap}`}>
-          <div className="mb-2 flex items-center gap-2 font-bold">
-            <verdictStyle.Icon size={16} /> {verdictStyle.label}
-            <span className="ml-auto font-mono text-xs opacity-70">
-              score {result.consistencyScore.toFixed(2)}
-            </span>
-          </div>
-          <div className="mb-2 grid grid-cols-2 gap-2 rounded-md bg-white/50 p-2 text-[11px]">
-            <div><div className="font-bold opacity-60">Expected urgency</div><div className="font-mono">{result.inputUrgency}</div></div>
-            <div><div className="font-bold opacity-60">LLM claimed urgency</div><div className="font-mono">{result.outputUrgency}</div></div>
-            <div><div className="font-bold opacity-60">Expected specialty</div><div className="font-mono">{result.inputSpecialty}</div></div>
-            <div><div className="font-bold opacity-60">LLM claimed specialty</div><div className="font-mono">{result.outputSpecialty}</div></div>
-          </div>
-          <p className="m-0 text-xs font-semibold">{result.action}</p>
-          {result.matchedRules.length > 0 && (
-            <div className="mt-2 grid gap-1.5">
-              {result.matchedRules.map((r, i) => (
-                <div key={i} className="rounded-md border border-current/20 bg-white/60 px-2.5 py-1.5 text-[11px]">
-                  <span className="font-bold">{r.rule}</span>
-                  <span className="ml-1 opacity-80">— {r.explanation}</span>
-                </div>
-              ))}
+        <>
+          {result.agent_output && (
+            <div className="mt-3 rounded-lg border border-[#cbdde6] bg-[#f8fcff] p-2.5">
+              <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[#6b7c8f]">
+                Live agent response
+              </div>
+              <p className="m-0 whitespace-pre-wrap text-xs text-[#102033]">{result.agent_output}</p>
             </div>
           )}
-        </div>
+
+          <div className={`mt-4 rounded-lg border p-3 ${verdictStyle.wrap}`}>
+            <div className="mb-2 flex items-center gap-2 font-bold">
+              <verdictStyle.Icon size={16} /> {verdictStyle.label}
+              <span className="ml-auto font-mono text-xs opacity-70">
+                score {result.consistency_score.toFixed(2)}
+              </span>
+            </div>
+
+            <div className="mb-2 grid grid-cols-2 gap-2 rounded-md bg-white/50 p-2 text-[11px]">
+              <div>
+                <div className="font-bold opacity-60">Expected urgency</div>
+                <div className="font-mono">{result.input_urgency}</div>
+              </div>
+              <div>
+                <div className="font-bold opacity-60">Agent implied urgency</div>
+                <div className="font-mono">{result.output_urgency}</div>
+              </div>
+              <div>
+                <div className="font-bold opacity-60">Expected specialty</div>
+                <div className="font-mono">{result.input_specialty}</div>
+              </div>
+              <div>
+                <div className="font-bold opacity-60">Agent implied specialty</div>
+                <div className="font-mono">{result.output_specialty}</div>
+              </div>
+            </div>
+
+            <p className="m-0 text-xs font-semibold">{result.action}</p>
+
+            {result.matched_rules.length > 0 && (
+              <div className="mt-2 grid gap-1.5">
+                {result.matched_rules.map((r, i) => (
+                  <div
+                    key={i}
+                    className="rounded-md border border-current/20 bg-white/60 px-2.5 py-1.5 text-[11px]"
+                  >
+                    <span className="font-bold">{r.rule}</span>
+                    <span className="ml-1 opacity-80">— {r.explanation}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {result.audit_logged && (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-white/70 px-2 py-1 text-[11px] font-bold">
+                ✓ Written to u_hallucination_log in ServiceNow
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       <div className="mt-4 border-t border-[#e5eef3] pt-3">
         <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[#6b7c8f]">
-          Semantic rules checked on every LLM response
+          Semantic rules checked on every response
         </div>
         <div className="flex flex-wrap gap-1.5">
           {HALLUCINATION_RULE_NAMES.map(name => (
-            <span key={name} className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] text-[#40566b]">
+            <span
+              key={name}
+              className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] text-[#40566b]"
+            >
               {name}
             </span>
           ))}

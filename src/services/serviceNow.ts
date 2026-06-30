@@ -1279,4 +1279,37 @@ export async function fetchHallucinationStats(): Promise<HallucinationStats> {
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
   return (await res.json()) as HallucinationStats
+
+}
+// ── UC13 Live Hallucination Check ─────────────────────────────────────────
+
+export interface HallucinationRuleMatch {
+  rule: string
+  explanation: string
+}
+
+export interface HallucinationLiveCheckResponse {
+  verdict: 'passed' | 'held' | 'blocked'
+  consistency_score: number
+  matched_rules: HallucinationRuleMatch[]
+  action: string
+  input_urgency: string
+  output_urgency: string
+  input_specialty: string
+  output_specialty: string
+  agent_output: string
+  audit_logged: boolean
+}
+
+export async function checkHallucinationLive(
+  reasonText: string,
+  reasonCategory: string,
+): Promise<HallucinationLiveCheckResponse> {
+  const res = await fetch(`${API_BASE}/governance/hallucination/live-check`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason_text: reasonText, reason_category: reasonCategory }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as HallucinationLiveCheckResponse
 }
