@@ -1,6 +1,17 @@
 # CareAtlas — Master README, Audit & Demo Playbook
 
-**Last updated: 2026-06-26** · Single source of truth for the whole project.
+**Last updated: 2026-06-28** · Single source of truth for the whole project.
+
+> **What's new (2026-06-28):** **4-step "before / after" storytelling added to all 6 demo pages.**
+> A reusable `BeforeAfterDemo` component (process strip → risk cards → control bar → ②Before/④After
+> toggle, matching Tanush's `Sample_AI_Use_Case_Process_Flows.pdf`) now wraps each
+> `/governance/demo/*` page. The **"before"** pane is an interactive `SimChat` console — the user
+> types a prompt or clicks a sample chip, hits **Send**, and the rogue/unguarded result appears
+> (damage generated client-side; **no live control is ever disabled**). The **"after"** pane keeps
+> the existing live-wired demo that ends on a real ServiceNow record. This directly addresses the
+> June 27 demo feedback (show the damage before the control). See `Plan md files/jul-4/`.
+>
+> **(2026-06-26):** UC10 — **Consent & Purpose-of-Use Enforcement** added (live runtime ConsentGate that blocks an agent when a patient hasn't consented to its purpose, plus a dedicated page at `/governance/demo/consent` with the workflow modal, consent panel, and a live incidents table). Merged the `hema` (UI) and `shesh` (consent) branches. All 6 app-driven use cases (UC1/2/3/5/6/8) plus UC10 verified working live on this date.
 
 > This document explains *everything* that has been built, how it works, how to run it,
 > what lives on the React side, what lives on the ServiceNow side, and the exact status
@@ -88,6 +99,8 @@ These are **real row counts** returned by `ven04690` today (read‑only `curl` w
 | `sn_aia_agent` | 160 | UC8 — AI agent inventory |
 | `alm_ai_system_digital_asset` | 333 | UC8 — AI asset inventory |
 | `sn_mcp_server` / `sn_mcp_server_registry` | 1 / 2 | UC9 — MCP kill‑switch target |
+| `u_patient.u_consent_flags` (+ `u_consent_accepted`) | populated | UC10 — per‑patient AI‑purpose consent |
+| `sn_si_incident` (`category=consent_purpose_violation`) | 1 (grows as the gate fires) | UC10 — consent‑violation incidents |
 
 **The target AI system for UC3, `Triage Appointment DG1`** (`sn_grc_ai_gov_ai_system`
 sys_id `cdf56dc91bd14b14d7eaea45604bcb6e`) is now **classified High‑risk** with 3
@@ -268,10 +281,14 @@ lets you enter any portal for demos without real credentials.
 `/governance/sign-in`, `/governance`, `/governance/ai-agents`, `/governance/acl`,
 `/governance/demo`, `/governance/demo/privacy` (UC1), `/governance/demo/risk` (UC2),
 `/governance/demo/regulation` (UC3), `/governance/demo/security` (UC5),
-`/governance/demo/fairness` (UC6), `/governance/agenda`, `/governance/additional-work`,
-`/governance/llm02-audit`. Fallback `*` → `/`.
+`/governance/demo/fairness` (UC6), `/governance/demo/consent` (UC10), `/governance/agenda`,
+`/governance/additional-work`, `/governance/llm02-audit`. Fallback `*` → `/`.
 
 ### 7.4 Key governance components (`src/components/governance/`)
+- `BeforeAfterDemo.tsx` — **all 6 UCs** the reusable 4-step before/after frame (process strip + risk
+  cards + control bar + ②Before/④After toggle). Exports `SimChat`, the interactive "before" console
+  (type/click a sample → Send → the rogue/unguarded result, generated client-side). Wraps every
+  `pages/governance/demo/*Page.tsx`.
 - `PiiRedactionDemo.tsx` / `AiRedactionComparisonCard.tsx` / `RoleBasedRedactionDemo.tsx` /
   `PrivacyControlsPanel.tsx` — **UC1** PII redaction & role‑based access comparison.
 - `ApprovalGateDemo.tsx` / `ApprovalLogPanel.tsx` — **UC2** human‑approval gate + audit log.
@@ -279,6 +296,7 @@ lets you enter any portal for demos without real credentials.
   missing live data — never guesses).
 - `InjectionTesterDemo.tsx` — **UC5** prompt‑injection tester.
 - `FairnessDebiasDemo.tsx` / `SchedulingAgentCompareModal.tsx` — **UC6** fairness/debias.
+- `ConsentEnforcementPanel.tsx` — **UC10** "Patient Consent Enforcement" panel, shared by the governance dashboard and the consent demo page. The `UseCaseWorkflowsModal` also has a `uc10` tab.
 - `ShadowAiWorkflowModal.tsx` — **UC8** shadow‑AI discovery animation.
 - `RegisterAgentModal.tsx` — register a new agent. `UseCaseWorkflowsModal.tsx` /
   `PatientLifecycleModal.tsx` — animated narratives. `DemoTag.tsx` — "Demo" label.
@@ -368,6 +386,15 @@ All under prefix `/api`. Full interactive list at `/docs` when running.
 |---|---|---|---|
 | GET | `/governance/fairness` | Appointment outcomes by gender/ethnicity/age (aggregates only, no PII) + skew alert | `u_appointment` ⋈ `u_patient` |
 
+### Consent & Purpose (**UC10**)
+| Method | Path | Does | ServiceNow |
+|---|---|---|---|
+| GET | `/patient/consent-flags` | Read a patient's allowed AI purposes (header `X-Username`; username→email fallback) | `u_patient.u_consent_flags` |
+| POST | `/patient/consent-flags` | Save a patient's allowed purposes (`{flags}`) | `u_patient` |
+| GET | `/governance/consent-violations` | 30‑day count + recent consent‑breach incidents | `sn_si_incident` (`category=consent_purpose_violation`) |
+
+> **Runtime ConsentGate:** `ask_scoped_agent` (`/governance/agent/ask`) checks the patient's `u_consent_flags` for the agent's purpose **before** reading; on a miss it blocks (reads nothing) and opens a `consent_purpose_violation` incident. Identity‑verification is exempt; behaviour is fail‑closed.
+
 ### ACL posture (**UC2**)
 | Method | Path | Does |
 |---|---|---|
@@ -406,6 +433,8 @@ All under prefix `/api`. Full interactive list at `/docs` when running.
 `sn_ai_governance_asset_governance_details`, `sn_grc_ai_gov_ai_system` (+ `_task`,
 `_risk_assessment_result`, `_entity_map`), `sn_smart_imp_auto_assessment_action`,
 `sn_ai_case_mgmt_ai_case`, content filters, `sys_security_acl`, `sys_user`.
+**Consent (UC10):** `u_patient.u_consent_flags` / `u_consent_accepted` / `u_consent_accepted_on`;
+`sn_si_incident` (`category=consent_purpose_violation`).
 
 ### 10.2 The `svc-*` service accounts (UC2)
 11 `svc-*` accounts exist; UC2 governs **9**: `svc-identity-verification-agent`,
@@ -430,7 +459,7 @@ callbacks (`/a2a/callback/...`) and an in‑memory store exist as a fallback pat
 
 ---
 
-## 11. The nine governance use cases — honest status (2026‑06‑26)
+## 11. The ten governance use cases — honest status (2026‑06‑26)
 
 Status legend: ✅ **Built & live‑verified** · 🟡 **Foundations live, partial app surface** ·
 🧭 **Roadmap / instance‑side only**.
@@ -503,6 +532,22 @@ split. **App:** `GET /agents/managed`, `GET /agents/unmanaged`, hook
 Control Tower Pro Plus** entitlement for the pause/resume control to surface — entitlement
 to confirm. Operated in ServiceNow; the app can optionally show a status badge.
 
+### UC10 — Consent & Purpose-of-Use Enforcement · ✅ (added 2026‑06‑26)
+**Proves:** the AI only processes a patient's data for the purposes that patient explicitly
+agreed to — purpose‑level, beyond table/field ACLs. Every patient sets allowed purposes
+(`scheduling`, `notes_summarisation`, `reminders`, `triage`) on `u_patient.u_consent_flags`.
+A **runtime ConsentGate** in `ask_scoped_agent` checks the patient's consent for the agent's
+purpose **before** reading; on a miss it **blocks (reads no data) and opens a real
+`sn_si_incident`** (`category=consent_purpose_violation`). Identity‑verification is exempt;
+behaviour is **fail‑closed**. Verified live: Notes Agent blocked for a scheduling‑only patient
+(incident opened), Scheduling Agent allowed. **App:** patient consent toggles in
+`ProfilePage.tsx`; shared `ConsentEnforcementPanel`; dedicated page `/governance/demo/consent`
+(workflow modal + panel + live incidents table); endpoints `GET/POST /patient/consent-flags`,
+`GET /governance/consent-violations`. **Docs:** `completed_UC10.md`, `UC10-Consent-PurposeOfUse.md`.
+**Loose ends:** `fetchConsentCoverage` (frontend) points at an unimplemented
+`/governance/consent-coverage`; the dashboard panel copy is static (the live table is on the
+consent page).
+
 ---
 
 ## 12. Use case → code map (quick reference)
@@ -518,6 +563,7 @@ to confirm. Operated in ServiceNow; the app can optionally show a status badge.
 | UC7 Data Integrity | (governance via AIRC; no app detection) | — | `sn_risk_definition` (model‑risk app absent) |
 | UC8 Visibility | `/agents`, `/agents/managed`, `/agents/unmanaged` | `/governance/ai-agents` | `sn_aia_agent`, `alm_ai_system_digital_asset` |
 | UC9 Operational Control | (ServiceNow MCP pause/resume) | optional badge | `sn_mcp_server` |
+| UC10 Consent & Purpose | `/patient/consent-flags`, `/governance/consent-violations`, gate in `/governance/agent/ask` | `/governance/demo/consent` (+ `ProfilePage`) | `u_patient.u_consent_flags`, `sn_si_incident` |
 
 ---
 
@@ -530,6 +576,12 @@ Life Cycle, each answer creating the next question:
 Bound it (UC2 Risk) → Protect the patient (UC1 Privacy) → Treat everyone fairly
 (UC6 Fairness) → Protect the inputs (UC7 Data Integrity) → Catch the attack (UC5 Security)
 → Stop it instantly (UC9 Operational Control).**
+
+> **On each `/governance/demo/*` page, drive the 4-step arc:** start on **②Before the control** and
+> Send the sample prompt to show the *damage* (rogue agent leaks / obeys / acts ungated), then flip
+> to **④After the control** to show the same attempt failing on a live ServiceNow record. Showing the
+> "before" damage first is what makes the control land — see `Plan md files/jul-4/` for the per-UC
+> talk track (`usecase-narratives-4step.md`).
 
 ---
 
@@ -584,7 +636,7 @@ UC3 read‑only instance audits: `server/scripts/audit_uc3_readonly.sh`,
 ## 17. Where to read more
 
 The `Plan md files/` directory is the narrative source of truth:
-- `june26BusinessPlan.md` — the full nine‑use‑case master plan with live evidence.
+- `june26BusinessPlan.md` — the full ten‑use‑case master plan with live evidence.
 - `26junstory.md` — the demo walkthrough script ("talk to me like a baby").
 - `completed_UC1.md`, `completed_UC2.md` (+ continuation), `completed_UC3.md`,
   `completed_UC5.md`, `completed_UC6.md` — per‑use‑case "what was built", with ServiceNow

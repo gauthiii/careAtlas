@@ -4,6 +4,7 @@ import {
   ClipboardList,
   Lock,
   ShieldAlert,
+  ShieldCheck,
   Siren,
   AlertTriangle,
   ArrowRight,
@@ -22,6 +23,7 @@ import { governanceDisplayName, useGovernanceAuth } from '../../contexts/Governa
 import { useUnmanagedAISystems } from '../../hooks/useUnmanagedAISystems'
 import { fetchAiDecisionLog, fetchFairnessData, fetchSecurityKpis, type AiDecisionLogEntry, type FairnessData, type FairnessGroupItem, type SecurityKpis } from '../../services/serviceNow'
 import { PrivacyControlsPanel } from '../../components/governance/PrivacyControlsPanel'
+import { ConsentEnforcementPanel } from '../../components/governance/ConsentEnforcementPanel'
 import { RegulatoryClassificationBadge } from '../../components/governance/RegulatoryClassificationBadge'
 import { DemoTag } from '../../components/governance/DemoTag'
 
@@ -212,7 +214,7 @@ export function GovernanceDashboardPage() {
                   <th>Status</th>
                   <th>Identity</th>
                   <th>Risk</th>
-                  <th>EU AI Act</th>
+                  <th>NIST AI RMF</th>
                 </tr>
               </thead>
 
@@ -396,7 +398,8 @@ export function GovernanceDashboardPage() {
         <div className="space-y-8">
           {/* DATA PRIVACY & PII PROTECTION (UC1) */}
           <PrivacyControlsPanel />
-
+           {/* CONSENT ENFORCEMENT — UC10 (shared component, also on /governance/demo/consent) */}
+          <ConsentEnforcementPanel />
           {/* SHADOW AI */}
           <PortalPanel
             title="Shadow AI Detection"

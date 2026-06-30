@@ -21,7 +21,7 @@ import {
   type PatientSearchResult,
   type SummaryNote,
 } from '../../services/serviceNow'
-import { AiRedactionComparisonCard } from '../../components/governance/AiRedactionComparisonCard'
+import { ContextualPrivacyBeforeAfter } from '../../components/governance/ContextualPrivacyBeforeAfter'
 
 const fieldClass =
   'w-full rounded-[9px] border border-[#cbdde6] bg-white px-3 py-[11px] text-inherit'
@@ -270,10 +270,8 @@ export function PatientRecordPage() {
             </PortalPanel>
 
             {patientProfile.sys_id && (
-              <AiRedactionComparisonCard
-                lookup={{ sysId: patientProfile.sys_id }}
-                title="AI agent access to this record"
-                intro="UC1 · Privacy — you are an authorized clinician; the AI scheduling agent is not."
+              <ContextualPrivacyBeforeAfter
+                profile={patientProfile}
                 fullLabel="You (clinician)"
                 agentLabel="AI scheduling agent"
               />

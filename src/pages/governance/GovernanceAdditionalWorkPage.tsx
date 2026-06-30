@@ -65,14 +65,14 @@ const SECTIONS: DeckSection[] = [
           'It exposes the official ServiceNow AI documentation as searchable, LLM-readable context — any MCP client (Claude Code, Claude Desktop, claude.ai) can call it as a set of tools.',
       },
       {
-        label: 'Focused on AI Control Tower + ServiceNow GRC',
+        label: 'Three documents: Enable AI, GRC, and AI Control Tower Implementation',
         detail:
-          'Two practice areas on the latest releases (Zurich & Australia): “Enable AI” (Now Assist, AI Agents, AI Control Tower, Document Intelligence, Knowledge Graph…) and “GRC” (AI Risk & Compliance, governance life cycle, NIST RMF, EU AI Act).',
+          'Three main documentation sets on the latest releases (Zurich & Australia): ServiceNow Enable AI (Now Assist, AI Agents, AI Control Tower, Document Intelligence, Knowledge Graph…), ServiceNow GRC (AI Risk & Compliance, Risk / Audit / Policy, Privacy, Third-Party Risk…), and the AI Control Tower Implementation guide (Discover → Govern → Assess → Build → Deploy → Observe → Measure).',
       },
       {
         label: 'Structured as document → topic → subtopic',
         detail:
-          '319 subtopics indexed: 277 under Enable AI (19 topics) and 42 under GRC (2 topics). Each subtopic is one markdown file the server can search and return in full.',
+          '1,628 subtopics across 54 topics: Enable AI (19 topics / 277 subtopics), GRC (14 topics / 802 subtopics), and AI Control Tower Implementation (21 topics / 549 subtopics). Each subtopic is one markdown file the server can search and return in full.',
       },
     ],
     mock: <WhatMock />,
@@ -90,14 +90,14 @@ const SECTIONS: DeckSection[] = [
           'These are living docs on the newest ServiceNow releases. No LLM’s training data reliably contains the current AI Control Tower / GRC behaviour — its knowledge is stale by construction.',
       },
       {
-        label: 'Thousands of pages, ~500 MB+ of source PDFs',
+        label: 'Thousands of pages across three source documents',
         detail:
-          'Verified: servicenow_grc.pdf ≈ 398 MB and servicenow_enable_ai.pdf ≈ 148 MB — ~546 MB combined, in the multi-thousand-page range each.',
+          'Hundreds of megabytes of source PDFs spanning the three documentation sets, each running to thousands of pages — far more than fits in any single context window.',
       },
       {
         label: 'Context limits exceed → answers truncate',
         detail:
-          'You cannot paste 500 MB of PDFs into a prompt. Stuff it in and the context window overflows or silently truncates, so the model answers from a partial, unreliable slice.',
+          'You cannot paste hundreds of MB of PDFs into a prompt. Stuff it in and the context window overflows or silently truncates, so the model answers from a partial, unreliable slice.',
       },
       {
         label: 'Search & web search can’t guarantee accuracy',
@@ -117,17 +117,17 @@ const SECTIONS: DeckSection[] = [
       {
         label: 'Step 1 — Chunk the PDFs (split_pikepdf.py)',
         detail:
-          'Page-bounded PDF chunks with bookmarks preserved — 73 chunks total (37 GRC + 36 Enable AI). The 500 MB problem becomes many small, addressable units.',
+          'Page-bounded PDF chunks with bookmarks preserved — one chunk set per document. The hundreds-of-MB problem becomes many small, addressable units.',
       },
       {
         label: 'Step 2 — Extract one markdown file per subtopic',
         detail:
-          'Each subtopic becomes a single .md under main-document → topic → subtopic. The result is ~6 MB of clean text instead of ~546 MB of binary PDF.',
+          'Each subtopic becomes a single .md under main-document → topic → subtopic. The result is a few MB of clean text instead of hundreds of MB of binary PDF.',
       },
       {
         label: 'Step 3 — Index + serve (mcp_server.py)',
         detail:
-          'The server indexes all 319 subtopics at startup and exposes 5 tools + a how_to_use prompt. The LLM pulls only the few subtopics it needs — the context is split across tool calls, never dumped at once.',
+          'The server indexes all 1,628 subtopics at startup and exposes 5 tools + a how_to_use prompt. The LLM pulls only the few subtopics it needs — the context is split across tool calls, never dumped at once.',
       },
       {
         label: 'That is the “context split as MCP tools”',
@@ -147,12 +147,12 @@ const SECTIONS: DeckSection[] = [
       {
         label: 'list_documents() → list_topics() → list_subtopics()',
         detail:
-          'Browsing path: see the two main documents and their topic/subtopic counts, then drill in. Used when the question is “what’s covered”.',
+          'Browsing path: see the three main documents and their topic/subtopic counts, then drill in. Used when the question is “what’s covered”.',
       },
       {
         label: 'search_documentation(query, document?, limit?)',
         detail:
-          'Full-text search across all 319 subtopics, returns ranked matches with stable subtopic_ids. The default entry point for a specific question.',
+          'Full-text search across all 1,628 subtopics, returns ranked matches with stable subtopic_ids. The default entry point for a specific question.',
       },
       {
         label: 'get_subtopic(subtopic_id)',
@@ -200,9 +200,14 @@ const SECTIONS: DeckSection[] = [
     icon: TowerControl,
     items: [
       {
+        label: 'Impact & value — 5× the coverage, plus the full Control Tower guide',
+        detail:
+          'Coverage grew from 2 documents / 319 subtopics to 3 documents / 1,628 subtopics — roughly 5× more indexed content — adding the entire AI Control Tower Implementation guide (Discover → Govern → Assess → Build → Deploy → Observe → Measure). More of the governance questions we field now resolve to an exact, citable subtopic instead of a model guess.',
+      },
+      {
         label: 'Always current, never truncated',
         detail:
-          'Re-run the pipeline when the June-2026 docs change and the server is up to date — no model retraining, no context overflow.',
+          'Re-run the pipeline when the docs change and the server is up to date — no model retraining, no context overflow.',
       },
       {
         label: 'Grounded, citable answers',
@@ -227,7 +232,7 @@ const SECTIONS: DeckSection[] = [
       {
         label: 'Sell it as a product',
         detail:
-          'The pipeline + MCP server is reusable IP. Any team doing ServiceNow AI / GRC work has the same 500 MB context problem we solved — that is a sellable solution.',
+          'The pipeline + MCP server is reusable IP. Any team doing ServiceNow AI / GRC work has the same hundreds-of-MB context problem we solved — that is a sellable solution.',
       },
       {
         label: 'Partner with ServiceNow',
@@ -310,7 +315,7 @@ export function GovernanceAdditionalWorkPage() {
       </div>
       <div className="flex flex-col items-end gap-1 text-right">
         <div className="rounded-full px-3 py-1 text-xs font-bold mb-3 border border-[#0397AE] rounded-xl">
-          319 subtopics
+          1,628 subtopics
         </div>
         <div className="rounded-full px-3 py-1 text-xs font-bold border border-[#0397AE] rounded-xl">
           In progress
@@ -516,14 +521,148 @@ function Pill({ children, color = '#0f5f8c', bg = '#e7f3f8' }: { children: React
   )
 }
 
+// Full document → topic → subtopic-count map, pulled live from the connected
+// servicenow-ai-docs MCP (list_documents / list_topics). Source topic names are
+// lightly cleaned of typos for display; counts are verbatim. Totals: 3 docs ·
+// 54 topics · 1,628 subtopics (277 + 802 + 549).
+const COVERAGE: {
+  doc: string
+  color: string
+  bg: string
+  border: string
+  topics: { name: string; n: number }[]
+}[] = [
+  {
+    doc: 'ServiceNow Enable AI',
+    color: '#0f5f8c',
+    bg: '#e7f3f8',
+    border: '#cfe0ea',
+    topics: [
+      { name: 'Now Assist AI agents', n: 66 },
+      { name: 'AI Control Tower', n: 35 },
+      { name: 'Now Assist', n: 33 },
+      { name: 'Now Assist Center', n: 24 },
+      { name: 'Now Assist Skill Kit', n: 23 },
+      { name: 'Now Assist Data Kit', n: 13 },
+      { name: 'Now Assist AI assets', n: 11 },
+      { name: 'ServiceNow AI Implementation', n: 11 },
+      { name: 'AI Agent Advisor', n: 10 },
+      { name: 'AI Desktop Actions', n: 7 },
+      { name: 'Predictive Intelligence', n: 7 },
+      { name: 'Document Intelligence', n: 6 },
+      { name: 'Knowledge Graph', n: 5 },
+      { name: 'Large language model on the ServiceNow AI Platform', n: 5 },
+      { name: 'Natural Language Understanding', n: 5 },
+      { name: 'MCP Server Console', n: 4 },
+      { name: 'Natural Language Query', n: 4 },
+      { name: 'Now Assist Readiness Evaluation', n: 4 },
+      { name: 'Now Assist in Document Intelligence', n: 4 },
+    ],
+  },
+  {
+    doc: 'ServiceNow GRC',
+    color: '#7c2d12',
+    bg: '#fdeadf',
+    border: '#f1d0bb',
+    topics: [
+      { name: 'Common Governance, Risk & Compliance Features', n: 118 },
+      { name: 'Third-Party Risk Management', n: 113 },
+      { name: 'Risk Management', n: 103 },
+      { name: 'Policy and Compliance Management', n: 77 },
+      { name: 'Privacy Management', n: 74 },
+      { name: 'Regulatory Change Management', n: 48 },
+      { name: 'AI Risk and Compliance', n: 42 },
+      { name: 'Operational Resilience', n: 42 },
+      { name: 'Business Continuity Management', n: 41 },
+      { name: 'Audit Management', n: 40 },
+      { name: 'Compliance Case Management', n: 33 },
+      { name: 'Continuous Authorization and Monitoring', n: 26 },
+      { name: 'Model Risk Management', n: 24 },
+      { name: 'Smart Assessment Engine', n: 21 },
+    ],
+  },
+  {
+    doc: 'AI Control Tower Implementation',
+    color: '#6d28d9',
+    bg: '#f0ebff',
+    border: '#d9cdf5',
+    topics: [
+      { name: 'Govern – Risk and Controls', n: 97 },
+      { name: 'Discover – Discovery', n: 72 },
+      { name: 'Govern – Lifecycle', n: 49 },
+      { name: 'Discover – Data Models', n: 42 },
+      { name: 'Manual Intake Configuration – Record Producers & Workspace', n: 41 },
+      { name: 'Govern – Now Assist Governance', n: 40 },
+      { name: 'Measure – Value', n: 33 },
+      { name: 'Cross-Product Integration – AI Case Management', n: 26 },
+      { name: 'Govern – Risk and Control', n: 22 },
+      { name: 'General – Technical and Functional Considerations', n: 21 },
+      { name: 'Cross-Product Integration – CMDB', n: 20 },
+      { name: 'General – Prelaunch', n: 20 },
+      { name: 'General – Personas, Roles, and Responsibilities', n: 14 },
+      { name: 'Cross-Product Integration – AI Gateway', n: 9 },
+      { name: 'Deploy – Review AI System Record & Pre-Deployment', n: 9 },
+      { name: 'Observe – Trace Collectors', n: 8 },
+      { name: 'Summary of AI System Asset – State Transitions & Tasks', n: 8 },
+      { name: 'General – Overview', n: 7 },
+      { name: 'Cross-Product Integration – AI Strategy', n: 5 },
+      { name: 'Assess – Evaluate AI Use Case Impacts', n: 3 },
+      { name: 'Build and Test – Implement Controls', n: 3 },
+    ],
+  },
+]
+
 function WhatMock() {
+  const docTotals = COVERAGE.map((d) => ({
+    doc: d.doc,
+    topics: d.topics.length,
+    subtopics: d.topics.reduce((sum, t) => sum + t.n, 0),
+  }))
+  const grandSub = docTotals.reduce((s, d) => s + d.subtopics, 0)
+  const grandTop = docTotals.reduce((s, d) => s + d.topics, 0)
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Pill color="#0f5f8c" bg="#e7f3f8"><Boxes size={12} /> 2 main documents</Pill>
-      <Pill color="#6d28d9" bg="#f0ebff"><FileStack size={12} /> 21 topics</Pill>
-      <Pill color="#0f6b4f" bg="#e8f7ef"><Database size={12} /> 319 subtopics</Pill>
-      <Pill color="#b45309" bg="#fef3c7"><TowerControl size={12} /> AI Control Tower</Pill>
-      <Pill color="#7c2d12" bg="#fdeadf"><ServerCog size={12} /> ServiceNow GRC</Pill>
+    <div className="grid gap-3">
+      {/* Summary pills */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Pill color="#0f5f8c" bg="#e7f3f8"><Boxes size={12} /> 3 main documents</Pill>
+        <Pill color="#6d28d9" bg="#f0ebff"><FileStack size={12} /> {grandTop} topics</Pill>
+        <Pill color="#0f6b4f" bg="#e8f7ef"><Database size={12} /> {grandSub.toLocaleString()} subtopics</Pill>
+      </div>
+
+      {/* Three-column document → topic tree */}
+      <div className="grid gap-3 lg:grid-cols-3">
+        {COVERAGE.map((d, i) => (
+          <div key={d.doc} className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: d.border }}>
+            <div className="flex items-center justify-between gap-2 border-b px-3 py-2" style={{ backgroundColor: d.bg, borderColor: d.border }}>
+              <span className="text-[0.72rem] font-black" style={{ color: d.color }}>{d.doc}</span>
+              <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[0.6rem] font-black" style={{ color: d.color }}>
+                {docTotals[i].topics} topics · {docTotals[i].subtopics}
+              </span>
+            </div>
+            <ul className="divide-y divide-[#f0f5f8]">
+              {d.topics.map((t) => (
+                <li key={t.name} className="flex items-center justify-between gap-2 px-3 py-1.5">
+                  <span className="min-w-0 text-[0.66rem] font-semibold leading-snug text-[#3c4f60] [overflow-wrap:anywhere]">{t.name}</span>
+                  <span
+                    className="shrink-0 rounded-md px-1.5 py-0.5 text-[0.6rem] font-black"
+                    style={{ color: d.color, backgroundColor: d.bg }}
+                  >
+                    {t.n}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {/* Grand total */}
+      <div className="flex flex-wrap items-center justify-center gap-2 rounded-lg border border-[#cfe0ea] bg-[#f8fbfc] px-3 py-2 text-[0.7rem] font-bold text-[#53687b]">
+        <span>3 documents</span><span className="text-[#b7ceda]">·</span>
+        <span>{grandTop} topics</span><span className="text-[#b7ceda]">·</span>
+        <span className="font-black text-[#0f6b4f]">{grandSub.toLocaleString()} subtopics indexed</span>
+      </div>
     </div>
   )
 }
@@ -532,10 +671,10 @@ function WhyMock() {
   return (
     <div className="grid gap-2 sm:grid-cols-2">
       {[
-        { label: 'servicenow_grc.pdf', value: '≈ 398 MB' },
-        { label: 'servicenow_enable_ai.pdf', value: '≈ 148 MB' },
-        { label: 'Combined source', value: '≈ 546 MB' },
-        { label: 'Updated', value: 'June 12, 2026' },
+        { label: 'ServiceNow Enable AI', value: '277 subtopics' },
+        { label: 'ServiceNow GRC', value: '802 subtopics' },
+        { label: 'AI Control Tower Implementation', value: '549 subtopics' },
+        { label: 'Total indexed', value: '1,628 subtopics' },
       ].map((s) => (
         <div key={s.label} className="flex items-center justify-between rounded-lg border border-[#f1d9b0] bg-white px-3 py-2">
           <span className="text-[0.7rem] font-bold text-[#53687b]">{s.label}</span>
@@ -554,9 +693,9 @@ function WhyMock() {
 
 function PipelineMock() {
   const steps = [
-    { icon: FileStack, label: '546 MB PDFs', color: '#b45309' },
-    { icon: Scissors, label: '73 chunks', color: '#6d28d9' },
-    { icon: Database, label: '319 .md subtopics', color: '#0f6b4f' },
+    { icon: FileStack, label: 'PDF sources', color: '#b45309' },
+    { icon: Scissors, label: 'Chunked per doc', color: '#6d28d9' },
+    { icon: Database, label: '1,628 .md subtopics', color: '#0f6b4f' },
     { icon: ServerCog, label: 'MCP server', color: '#0f5f8c' },
   ]
   return (

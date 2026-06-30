@@ -14,7 +14,7 @@ const TIER_STYLE: Record<RegulatoryTier, string> = {
 }
 
 /**
- * UC3 · Regulation — read-only EU AI Act classification badge.
+ * UC3 · Regulation — read-only NIST AI RMF classification badge.
  * Shows verified live classification data when supplied. Without live evidence
  * it renders as Unverified rather than guessing from an agent name.
  */
@@ -36,13 +36,13 @@ export function RegulatoryClassificationBadge({
   if (compact) {
     return (
       <span
-        title={classification ? `EU AI Act ${c.tier} · ${c.assessment}${c.friaAttached ? ' · FRIA attached' : ''}` : 'Live ServiceNow classification unavailable'}
+        title={classification ? `NIST AI RMF ${c.tier} · ${c.assessment}${c.friaAttached ? ' · AI Impact Assessment attached' : ''}` : 'Live ServiceNow classification unavailable'}
         className={cn(
           'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold',
           TIER_STYLE[c.tier],
         )}
       >
-        <Scale size={11} /> EU AI Act · {c.tier}
+        <Scale size={11} /> NIST AI RMF · {c.tier}
       </span>
     )
   }
@@ -55,14 +55,14 @@ export function RegulatoryClassificationBadge({
           TIER_STYLE[c.tier],
         )}
       >
-        <Scale size={11} /> EU AI Act · {c.tier}
+        <Scale size={11} /> NIST AI RMF · {c.tier}
       </span>
       <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
         {c.assessment}
       </span>
       {c.friaAttached && (
         <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
-          <FileCheck2 size={11} /> FRIA
+          <FileCheck2 size={11} /> AI Impact Assessment
         </span>
       )}
     </span>

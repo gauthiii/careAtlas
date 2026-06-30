@@ -3,6 +3,7 @@ import { PortalPage } from '../../../components/portal/PortalShell'
 import { UseCaseWorkflowsModal } from '../../../components/governance/UseCaseWorkflowsModal'
 import { ArrowRight, Scale, FileText, ArrowLeft, AlertTriangle, CheckCircle2, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { BeforeAfterDemo, SimChat } from '../../../components/governance/BeforeAfterDemo'
 import {
   fetchRegulatoryAiSystems,
   fetchRegulatoryEvidence,
@@ -57,10 +58,10 @@ export function GovernanceRegulationPage() {
           >
             <ArrowLeft size={20} />
           </Link>
-          Regulation — EU AI Act Conformity + FRIA
+          Regulation — NIST AI RMF Conformance + AI Impact Assessment
         </div>
       }
-      intro="Platform-driven risk classification and generation of Fundamental Rights Impact Assessment evidence."
+      intro="Platform-driven risk classification and generation of AI Impact Assessment evidence."
     >
       <section className="px-6 pb-6">
         <button
@@ -82,6 +83,66 @@ export function GovernanceRegulationPage() {
           </span>
         </button>
 
+        <BeforeAfterDemo
+          riskLevel="High risk"
+          processCaption="A patient-triage agent makes a high-impact decision. Before it ships, the platform must classify its risk and back it with evidence."
+          process={[
+            { label: 'Agent proposed', sub: 'patient-facing' },
+            { label: 'Use & Purpose intake', sub: 'questionnaire' },
+            { label: 'Runs ungoverned', sub: 'no classification', tone: 'risk' },
+            { label: 'RAM + AI Impact Assessment', sub: 'platform-driven', tone: 'control' },
+            { label: 'Approved & evidenced', sub: 'audit trail' },
+          ]}
+          risksHeading="Risks of an unclassified AI system"
+          risks={[
+            { title: 'Undocumented exposure', body: 'No one knows the regulatory risk tier of an agent making clinical-priority decisions.', ref: 'NIST AI RMF' },
+            { title: 'No defensible classification', body: 'A regulator asks "is this high-risk?" and there is no evidence to answer.' },
+            { title: 'No impact assessment', body: 'A high-impact decision ships with no AI Impact Assessment behind it.' },
+          ]}
+          control="ServiceNow RAM auto-classifies the agent (High/Med/Low) from the Use & Purpose answers and generates the AI Impact Assessment; Post Assessment Actions auto-map risk statements and control objectives."
+          before={
+            <SimChat
+              agent="Governance assistant"
+              placeholder="Ask about this agent's regulatory status…"
+              samples={[
+                {
+                  prompt: "What's the risk tier and impact assessment for the Triage agent?",
+                  result: (
+                    <div className="space-y-3">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-[#6b7c8f]">
+                        Ungoverned agent · no assessment run
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
+                        {[
+                          { k: 'Risk classification', v: 'To be determined' },
+                          { k: 'AI Impact Assessment', v: 'None attached' },
+                          { k: 'Assessment tasks', v: '0' },
+                          { k: 'Mapped risk/controls', v: 'None' },
+                        ].map((m) => (
+                          <div key={m.k} className="rounded-lg border border-red-200 bg-white px-4 py-3">
+                            <div className="text-[11px] font-bold uppercase tracking-wide text-[#6b7c8f]">{m.k}</div>
+                            <div className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-red-700">
+                              <XCircle size={14} /> {m.v}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
+                        <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" /> Only a bare system record exists — the agent runs with no defensible NIST AI RMF classification and no impact-assessment evidence.
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  prompt: 'Is this agent approved to deploy?',
+                  response: 'No classification on file and no impact assessment — but nothing is stopping deployment either.',
+                  impact: 'An unclassified, unassessed agent could ship with zero regulatory evidence behind it.',
+                },
+              ]}
+            />
+          }
+          after={(
+            <>
         <section className="rounded-xl border border-[#d7e5ec] bg-white p-6 shadow-sm">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -138,14 +199,14 @@ export function GovernanceRegulationPage() {
                 <Metric label="Risk classification" value={evidence.risk_classification || 'Unverified'} />
                 <Metric label="AI system state" value={evidence.state || 'Unverified'} />
                 <Metric label="Assessment tasks" value={String(evidence.assessment_tasks_count)} />
-                <Metric label="FRIA actions active" value={String(evidence.fria_actions_active_count)} />
+                <Metric label="AI Impact Assessment actions active" value={String(evidence.fria_actions_active_count)} />
               </div>
 
               <div className="grid grid-cols-2 gap-3 max-[780px]:grid-cols-1">
                 <ReadinessItem ok={evidence.has_ai_system_record} label="AI system record exists" detail={evidence.target_sys_id || 'No matching record'} />
                 <ReadinessItem ok={evidence.has_completed_classification} label="RAM classification complete" detail={evidence.risk_classification || 'No classification'} />
                 <ReadinessItem ok={evidence.has_assessment_task} label="Assessment task present" detail={`${evidence.assessment_tasks_count} task(s)`} />
-                <ReadinessItem ok={evidence.fria_attached} label="FRIA attached to target" detail={evidence.fria_attached ? 'Verified' : 'No target FRIA task found'} />
+                <ReadinessItem ok={evidence.fria_attached} label="AI Impact Assessment attached to target" detail={evidence.fria_attached ? 'Verified' : 'No target AI Impact Assessment task found'} />
                 <ReadinessItem ok={evidence.has_risk_assessment_result} label="Risk result mapped" detail={`${evidence.risk_assessment_results_count} result(s)`} />
                 <ReadinessItem ok={evidence.has_post_assessment_actions} label="Post Assessment Actions available" detail={`${evidence.post_assessment_actions_count} action(s)`} />
               </div>
@@ -169,15 +230,18 @@ export function GovernanceRegulationPage() {
             <span className="grid h-10 w-10 place-items-center rounded-lg bg-[#e7f3f8] text-[#0f5f8c]">
               <FileText size={20} />
             </span>
-            <h3 className="text-lg font-bold text-[#102033]">EU AI Act Implementation Details</h3>
+            <h3 className="text-lg font-bold text-[#102033]">NIST AI RMF Implementation Details</h3>
           </div>
           <p className="text-sm leading-relaxed text-[#53687b] mb-4">
-            This module represents the automation of EU AI Act conformity. Rather than relying on manual consultant questionnaires, the platform leverages its Risk Assessment Methodology (RAM) engine to dynamically classify the AI system tier (High / Medium / Low).
+            This module represents the automation of NIST AI Risk Management Framework conformance. Rather than relying on manual consultant questionnaires, the platform leverages its Risk Assessment Methodology (RAM) engine to dynamically classify the AI system tier (High / Medium / Low).
           </p>
           <p className="text-sm leading-relaxed text-[#53687b]">
-            For systems classified as High-risk, the necessary Fundamental Rights Impact Assessment (FRIA) is automatically generated. The platform tracks this end-to-end, providing a verifiable audit trail for regulatory compliance.
+            For systems classified as High-risk, the necessary AI Impact Assessment (AIA) is automatically generated. The platform tracks this end-to-end, providing a verifiable audit trail for regulatory compliance.
           </p>
         </div>
+            </>
+          )}
+        />
       </section>
       <UseCaseWorkflowsModal open={modalOpen} onClose={() => setModalOpen(false)} initialTab="uc3" />
     </PortalPage>

@@ -886,7 +886,7 @@ async def fetch_regulatory_evidence(
 ) -> RegulatoryEvidenceResponse:
     """Return live, read-only UC3 evidence for one AI system.
 
-    This intentionally does not fabricate FRIA/assessment status. Missing live
+    This intentionally does not fabricate assessment status. Missing live
     records become false readiness flags so the demo cannot imply completion.
     """
     clean_query = query.strip() or "Triage Appointment DG1"
@@ -911,13 +911,13 @@ async def fetch_regulatory_evidence(
             client,
             settings,
             "sn_smart_imp_auto_assessment_action",
-            query="assessment_templateLIKEFundamental Rights Impact Assessment^active=true",
+            query="assessment_templateLIKEAI Impact Assessment^active=true",
         )
         fria_inactive_count = await _snow_table_count(
             client,
             settings,
             "sn_smart_imp_auto_assessment_action",
-            query="assessment_templateLIKEFundamental Rights Impact Assessment^active=false",
+            query="assessment_templateLIKEAI Impact Assessment^active=false",
         )
 
         if target is None:
@@ -1362,6 +1362,12 @@ def _patient_registration_payload(registration: PatientRegistrationRequest) -> d
         "u_email_verified": "false",
         "u_profile_complete": str(_has_complete_patient_profile(registration)).lower(),
         "u_consent_accepted": str(registration.consent_accepted).lower(),
+        # Seed the four AI-feature consent purposes ON by default so a freshly
+        # registered patient's scoped agents (scheduling/triage/notes/reminders)
+        # work out of the box. The patient can withdraw any purpose in Profile →
+        # AI feature consent (which rewrites u_consent_flags). Without this the
+        # ConsentGate is fail-closed and every scoped agent would block.
+        "u_consent_flags": ",".join(DEFAULT_AI_CONSENT_FLAGS),
         "u_privacy_notice_version": "v1",
         "u_confidence_score": "100",
     }
@@ -3470,6 +3476,128 @@ _SCOPED_PII = (
     ("u_insurance_id", "Insurance ID"),
 )
 
+# ---------------------------------------------------------------------------
+# UC10 ConsentGate — purpose-of-use enforcement.
+# Each gated scoped agent is bound to ONE consent purpose; before it reads a
+# patient, the patient's u_consent_flags must contain that purpose. Identity
+# verification is exempt (it is not a patient-toggleable AI purpose). Behaviour
+# is fail-closed: missing flag (or any read error) → blocked + incident logged.
+# ---------------------------------------------------------------------------
+# The four patient-toggleable AI consent purposes, seeded ON at registration so
+# scoped agents work out of the box (the patient can withdraw any in Profile).
+DEFAULT_AI_CONSENT_FLAGS: tuple[str, ...] = (
+    "scheduling",
+    "notes_summarisation",
+    "reminders",
+    "triage",
+)
+
+AGENT_CONSENT_PURPOSE: dict[str, str | None] = {
+    "scheduling": "scheduling",
+    "notes": "notes_summarisation",
+    "reminder": "reminders",
+    "triage": "triage",
+    "identity": None,  # exempt — baseline security, not a consent-gated purpose
+}
+
+
+async def _patient_consents_to(
+    settings: Settings, client: httpx.AsyncClient, sys_id: str, purpose: str
+) -> bool:
+    """True iff the patient's u_consent_flags contains *purpose*. Fail-closed."""
+    response = await client.get(
+        f"{settings.snow_base_url}/api/now/table/u_patient/{sys_id}",
+        params={"sysparm_fields": "u_consent_flags"},
+        headers={"Accept": "application/json"},
+        auth=(settings.snow_username, settings.snow_password),
+    )
+    if not response.is_success:
+        return False
+    record = response.json().get("result", {})
+    record = record if isinstance(record, dict) else {}
+    raw = _field_value(record.get("u_consent_flags")) or ""
+    flags = {f.strip() for f in raw.split(",") if f.strip()}
+    return purpose in flags
+
+
+async def _open_consent_violation_incident(
+    settings: Settings,
+    client: httpx.AsyncClient,
+    *,
+    agent_label: str,
+    agent_username: str,
+    purpose: str,
+    patient_ref: str,
+) -> str | None:
+    """Open an sn_si_incident (category=consent_purpose_violation). Returns its number."""
+    payload = {
+        "short_description": (
+            f"[CareAtlas] Consent violation blocked — {agent_label} denied "
+            f"'{purpose}' for patient {patient_ref}"
+        ),
+        "description": (
+            f"ConsentGate blocked agent {agent_label} ({agent_username}).\n"
+            f"Required purpose: {purpose}.\n"
+            f"Patient {patient_ref} has not consented to this purpose "
+            f"(u_consent_flags), so the agent was refused and read NO patient data.\n"
+            f"UC10 — Consent & Purpose-of-Use Enforcement."
+        ),
+        "category": "consent_purpose_violation",
+    }
+    try:
+        response = await client.post(
+            f"{settings.snow_base_url}/api/now/table/sn_si_incident",
+            json=payload,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        if response.is_success:
+            return _field_value(response.json().get("result", {}).get("number"))
+    except Exception:
+        logger.exception("Failed to open consent-violation incident")
+    return None
+
+
+async def raise_fairness_remediation_incident(settings: Settings) -> dict[str, str]:
+    """UC6 Fairness — open a remediation incident for the 13.1pp scheduling skew.
+
+    Posts to sn_si_incident with category=fairness_bias_alert so the controlled
+    human workflow (the platform boundary) is visible as a live record.
+    Returns {"number": "INC...", "sys_id": "...", "state": "created"}.
+    """
+    payload = {
+        "short_description": (
+            "[CareAtlas] Fairness alert — scheduling skew exceeds threshold (13.1pp)"
+        ),
+        "description": (
+            "UC6 · Fairness & Non-Discrimination.\n\n"
+            "The CareAtlas scheduling agent shows a 13.1 percentage-point over-allocation "
+            "to the white patient cohort across the last 90 appointments "
+            "(vs. expected fair share). This exceeds the 5pp alert threshold.\n\n"
+            "NIST AI RMF — Harmful Bias detection triggered.\n"
+            "Remediation required: human review of scheduling algorithm weights "
+            "and cohort outcome balancing. AIRC does not auto-correct — this incident "
+            "documents the controlled human response."
+        ),
+        "category": "fairness_bias_alert",
+        "urgency": "2",
+        "impact": "2",
+    }
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        response = await client.post(
+            f"{settings.snow_base_url}/api/now/table/sn_si_incident",
+            json=payload,
+            headers={"Accept": "application/json"},
+            auth=(settings.snow_username, settings.snow_password),
+        )
+        response.raise_for_status()
+        result = response.json().get("result", {})
+        return {
+            "number": _field_value(result.get("number")) or "",
+            "sys_id": _field_value(result.get("sys_id")) or "",
+            "state": "created",
+        }
+
 
 async def ask_scoped_agent(
     settings: Settings,
@@ -3523,6 +3651,36 @@ async def ask_scoped_agent(
                 scope=scope,
                 reply=f"I'm the {label} ({username}). My job is to {scope}. No patient record was in context.",
             )
+
+        # 2b) ConsentGate (UC10) — purpose-of-use enforcement. Identity verification
+        # is exempt; every other gated agent needs the patient's consent for its purpose.
+        purpose = AGENT_CONSENT_PURPOSE.get(agent_key)
+        if purpose:
+            consented = await _patient_consents_to(settings, client, sys_id, purpose)
+            if not consented:
+                incident = await _open_consent_violation_incident(
+                    settings,
+                    client,
+                    agent_label=label,
+                    agent_username=username,
+                    purpose=purpose,
+                    patient_ref=patient_ref,
+                )
+                incident_text = f"Incident {incident} opened" if incident else "Incident logged"
+                return ScopedAgentAnswer(
+                    kind="info",
+                    agent_key=agent_key,
+                    agent_label=label,
+                    agent_username=username,
+                    scope=scope,
+                    patient_ref=patient_ref,
+                    reply=(
+                        f"🔒 Blocked by ConsentGate. Patient {patient_ref} has not consented to "
+                        f"the '{purpose}' purpose, so I ({label}) cannot read their record. "
+                        f"No patient data was accessed. {incident_text} in ServiceNow "
+                        f"(consent_purpose_violation)."
+                    ),
+                )
 
         # 3) Read the record AS this agent identity (PII is stripped by the ACL).
         fields = [f for f, _ in config["allowed"]] + [f for f, _ in _SCOPED_PII]
@@ -4186,3 +4344,206 @@ async def fetch_security_kpis(settings: Settings) -> "SecurityKpisResponse":
         automation_rules_active=automation_rules_active,
         recent_cases=recent_cases,
     )
+# ── UC11 Consent flags ────────────────────────────────────────────────────────
+
+CONSENT_FLAGS_FIELDS = [
+    "sys_id",
+    "u_patient_id",
+    "u_consent_flags",
+    "u_consent_accepted",
+    "u_consent_accepted_on",
+    "u_username",
+    "u_email",
+]
+
+
+async def fetch_consent_flags(username: str, settings: Settings) -> dict:
+    """Read consent flags for a patient looked up by username or email."""
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        # Try username first
+        resp = await client.get(
+            f"{base}/api/now/table/u_patient",
+            auth=auth,
+            params={
+                "sysparm_query": f"u_username={username}",
+                "sysparm_fields": ",".join(CONSENT_FLAGS_FIELDS),
+                "sysparm_limit": 1,
+            },
+        )
+        results = resp.json().get("result", [])
+
+        # Fall back to email
+        if not results:
+            resp = await client.get(
+                f"{base}/api/now/table/u_patient",
+                auth=auth,
+                params={
+                    "sysparm_query": f"u_email={username}",
+                    "sysparm_fields": ",".join(CONSENT_FLAGS_FIELDS),
+                    "sysparm_limit": 1,
+                },
+            )
+            results = resp.json().get("result", [])
+
+        if not results:
+            return {"flags": [], "consent_accepted": False, "flags_set": False}
+
+        row = results[0]
+        raw = row.get("u_consent_flags", "") or ""
+        flags = [f.strip() for f in raw.split(",") if f.strip()]
+        return {
+            "flags": flags,
+            "consent_accepted": row.get("u_consent_accepted") == "true",
+            "flags_set": len(flags) > 0,
+        }
+
+
+async def update_consent_flags(
+    username: str, flags: list[str], settings: Settings
+) -> bool:
+    """Write consent flags for a patient looked up by username."""
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        # Look up by username first, then fall back to email — mirrors
+        # fetch_consent_flags so reads and writes resolve the same patient.
+        resp = await client.get(
+            f"{base}/api/now/table/u_patient",
+            auth=auth,
+            params={
+                "sysparm_query": f"u_username={username}",
+                "sysparm_fields": "sys_id",
+                "sysparm_limit": 1,
+            },
+        )
+        results = resp.json().get("result", [])
+
+        if not results:
+            resp = await client.get(
+                f"{base}/api/now/table/u_patient",
+                auth=auth,
+                params={
+                    "sysparm_query": f"u_email={username}",
+                    "sysparm_fields": "sys_id",
+                    "sysparm_limit": 1,
+                },
+            )
+            results = resp.json().get("result", [])
+
+        if not results:
+            return False
+
+        sys_id = results[0]["sys_id"]
+        from datetime import datetime, timezone
+        payload = {
+            "u_consent_flags": ",".join(flags),
+            "u_consent_accepted": True,
+            "u_consent_accepted_on": datetime.now(timezone.utc).isoformat(),
+        }
+        patch = await client.patch(
+            f"{base}/api/now/table/u_patient/{sys_id}",
+            auth=auth,
+            json=payload,
+        )
+        patch.raise_for_status()
+        return True
+
+
+async def fetch_fairness_incidents(settings: Settings) -> dict:
+    """Fetch fairness bias alert SecOps incidents for the governance dashboard."""
+    from datetime import datetime, timezone, timedelta
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+    thirty_days_ago = (
+        datetime.now(timezone.utc) - timedelta(days=30)
+    ).strftime("%Y-%m-%d %H:%M:%S")
+    # Filter by short_description prefix — fairness_bias_alert is not a valid
+    # sn_si_incident category choice on this instance, so category is silently dropped.
+    desc_filter = "short_descriptionSTARTSWITH[CareAtlas] Fairness alert"
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        count_resp = await client.get(
+            f"{base}/api/now/table/sn_si_incident",
+            auth=auth,
+            params={
+                "sysparm_query": f"{desc_filter}^opened_at>={thirty_days_ago}",
+                "sysparm_fields": "sys_id",
+                "sysparm_limit": 1000,
+            },
+        )
+        count = len(count_resp.json().get("result", []))
+
+        recent_resp = await client.get(
+            f"{base}/api/now/table/sn_si_incident",
+            auth=auth,
+            params={
+                "sysparm_query": f"{desc_filter}^ORDERBYDESCopened_at",
+                "sysparm_fields": "number,opened_at,short_description",
+                "sysparm_limit": 20,
+            },
+        )
+        recent = recent_resp.json().get("result", [])
+
+        return {
+            "count_30_days": count,
+            "recent": [
+                {
+                    "number": r.get("number", ""),
+                    "opened_at": r.get("opened_at", ""),
+                    "short_description": r.get("short_description", ""),
+                }
+                for r in recent
+            ],
+        }
+
+
+async def fetch_consent_violations(settings: Settings) -> dict:
+    """Fetch consent violation SecOps incidents for the governance dashboard."""
+    from datetime import datetime, timezone, timedelta
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+    thirty_days_ago = (
+        datetime.now(timezone.utc) - timedelta(days=30)
+    ).strftime("%Y-%m-%d %H:%M:%S")
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        count_resp = await client.get(
+            f"{base}/api/now/table/sn_si_incident",
+            auth=auth,
+            params={
+                "sysparm_query": (
+                    f"category=consent_purpose_violation"
+                    f"^opened_at>={thirty_days_ago}"
+                ),
+                "sysparm_fields": "sys_id",
+                "sysparm_limit": 1000,
+            },
+        )
+        count = len(count_resp.json().get("result", []))
+
+        recent_resp = await client.get(
+            f"{base}/api/now/table/sn_si_incident",
+            auth=auth,
+            params={
+                "sysparm_query": "category=consent_purpose_violation^ORDERBYDESCopened_at",
+                "sysparm_fields": "number,opened_at,short_description",
+                "sysparm_limit": 20,
+            },
+        )
+        recent = recent_resp.json().get("result", [])
+
+        return {
+            "count_30_days": count,
+            "recent": [
+                {
+                    "number": r.get("number", ""),
+                    "opened_at": r.get("opened_at", ""),
+                    "short_description": r.get("short_description", ""),
+                }
+                for r in recent
+            ],
+        }

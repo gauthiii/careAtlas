@@ -77,8 +77,8 @@ export interface ExecuteAgentResponse {
 /** ServiceNow sys_id of the patient Book Appointment scheduling agent. */
 export const BOOK_APPOINTMENT_AGENT_ID = 'b2cdf70e1bd50f54d7eaea45604bcb0c'
 
-/** ServiceNow sys_id of the unrestricted Bad Patient Agent (no ACL — leaks PII). */
-export const BAD_PATIENT_AGENT_ID = 'e175cd041ba54f94b72fc9d3604bcb4c'
+/** ServiceNow sys_id of the unrestricted Rogue Agent (no ACL — leaks PII). */
+export const ROGUE_AGENT_ID = 'e175cd041ba54f94b72fc9d3604bcb4c'
 
 export interface AclTestCheck {
   label: string
@@ -1081,6 +1081,21 @@ export async function fetchFairnessData(): Promise<FairnessData> {
   return (await res.json()) as FairnessData
 }
 
+export interface FairnessRemediationResult {
+  number: string
+  sys_id: string
+  state: string
+}
+
+export async function raiseFairnessRemediationIncident(): Promise<FairnessRemediationResult> {
+  const res = await fetch(`${API_BASE}/governance/fairness/remediation`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as FairnessRemediationResult
+}
+
 // ---------------------------------------------------------------------------
 // UC5 Security — Prompt-Injection Defense + Output-Pattern Detection
 // ---------------------------------------------------------------------------
@@ -1128,4 +1143,72 @@ export async function fetchSecurityKpis(): Promise<SecurityKpis> {
   })
   if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
   return (await res.json()) as SecurityKpis
+}
+// ── UC11 Consent ──────────────────────────────────────────────────────────────
+
+export interface ConsentFlagsResponse {
+  flags: string[]
+  consent_accepted: boolean
+  flags_set: boolean
+}
+
+export async function fetchConsentFlags(username: string): Promise<ConsentFlagsResponse> {
+  const res = await fetch('/api/patient/consent-flags', {
+    headers: { 'X-Username': username },
+  })
+  if (!res.ok) throw new Error('Failed to fetch consent flags')
+  return res.json()
+}
+
+export async function updateConsentFlags(
+  username: string,
+  flags: string[]
+): Promise<void> {
+  const res = await fetch('/api/patient/consent-flags', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Username': username,
+    },
+    body: JSON.stringify({ flags }),
+  })
+  if (!res.ok) throw new Error('Failed to update consent flags')
+}
+
+export interface ConsentViolationEntry {
+  number: string
+  opened_at: string
+  short_description: string
+}
+
+export interface ConsentViolationsResponse {
+  count_30_days: number
+  recent: ConsentViolationEntry[]
+}
+
+export async function fetchConsentViolations(): Promise<ConsentViolationsResponse> {
+  const res = await fetch(`${API_BASE}/governance/consent-violations`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as ConsentViolationsResponse
+}
+
+export interface FairnessIncidentEntry {
+  number: string
+  opened_at: string
+  short_description: string
+}
+
+export interface FairnessIncidentsResponse {
+  count_30_days: number
+  recent: FairnessIncidentEntry[]
+}
+
+export async function fetchFairnessIncidents(): Promise<FairnessIncidentsResponse> {
+  const res = await fetch(`${API_BASE}/governance/fairness/incidents`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as FairnessIncidentsResponse
 }

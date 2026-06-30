@@ -26,6 +26,8 @@ export type AiAssistantAgentConfig = {
     label: string
     scope: string
     patientEmail?: string
+    /** Doctor portal — bind the scoped read to the patient record on screen. */
+    patientSysId?: string
   } | null
 }
 
@@ -233,6 +235,7 @@ export function AiAssistantWidget({
           agentKey: identity.key,
           question: trimmedInput,
           patientEmail: identity.patientEmail,
+          patientSysId: identity.patientSysId,
         })
         if (sessionVersion !== sessionVersionRef.current) return
         if (ans.kind === 'approval') {

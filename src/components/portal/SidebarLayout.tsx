@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import {
   Hospital,
   LogOut,
@@ -82,11 +82,11 @@ export function SidebarLayout({
   collapsed?: boolean
   children: ReactNode
 }) {
-  const renderedNav = nav.map(({ label, node }, index) => {
-    if (!collapsed) return <>{node(false)}</>
+  const renderedNav = nav.map(({ label, node }) => {
+    if (!collapsed) return <Fragment key={label}>{node(false)}</Fragment>
 
     return (
-      <CollapsedTooltip key={index} label={label}>
+      <CollapsedTooltip key={label} label={label}>
         {node(true)}
       </CollapsedTooltip>
     )

@@ -5,6 +5,7 @@ import { GovernanceAclPage } from './pages/governance/GovernanceAclPage'
 import { GovernanceAiAgentsPage } from './pages/governance/GovernanceAiAgentsPage'
 import { GovernanceDashboardPage } from './pages/governance/GovernanceDashboardPage'
 import { GovernanceAgendaPage } from './pages/governance/GovernanceAgendaPage'
+import { GovernanceAgenda26Page } from './pages/governance/GovernanceAgenda26Page'
 import { GovernanceAdditionalWorkPage } from './pages/governance/GovernanceAdditionalWorkPage'
 import { GovernanceLlm02AuditPage } from './pages/governance/GovernanceLlm02AuditPage'
 import { GovernanceDemoPage } from './pages/governance/GovernanceDemoPage'
@@ -13,6 +14,7 @@ import { GovernanceRiskPage } from './pages/governance/demo/RiskPage'
 import { GovernanceRegulationPage } from './pages/governance/demo/RegulationPage'
 import { GovernanceSecurityPage } from './pages/governance/demo/SecurityPage'
 import { GovernanceFairnessPage } from './pages/governance/demo/FairnessPage'
+import { GovernanceConsentPage } from './pages/governance/demo/ConsentPage'
 import { GovernanceSignInPage } from './pages/governance/GovernanceSignInPage'
 import { ViewChooserPage } from './pages/home/ViewChooserPage'
 import { AppointmentsPage as PatientAppointmentsPage } from './pages/patient/AppointmentsPage'
@@ -437,12 +439,36 @@ function App() {
           }
         />
         <Route
+          path="/governance/demo/consent"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernanceConsentPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
+        <Route
           path="/governance/agenda"
           element={
             <PatientRoleBlocker>
               <ClinicianRoleBlocker>
                 <GovernanceProtectedRoute>
                   <GovernanceAgendaPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
+        <Route
+          path="/governance/agenda-26"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernanceAgenda26Page />
                 </GovernanceProtectedRoute>
               </ClinicianRoleBlocker>
             </PatientRoleBlocker>
@@ -774,15 +800,26 @@ function getAssistantAgentConfig(pathname: string, user: PatientAuthUser | null)
   }
 
   // Doctor portal — Patient Record page (route carries the patient id) + fixed routes.
-  const doctorAgent =
-    pathname.startsWith('/staff/patient/')
-      ? { key: 'identity', label: 'Identity Verification Agent', scope: 'verify patient identity', pageName: 'Patient Record' }
-      : DOCTOR_PAGE_AGENTS[pathname]
+  const isPatientRecord = pathname.startsWith('/staff/patient/')
+  const doctorAgent = isPatientRecord
+    ? { key: 'identity', label: 'Identity Verification Agent', scope: 'verify patient identity', pageName: 'Patient Record' }
+    : DOCTOR_PAGE_AGENTS[pathname]
   if (doctorAgent) {
+    // On the Patient Record page, bind the scoped read to the record on screen.
+    // The route's :id is a lookup value (name / email / patient id), so pass it as
+    // the resolver query — the backend matches it LIKE name/email/patient_id — so
+    // the assistant answers about the patient the clinician is viewing rather than
+    // a representative one. The "search" placeholder (no patient chosen yet) falls
+    // back to the representative patient.
+    let patientLookup: string | undefined
+    if (isPatientRecord) {
+      const raw = decodeURIComponent(pathname.split('/staff/patient/')[1]?.split('/')[0] || '').trim()
+      patientLookup = raw && raw.toLowerCase() !== 'search' ? raw : undefined
+    }
     return {
       agentSysId: BOOK_APPOINTMENT_AGENT_ID,
       pageName: doctorAgent.pageName,
-      identity: { key: doctorAgent.key, label: doctorAgent.label, scope: doctorAgent.scope },
+      identity: { key: doctorAgent.key, label: doctorAgent.label, scope: doctorAgent.scope, patientEmail: patientLookup },
     }
   }
 

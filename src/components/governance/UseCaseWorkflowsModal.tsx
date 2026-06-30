@@ -293,7 +293,7 @@ const FLOW_UC2 = flow([
 ])
 
 // ---------------------------------------------------------------------------
-// UC3 · Regulation — EU AI Act conformity + FRIA (EU AI Act)
+// UC3 · Regulation — NIST AI RMF conformance + AI Impact Assessment
 // ---------------------------------------------------------------------------
 const FLOW_UC3 = flow([
   {
@@ -315,10 +315,10 @@ const FLOW_UC3 = flow([
     badge: 'Assess',
     actor: 'Risk & Compliance Mgr',
     actorIcon: 'shield',
-    record: 'EU AI Act Conformity',
+    record: 'NIST AI RMF Conformance',
     recordIcon: 'scale',
     icon: 'clipboard',
-    desc: 'Publish + run the delivered EU AI Act conformity template; answer the Use & Purpose questionnaire.',
+    desc: 'Publish + run the delivered NIST AI RMF conformance template; answer the Use & Purpose questionnaire.',
   },
   {
     col: 3,
@@ -330,19 +330,19 @@ const FLOW_UC3 = flow([
     record: 'High / Medium / Low',
     recordIcon: 'gauge',
     icon: 'shieldAlert',
-    desc: 'The Risk Assessment Methodology computes the EU AI Act risk tier from the answers — the platform, not a consultant.',
+    desc: 'The Risk Assessment Methodology computes the NIST AI RMF risk tier from the answers — the platform, not a consultant.',
   },
   {
     col: 4,
-    title: 'FRIA generated',
+    title: 'AI Impact Assessment generated',
     stage: 'assess',
     badge: 'Assess',
     actor: 'Risk & Compliance Mgr',
     actorIcon: 'shield',
-    record: 'Fundamental Rights IA',
+    record: 'AI Impact Assessment',
     recordIcon: 'fileSearch',
     icon: 'fileSearch',
-    desc: 'If High-risk, the Fundamental Rights Impact Assessment is generated as the evidence behind the classification.',
+    desc: 'If High-risk, the AI Impact Assessment is generated as the evidence behind the classification.',
   },
   {
     col: 5,
@@ -366,7 +366,7 @@ const FLOW_UC3 = flow([
     record: 'Read-only classification badge',
     recordIcon: 'badge',
     icon: 'checkCircle',
-    desc: 'The portal shows the EU AI Act tier + FRIA status — a full regulatory audit trail on the record, on demand.',
+    desc: 'The portal shows the NIST AI RMF tier + AI Impact Assessment status — a full regulatory audit trail on the record, on demand.',
   },
 ])
 
@@ -449,7 +449,7 @@ const FLOW_UC5 = flow([
 ])
 
 // ---------------------------------------------------------------------------
-// UC6 · Fairness — Non-Discriminatory Scheduling (EU AI Act Art. 10)
+// UC6 · Fairness — Non-Discriminatory Scheduling (NIST AI RMF · Harmful Bias)
 // ---------------------------------------------------------------------------
 const FLOW_UC6 = flow([
   {
@@ -498,7 +498,7 @@ const FLOW_UC6 = flow([
     record: 'Fairness control attested',
     recordIcon: 'clipboardCheck',
     icon: 'shieldCheck',
-    desc: 'Define + attest the control: "scheduling outcomes monitored for demographic skew" (EU AI Act Art. 10 evidence).',
+    desc: 'Define + attest the control: "scheduling outcomes monitored for demographic skew" (NIST AI RMF Harmful-Bias evidence).',
   },
   {
     col: 5,
@@ -523,6 +523,84 @@ const FLOW_UC6 = flow([
     recordIcon: 'siren',
     icon: 'checkCircle',
     desc: 'The platform flags the moment outcomes skew — fairness measured continuously, not once a year.',
+  },
+])
+
+// ---------------------------------------------------------------------------
+// UC10 · Consent & Purpose-of-Use Enforcement (code id: UC11 / ConsentGate)
+// ---------------------------------------------------------------------------
+const FLOW_UC10 = flow([
+  {
+    col: 1,
+    title: 'Patient declares consent',
+    stage: 'intake',
+    badge: 'Intake',
+    actor: 'Patient',
+    actorIcon: 'userCheck',
+    record: 'u_patient.u_consent_flags',
+    recordIcon: 'users',
+    icon: 'scan',
+    desc: 'At registration / in their profile the patient picks which AI purposes they allow; saved to u_consent_flags (+ u_consent_accepted).',
+  },
+  {
+    col: 2,
+    title: 'Map agent → purpose',
+    stage: 'assess',
+    badge: 'Assess',
+    actor: 'AI Steward',
+    actorIcon: 'userCog',
+    record: 'purpose vocabulary',
+    recordIcon: 'listChecks',
+    icon: 'fileSearch',
+    desc: 'Each agent is bound to a required purpose: scheduling, notes_summarisation, reminders, triage.',
+  },
+  {
+    col: 3,
+    title: 'ConsentGate checks purpose',
+    stage: 'enforce',
+    badge: 'Enforce',
+    actor: 'System · ConsentGate',
+    actorIcon: 'cpu',
+    record: 'u_consent_flags',
+    recordIcon: 'shieldCheck',
+    icon: 'shieldCheck',
+    desc: 'Before any agent reads a patient record, ConsentGate checks that the patient consented to that agent’s purpose.',
+  },
+  {
+    col: 4,
+    title: 'Block if not consented',
+    stage: 'enforce',
+    badge: 'Enforce',
+    actor: 'ConsentGate',
+    actorIcon: 'shield',
+    record: 'access denied',
+    recordIcon: 'lock',
+    icon: 'lock',
+    desc: 'Missing flag → the agent is blocked and no patient data is accessed — purpose-level, beyond table/field ACLs.',
+  },
+  {
+    col: 5,
+    title: 'Violation logged',
+    stage: 'monitor',
+    badge: 'Monitor',
+    actor: 'System',
+    actorIcon: 'cpu',
+    record: 'sn_si_incident · consent_purpose_violation',
+    recordIcon: 'siren',
+    icon: 'checkCircle',
+    desc: 'A purpose breach opens a SecOps incident (category=consent_purpose_violation) — auditable proof, surfaced on the governance dashboard.',
+  },
+  {
+    col: 6,
+    title: 'Patient can revoke anytime',
+    stage: 'monitor',
+    badge: 'Monitor',
+    actor: 'Patient',
+    actorIcon: 'userCheck',
+    record: 'ProfilePage consent toggles',
+    recordIcon: 'eye',
+    icon: 'activity',
+    desc: 'The patient can change or revoke any purpose at any time in their profile; enforcement reflects the new consent immediately.',
   },
 ])
 
@@ -562,9 +640,9 @@ const TABS: Tab[] = [
     key: 'uc3',
     num: '3',
     short: 'Regulation',
-    category: 'Regulation · EU AI Act',
-    heading: 'UC3 · Regulation — EU AI Act Conformity + FRIA',
-    sub: 'The platform classifies each agent’s EU AI Act risk tier and generates the fundamental-rights evidence.',
+    category: 'Regulation · NIST AI RMF',
+    heading: 'UC3 · Regulation — NIST AI RMF Conformance + AI Impact Assessment',
+    sub: 'The platform classifies each agent’s NIST AI RMF risk tier and generates the AI Impact Assessment evidence.',
     flow: FLOW_UC3,
   },
   {
@@ -580,10 +658,19 @@ const TABS: Tab[] = [
     key: 'uc6',
     num: '6',
     short: 'Fairness',
-    category: 'Fairness · EU AI Act Art. 10',
+    category: 'Fairness · NIST AI RMF (Harmful Bias)',
     heading: 'UC6 · Fairness — Non-Discriminatory Scheduling',
     sub: 'Measure appointment fairness across gender, age and ethnicity continuously — and alarm the moment it skews.',
     flow: FLOW_UC6,
+  },
+  {
+    key: 'uc10',
+    num: '10',
+    short: 'Consent',
+    category: 'Consent & Purpose · HIPAA',
+    heading: 'UC10 · Consent — Purpose-of-Use Enforcement',
+    sub: 'The AI only processes a patient’s data for the purposes that patient explicitly agreed to — purpose-level, not just table access.',
+    flow: FLOW_UC10,
   },
 ]
 

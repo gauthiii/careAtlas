@@ -82,6 +82,11 @@ from .models import (
     SummaryNoteUpdateRequest,
     ValidateRequest,
     ValidateResponse,
+    ConsentFlagsRequest,
+    ConsentFlagsResponse,
+    ConsentViolationsResponse,
+    FairnessRemediationResponse,
+    FairnessIncidentsResponse,
 )
 from .notifications import fetch_notifications, mark_notification_read
 from .pwned_passwords import PwnedPasswordsError, check_pwned_password
@@ -92,6 +97,8 @@ from .servicenow import (
     SummaryNoteAppointmentNotFoundError,
     create_agent,
     fetch_fairness_outcomes,
+    fetch_fairness_incidents,
+    raise_fairness_remediation_incident,
     create_clinician_appointment,
     create_doctor,
     create_guardrail_audit_log,
@@ -128,6 +135,9 @@ from .servicenow import (
     validate_user,
     guardrail_scan,
     fetch_security_kpis,
+    fetch_consent_flags,
+    update_consent_flags,
+    fetch_consent_violations,
 )
 
 logging.basicConfig(
@@ -683,6 +693,35 @@ async def get_governance_fairness(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
+@api.post("/governance/fairness/remediation", response_model=FairnessRemediationResponse)
+async def post_fairness_remediation(
+    settings: Settings = Depends(get_settings),
+) -> FairnessRemediationResponse:
+    """UC6 Fairness — raise a remediation incident for the scheduling skew.
+
+    Opens an sn_si_incident (category=fairness_bias_alert) documenting the
+    controlled human-workflow response to the detected 13.1pp demographic skew.
+    This is the platform boundary: AIRC detects and governs; remediation is manual.
+    """
+    try:
+        result = await raise_fairness_remediation_incident(settings)
+        return FairnessRemediationResponse(**result)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/fairness/incidents", response_model=FairnessIncidentsResponse)
+async def get_fairness_incidents(
+    settings: Settings = Depends(get_settings),
+) -> FairnessIncidentsResponse:
+    """UC6 Fairness — fetch fairness bias alert incidents from ServiceNow."""
+    try:
+        result = await fetch_fairness_incidents(settings)
+        return FairnessIncidentsResponse(**result)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 @api.get("/governance/privacy/patient-lookup", response_model=PatientAccessComparison)
 async def get_privacy_patient_lookup(
     q: str | None = None,
@@ -923,5 +962,51 @@ def create_app() -> FastAPI:
     app.include_router(aws_auth_router)
     return app
 
+# ── UC11 Consent endpoints ────────────────────────────────────────────────────
+
+@api.get("/patient/consent-flags", response_model=ConsentFlagsResponse)
+async def get_consent_flags(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> ConsentFlagsResponse:
+    username = request.headers.get("X-Username", "")
+    if not username:
+        raise HTTPException(status_code=400, detail="X-Username header required")
+    try:
+        result = await fetch_consent_flags(username, settings)
+        return ConsentFlagsResponse(**result)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.post("/patient/consent-flags")
+async def post_consent_flags(
+    body: ConsentFlagsRequest,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    username = request.headers.get("X-Username", "")
+    if not username:
+        raise HTTPException(status_code=400, detail="X-Username header required")
+    try:
+        ok = await update_consent_flags(username, body.flags, settings)
+        if not ok:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        return {"success": True}
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@api.get("/governance/consent-violations", response_model=ConsentViolationsResponse)
+async def get_consent_violations(
+    settings: Settings = Depends(get_settings),
+) -> ConsentViolationsResponse:
+    try:
+        result = await fetch_consent_violations(settings)
+        return ConsentViolationsResponse(**result)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
 
 app = create_app()
+

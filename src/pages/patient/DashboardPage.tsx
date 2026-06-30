@@ -23,7 +23,7 @@ import {
   formatTime,
 } from '../../lib/scheduling'
 import { dashboardActions } from '../../data/patientPortalData'
-import { AiRedactionComparisonCard } from '../../components/governance/AiRedactionComparisonCard'
+import { ContextualPrivacyBeforeAfter } from '../../components/governance/ContextualPrivacyBeforeAfter'
 
 // Demo-only data: there is no ServiceNow table for medications, so these stay static.
 const medications = [
@@ -345,10 +345,8 @@ export function DashboardPage() {
 
       {profile?.sys_id && (
         <section className="mt-4">
-          <AiRedactionComparisonCard
-            lookup={{ sysId: profile.sys_id }}
-            title="What our AI agents can see about you"
-            intro="UC1 · Privacy — you and your care team see your full record; our AI scheduling agent cannot read your personal identifiers."
+          <ContextualPrivacyBeforeAfter
+            profile={profile}
             fullLabel="You & your care team"
             agentLabel="Our AI scheduling agent"
           />

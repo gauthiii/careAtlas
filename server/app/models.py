@@ -760,3 +760,40 @@ class SecurityKpisResponse(BaseModel):
     injection_output_patterns: int
     automation_rules_active: int
     recent_cases: list[dict]
+class ConsentFlagsResponse(BaseModel):
+    flags: list[str] = []
+    consent_accepted: bool = False
+    flags_set: bool = False
+
+
+class ConsentFlagsRequest(BaseModel):
+    flags: list[str] = []
+
+
+class ConsentViolationEntry(BaseModel):
+    number: str = ""
+    opened_at: str = ""
+    short_description: str = ""
+
+
+class ConsentViolationsResponse(BaseModel):
+    count_30_days: int = 0
+    recent: list[ConsentViolationEntry] = []
+
+
+class FairnessRemediationResponse(BaseModel):
+    """UC6 Fairness — response from raising a remediation incident."""
+
+    number: str
+    sys_id: str
+
+
+class FairnessIncidentEntry(BaseModel):
+    number: str = ""
+    opened_at: str = ""
+    short_description: str = ""
+
+
+class FairnessIncidentsResponse(BaseModel):
+    count_30_days: int = 0
+    recent: list[FairnessIncidentEntry] = []

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { ArrowRight, Bot, CalendarDays, ExternalLink, Hospital, HeartPulse, TowerControl, Users, ScanSearch, ShieldAlert, Scale, Radar, Activity } from 'lucide-react'
+import { ArrowRight, Bot, CalendarDays, ExternalLink, Hospital, HeartPulse, TowerControl, Users, ScanSearch, ShieldAlert, Scale, Radar, Activity, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { PortalPage } from '../../components/portal/PortalShell'
@@ -124,9 +124,9 @@ export function GovernanceDemoPage() {
         {/* Focus Five — Individual Use-Case Pages */}
         <div className="mt-10">
           <div className="mb-4">
-            <h2 className="m-0 text-lg font-bold text-[#102033]">Focus Five — Use Cases</h2>
+            <h2 className="m-0 text-lg font-bold text-[#102033]">Governance Use Cases</h2>
             <p className="m-0 mt-0.5 text-sm leading-snug text-[#53687b]">
-              Explore the five core governance use cases. Each page contains its animated workflow and interactive guardrail demo.
+              Explore the core governance use cases. Each page contains its animated workflow and interactive guardrail demo. Consent &amp; Purpose opens its workflow inline.
             </p>
           </div>
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -157,7 +157,7 @@ export function GovernanceDemoPage() {
                 </span>
                 <span className="text-base font-bold text-[#102033]">Regulation</span>
               </div>
-              <p className="text-sm text-[#53687b] flex-1">EU AI Act Conformity + FRIA</p>
+              <p className="text-sm text-[#53687b] flex-1">NIST AI RMF Conformance + AI Impact Assessment</p>
             </Link>
 
             <Link to="/governance/demo/security" className="group flex flex-col rounded-xl border border-[#cfe0ea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#143A57]">
@@ -177,7 +177,18 @@ export function GovernanceDemoPage() {
                 </span>
                 <span className="text-base font-bold text-[#102033]">Fairness</span>
               </div>
-              <p className="text-sm text-[#53687b] flex-1">Non-Discriminatory Scheduling (EU AI Act Art. 10)</p>
+              <p className="text-sm text-[#53687b] flex-1">Non-Discriminatory Scheduling (NIST AI RMF · Harmful Bias)</p>
+            </Link>
+
+            {/* Consent & Purpose — dedicated page (workflow modal + incidents table live there) */}
+            <Link to="/governance/demo/consent" className="group flex flex-col rounded-xl border border-[#cfe0ea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#143A57]">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-[#e7f3f8] text-[#0f5f8c]">
+                  <ShieldCheck size={20} />
+                </span>
+                <span className="text-base font-bold text-[#102033]">Consent &amp; Purpose</span>
+              </div>
+              <p className="text-sm text-[#53687b] flex-1">Consent &amp; Purpose-of-Use Enforcement — the AI only sees what you said it could</p>
             </Link>
           </div>
         </div>
