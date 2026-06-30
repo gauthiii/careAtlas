@@ -1,8 +1,17 @@
 # CareAtlas — Master README, Audit & Demo Playbook
 
-**Last updated: 2026-06-28** · Single source of truth for the whole project.
+**Last updated: 2026-06-30** · Single source of truth for the whole project.
 
-> **What's new (2026-06-28):** **4-step "before / after" storytelling added to all 6 demo pages.**
+> **What's new (2026-06-30):** **UC13 — AI Output Integrity & Hallucination Detection** added.
+> A semantic validation layer (`scanHallucination`) sits between the NowAssist LLM call and the
+> scheduling scoring function. Every LLM output is checked against the original patient input
+> (5 rules: malformed JSON, missing fields, urgency escalation, high-acuity specialty fabrication,
+> specialty mismatch). Fabricated outputs are blocked or held; events are immutably logged to
+> `u_hallucination_log` via `POST /governance/hallucination/flag`. A UC13 KPI tile (scanned /
+> blocked / held / pass-rate, live from `u_hallucination_log`) now appears on the Governance
+> Dashboard. References: OWASP LLM09:2025 · EU AI Act Article 15 · NIST AI RMF Measure 2.7.
+>
+> **(2026-06-28):** **4-step "before / after" storytelling added to all 6 demo pages.**
 > A reusable `BeforeAfterDemo` component (process strip → risk cards → control bar → ②Before/④After
 > toggle, matching Tanush's `Sample_AI_Use_Case_Process_Flows.pdf`) now wraps each
 > `/governance/demo/*` page. The **"before"** pane is an interactive `SimChat` console — the user
@@ -101,6 +110,7 @@ These are **real row counts** returned by `ven04690` today (read‑only `curl` w
 | `sn_mcp_server` / `sn_mcp_server_registry` | 1 / 2 | UC9 — MCP kill‑switch target |
 | `u_patient.u_consent_flags` (+ `u_consent_accepted`) | populated | UC10 — per‑patient AI‑purpose consent |
 | `sn_si_incident` (`category=consent_purpose_violation`) | 1 (grows as the gate fires) | UC10 — consent‑violation incidents |
+| `u_hallucination_log` | grows with each flagged scan | UC13 — immutable AI output integrity log |
 
 **The target AI system for UC3, `Triage Appointment DG1`** (`sn_grc_ai_gov_ai_system`
 sys_id `cdf56dc91bd14b14d7eaea45604bcb6e`) is now **classified High‑risk** with 3
@@ -281,7 +291,8 @@ lets you enter any portal for demos without real credentials.
 `/governance/sign-in`, `/governance`, `/governance/ai-agents`, `/governance/acl`,
 `/governance/demo`, `/governance/demo/privacy` (UC1), `/governance/demo/risk` (UC2),
 `/governance/demo/regulation` (UC3), `/governance/demo/security` (UC5),
-`/governance/demo/fairness` (UC6), `/governance/demo/consent` (UC10), `/governance/agenda`,
+`/governance/demo/fairness` (UC6), `/governance/demo/consent` (UC10),
+`/governance/demo/hallucination` (UC13), `/governance/agenda`,
 `/governance/additional-work`, `/governance/llm02-audit`. Fallback `*` → `/`.
 
 ### 7.4 Key governance components (`src/components/governance/`)
@@ -295,6 +306,7 @@ lets you enter any portal for demos without real credentials.
 - `RegulatoryClassificationBadge.tsx` — **UC3** risk tier badge (renders `Unverified` on
   missing live data — never guesses).
 - `InjectionTesterDemo.tsx` — **UC5** prompt‑injection tester.
+- `HallucinationDetectionDemo.tsx` — **UC13** semantic scan widget; embedded on the Demo Hub (`/governance/demo`). Calls `scanHallucination` (client-side, 5 rules) then optionally `flagHallucinationEvent` to write a real `u_hallucination_log` record.
 - `FairnessDebiasDemo.tsx` / `SchedulingAgentCompareModal.tsx` — **UC6** fairness/debias.
 - `ConsentEnforcementPanel.tsx` — **UC10** "Patient Consent Enforcement" panel, shared by the governance dashboard and the consent demo page. The `UseCaseWorkflowsModal` also has a `uc10` tab.
 - `ShadowAiWorkflowModal.tsx` — **UC8** shadow‑AI discovery animation.
@@ -311,6 +323,7 @@ approval gate and guardrail scan per page), `NotificationBell.tsx`, `Notificatio
   `submitApprovalIntent` / `decideApproval` / `fetchApprovalLog` (UC2),
   `fetchRegulatoryEvidence` / `fetchRegulatoryAiSystems` (UC3),
   `scanGuardrailApi` / `fetchSecurityKpis` (UC5), `fetchFairnessData` (UC6),
+  `flagHallucinationEvent` / `fetchHallucinationLog` / `fetchHallucinationStats` (UC13),
   `fetchAclSummary` / `testServiceAccountAcl` (UC2), plus all patient/booking/notes/notification calls.
 - `awsAuth.ts` — Cognito auth calls (`/api/aws/*`).
 
@@ -395,6 +408,13 @@ All under prefix `/api`. Full interactive list at `/docs` when running.
 
 > **Runtime ConsentGate:** `ask_scoped_agent` (`/governance/agent/ask`) checks the patient's `u_consent_flags` for the agent's purpose **before** reading; on a miss it blocks (reads nothing) and opens a `consent_purpose_violation` incident. Identity‑verification is exempt; behaviour is fail‑closed.
 
+### AI Output Integrity (**UC13**)
+| Method | Path | Does | ServiceNow |
+|---|---|---|---|
+| POST | `/governance/hallucination/flag` | Log one flagged LLM output event (immutable insert) | `u_hallucination_log` |
+| GET | `/governance/hallucination/log` | Fetch recent hallucination log entries, newest first | `u_hallucination_log` |
+| GET | `/governance/hallucination/stats` | Aggregate blocked / held / passed counts for last 30 days | `u_hallucination_log` |
+
 ### ACL posture (**UC2**)
 | Method | Path | Does |
 |---|---|---|
@@ -435,6 +455,7 @@ All under prefix `/api`. Full interactive list at `/docs` when running.
 `sn_ai_case_mgmt_ai_case`, content filters, `sys_security_acl`, `sys_user`.
 **Consent (UC10):** `u_patient.u_consent_flags` / `u_consent_accepted` / `u_consent_accepted_on`;
 `sn_si_incident` (`category=consent_purpose_violation`).
+**AI Output Integrity (UC13):** `u_hallucination_log` (immutable insert on every flagged LLM output).
 
 ### 10.2 The `svc-*` service accounts (UC2)
 11 `svc-*` accounts exist; UC2 governs **9**: `svc-identity-verification-agent`,
@@ -532,6 +553,23 @@ split. **App:** `GET /agents/managed`, `GET /agents/unmanaged`, hook
 Control Tower Pro Plus** entitlement for the pause/resume control to surface — entitlement
 to confirm. Operated in ServiceNow; the app can optionally show a status badge.
 
+### UC13 — AI Output Integrity & Hallucination Detection (OWASP LLM09) · ✅ (added 2026‑06‑30)
+**Proves:** every LLM output is semantically validated against the original patient input before
+it reaches scheduling logic. Fabricated urgency levels, hallucinated specialties, and malformed
+JSON are caught, blocked or held, and logged immutably. **Five rules** checked on every response:
+Malformed JSON (score 0.90 → blocked), Urgency escalation without input evidence (0.82 → held),
+High-acuity specialty fabricated (0.80 → held), Missing required fields (0.75 → held), Specialty
+mismatch (0.55 → held). Threshold ≥0.85 = blocked; ≥0.60 = held for human review; <0.60 = passed.
+**App:** dedicated page `/governance/demo/hallucination` with BeforeAfterDemo arc (3 before
+samples, live after panel = `HallucinationDetectorDemo`) + immutable log table
+(`fetchHallucinationLog` → `u_hallucination_log`, 25 most-recent rows, refreshes after each
+"Log to ServiceNow" click); UC13 KPI tile on `/governance` dashboard (scanned / blocked / held /
+pass-rate, last 30 days). Link card on Demo Hub (`/governance/demo`).
+**Backend:** `POST /governance/hallucination/flag`, `GET /governance/hallucination/log`,
+`GET /governance/hallucination/stats`; all three write/read `u_hallucination_log`.
+**Workflow modal:** `UseCaseWorkflowsModal` tab `uc13` — 6-node animated flow
+(Intake → Assess → Enforce·Scan → Enforce·Action → Enforce·Audit → Monitor).
+
 ### UC10 — Consent & Purpose-of-Use Enforcement · ✅ (added 2026‑06‑26)
 **Proves:** the AI only processes a patient's data for the purposes that patient explicitly
 agreed to — purpose‑level, beyond table/field ACLs. Every patient sets allowed purposes
@@ -564,6 +602,7 @@ consent page).
 | UC8 Visibility | `/agents`, `/agents/managed`, `/agents/unmanaged` | `/governance/ai-agents` | `sn_aia_agent`, `alm_ai_system_digital_asset` |
 | UC9 Operational Control | (ServiceNow MCP pause/resume) | optional badge | `sn_mcp_server` |
 | UC10 Consent & Purpose | `/patient/consent-flags`, `/governance/consent-violations`, gate in `/governance/agent/ask` | `/governance/demo/consent` (+ `ProfilePage`) | `u_patient.u_consent_flags`, `sn_si_incident` |
+| UC13 AI Output Integrity | `/governance/hallucination/flag`, `/governance/hallucination/log`, `/governance/hallucination/stats` | `/governance/demo/hallucination` (dedicated page) + `/governance` (dashboard KPI tile) | `u_hallucination_log` |
 
 ---
 
