@@ -21,7 +21,7 @@ import {
 } from '../../components/portal/PortalShell'
 import { governanceDisplayName, useGovernanceAuth } from '../../contexts/GovernanceAuthContext'
 import { useUnmanagedAISystems } from '../../hooks/useUnmanagedAISystems'
-import { fetchAiDecisionLog, fetchFairnessData, fetchSecurityKpis, type AiDecisionLogEntry, type FairnessData, type FairnessGroupItem, type SecurityKpis } from '../../services/serviceNow'
+import { fetchAiDecisionLog, fetchFairnessData, fetchSecurityKpis, fetchHallucinationStats, type AiDecisionLogEntry, type FairnessData, type FairnessGroupItem, type SecurityKpis, type HallucinationStats } from '../../services/serviceNow'
 import { PrivacyControlsPanel } from '../../components/governance/PrivacyControlsPanel'
 import { ConsentEnforcementPanel } from '../../components/governance/ConsentEnforcementPanel'
 import { RegulatoryClassificationBadge } from '../../components/governance/RegulatoryClassificationBadge'
@@ -55,6 +55,7 @@ export function GovernanceDashboardPage() {
   const [logRefreshKey, setLogRefreshKey] = useState(0)
   const [fairness, setFairness] = useState<FairnessData | null>(null)
   const [securityKpis, setSecurityKpis] = useState<SecurityKpis | null>(null)
+  const [hallucinationStats, setHallucinationStats] = useState<HallucinationStats | null>(null)
 
   useEffect(() => {
     let active = true
@@ -81,6 +82,9 @@ export function GovernanceDashboardPage() {
       .catch(() => {/* silently keep null — fallback rendering handles it */})
     fetchSecurityKpis()
       .then(setSecurityKpis)
+      .catch(() => {/* silently keep null */})
+    fetchHallucinationStats()
+      .then(setHallucinationStats)
       .catch(() => {/* silently keep null */})
   }, [logRefreshKey])
 
@@ -400,6 +404,38 @@ export function GovernanceDashboardPage() {
           <PrivacyControlsPanel />
            {/* CONSENT ENFORCEMENT — UC10 (shared component, also on /governance/demo/consent) */}
           <ConsentEnforcementPanel />
+
+          {/* AI OUTPUT INTEGRITY — UC13 (hallucination detection stats) */}
+          <PortalPanel title="AI Output Integrity (UC13)" icon={<ShieldCheck size={18} />}>
+            {hallucinationStats == null ? (
+              <div className="py-4 text-center text-sm text-[#53687b]">Loading…</div>
+            ) : (
+              <>
+                <div className="mb-3 grid grid-cols-4 gap-3">
+                  <div className="rounded-lg border border-[#d7e5ec] bg-[#f4f8fb] p-3 text-center">
+                    <div className="text-xl font-bold text-[#143A57]">{hallucinationStats.total}</div>
+                    <div className="text-[10px] font-semibold uppercase text-[#53687b]">Scanned</div>
+                  </div>
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-center">
+                    <div className="text-xl font-bold text-[#a22828]">{hallucinationStats.blocked}</div>
+                    <div className="text-[10px] font-semibold uppercase text-[#53687b]">Blocked</div>
+                  </div>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
+                    <div className="text-xl font-bold text-amber-700">{hallucinationStats.held}</div>
+                    <div className="text-[10px] font-semibold uppercase text-[#53687b]">Held</div>
+                  </div>
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-center">
+                    <div className="text-xl font-bold text-[#0f6b4f]">{hallucinationStats.pass_rate}%</div>
+                    <div className="text-[10px] font-semibold uppercase text-[#53687b]">Pass rate</div>
+                  </div>
+                </div>
+                <div className="text-[10px] text-[#6b7c8f]">
+                  Last 30 days · live from <span className="font-mono">u_hallucination_log</span> · OWASP LLM09:2025
+                </div>
+              </>
+            )}
+          </PortalPanel>
+
           {/* SHADOW AI */}
           <PortalPanel
             title="Shadow AI Detection"

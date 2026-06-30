@@ -9,7 +9,7 @@ import {
 import { flagHallucinationEvent } from '../../services/serviceNow'
 import { DemoTag } from './DemoTag'
 
-export function HallucinationDetectorDemo() {
+export function HallucinationDetectorDemo({ onFlagged }: { onFlagged?: () => void } = {}) {
   const [selectedPreset, setSelectedPreset] = useState(0)
   const [customInput, setCustomInput] = useState(HALLUCINATION_PRESETS[0].input)
   const [customOutput, setCustomOutput] = useState(HALLUCINATION_PRESETS[0].llmOutput)
@@ -50,6 +50,7 @@ export function HallucinationDetectorDemo() {
         action_taken: result.verdict,
       })
       setLogged(true)
+      onFlagged?.()
     } catch (err) {
       console.error('Hallucination log failed:', err)
     }
