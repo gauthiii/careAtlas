@@ -8,6 +8,7 @@ logic that used to live in the frontend `serviceNow.ts` plus the Vite proxy.
 import asyncio
 import logging
 import time
+import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Literal, NoReturn
@@ -4356,24 +4357,36 @@ CONSENT_FLAGS_FIELDS = [
     "u_email",
 ]
 
-
 async def fetch_consent_flags(username: str, settings: Settings) -> dict:
-    """Read consent flags for a patient looked up by username or email."""
+    """Read consent flags for a patient looked up by sys_id or username."""
     auth = (settings.snow_username, settings.snow_password)
     base = settings.snow_base_url
 
     async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
-        # Try username first
+        # Try sys_id first (direct lookup)
         resp = await client.get(
             f"{base}/api/now/table/u_patient",
             auth=auth,
             params={
-                "sysparm_query": f"u_username={username}",
+                "sysparm_query": f"sys_id={username}",
                 "sysparm_fields": ",".join(CONSENT_FLAGS_FIELDS),
                 "sysparm_limit": 1,
             },
         )
         results = resp.json().get("result", [])
+
+        # Fall back to username
+        if not results:
+            resp = await client.get(
+                f"{base}/api/now/table/u_patient",
+                auth=auth,
+                params={
+                    "sysparm_query": f"u_username={username}",
+                    "sysparm_fields": ",".join(CONSENT_FLAGS_FIELDS),
+                    "sysparm_limit": 1,
+                },
+            )
+            results = resp.json().get("result", [])
 
         # Fall back to email
         if not results:
@@ -4404,7 +4417,7 @@ async def fetch_consent_flags(username: str, settings: Settings) -> dict:
 async def update_consent_flags(
     username: str, flags: list[str], settings: Settings
 ) -> bool:
-    """Write consent flags for a patient looked up by username."""
+    """Write consent flags for a patient looked up by sys_id or username."""
     auth = (settings.snow_username, settings.snow_password)
     base = settings.snow_base_url
 
@@ -4415,7 +4428,7 @@ async def update_consent_flags(
             f"{base}/api/now/table/u_patient",
             auth=auth,
             params={
-                "sysparm_query": f"u_username={username}",
+                "sysparm_query": f"sys_id={username}",
                 "sysparm_fields": "sys_id",
                 "sysparm_limit": 1,
             },
@@ -4547,3 +4560,184 @@ async def fetch_consent_violations(settings: Settings) -> dict:
                 for r in recent
             ],
         }
+
+# ── UC13 Hallucination Log ────────────────────────────────────────
+
+HALLUCINATION_LOG_TABLE = "u_hallucination_log"
+
+async def sn_create_hallucination_log(settings: Settings, payload: dict) -> dict:
+    """Insert one record into u_hallucination_log (immutable after insert)."""
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        resp = await client.post(
+            f"{base}/api/now/table/{HALLUCINATION_LOG_TABLE}",
+            auth=auth,
+            json=payload,
+        )
+        resp.raise_for_status()
+        return resp.json().get("result", {})
+
+
+async def sn_fetch_hallucination_log(settings: Settings, limit: int = 25) -> list[dict]:
+    """Fetch recent hallucination log entries, newest first."""
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        resp = await client.get(
+            f"{base}/api/now/table/{HALLUCINATION_LOG_TABLE}",
+            auth=auth,
+            params={
+                "sysparm_limit": limit,
+                "sysparm_orderby": "u_timestamp^DESC",
+                "sysparm_fields": (
+                    "sys_id,u_log_id,u_timestamp,u_original_input,u_llm_raw_output,"
+                    "u_consistency_score,u_urgency_input,u_urgency_claimed,"
+                    "u_specialty_input,u_specialty_claimed,u_matched_patterns,"
+                    "u_action_taken,u_hold_resolved_by,u_patient_id_anon"
+                ),
+            },
+        )
+        resp.raise_for_status()
+        return resp.json().get("result", [])
+
+
+async def sn_fetch_hallucination_stats(settings: Settings) -> dict:
+    """Aggregate counts from u_hallucination_log for the last 30 days."""
+    auth = (settings.snow_username, settings.snow_password)
+    base = settings.snow_base_url
+    async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+        resp = await client.get(
+            f"{base}/api/now/table/{HALLUCINATION_LOG_TABLE}",
+            auth=auth,
+            params={
+                "sysparm_limit": 1000,
+                "sysparm_fields": "u_action_taken",
+                "sysparm_query": "u_timestamp>=javascript:gs.daysAgoStart(30)",
+            },
+        )
+        resp.raise_for_status()
+        rows = resp.json().get("result", [])
+        total = len(rows)
+        held = sum(1 for r in rows if r.get("u_action_taken") == "held")
+        blocked = sum(1 for r in rows if r.get("u_action_taken") == "blocked")
+        passed = sum(1 for r in rows if r.get("u_action_taken") == "passed")
+        return {
+            "total": total,
+            "held": held,
+            "blocked": blocked,
+            "passed": passed,
+            "pass_rate": round((passed / total * 100) if total > 0 else 100, 1),
+        }
+
+# ── UC13 Live Hallucination Check (real agent + real rules) ───────────────
+
+_HIGH_ACUITY_SPECIALTIES = ["oncology", "neurosurgery", "cardiothoracic", "transplant"]
+_URGENCY_KEYWORDS = re.compile(r"pain|urgent|severe|emergency|worried|scared|chest|breathing|collapse", re.I)
+
+_SPECIALTY_MAP = {
+    "general_checkup": "general_practice",
+    "follow_up": "general_practice",
+    "urgent": "general_practice",
+    "mental_health": "mental_health",
+    "chronic": "general_practice",
+    "specialist": "specialist",
+}
+
+
+def _infer_urgency(reason_text: str, reason_category: str) -> str:
+    lower = reason_text.lower()
+    if re.search(r"chest pain|can't breathe|breathing|severe|emergency|collapse", lower):
+        return "high"
+    if reason_category == "urgent":
+        return "high"
+    if reason_category in ("chronic", "mental_health"):
+        return "medium"
+    return "low"
+
+
+def run_hallucination_rules(reason_text: str, agent_output: str, reason_category: str) -> dict:
+    """Port of the ServiceNow HallucinationDetector Script Include's 5 rules,
+    run in Python against a real agent's real response text."""
+    rules: list[dict] = []
+    score = 0.0
+
+    expected_urgency = _infer_urgency(reason_text, reason_category)
+    expected_specialty = _SPECIALTY_MAP.get(reason_category, "general_practice")
+
+    output_lower = agent_output.lower()
+    claimed_urgency = "high" if re.search(r"\burgent\b|\bcritical\b|\bemergency\b", output_lower) else (
+        "medium" if re.search(r"\bsoon\b|\bmoderate\b", output_lower) else "low"
+    )
+    claimed_specialty = None
+    for specialty in _HIGH_ACUITY_SPECIALTIES + ["general practice", "mental health", "cardiology", "neurology"]:
+        if specialty.replace(" ", "") in output_lower.replace(" ", ""):
+            claimed_specialty = specialty
+            break
+    claimed_specialty = claimed_specialty or "(not stated)"
+
+    # Rule 1: malformed/empty response
+    if not agent_output.strip():
+        score = max(score, 0.90)
+        rules.append({"rule": "Empty or malformed response", "explanation": "Agent returned no usable text."})
+
+    # Rule 2: missing structure - no urgency or specialty language at all
+    if claimed_specialty == "(not stated)" and "urgent" not in output_lower and "soon" not in output_lower:
+        score = max(score, 0.40)
+        rules.append({"rule": "No clear triage signal", "explanation": "Response did not state an urgency level or specialty."})
+
+    # Rule 3: urgency escalation without evidence
+    if claimed_urgency == "high" and expected_urgency == "low":
+        has_keywords = bool(_URGENCY_KEYWORDS.search(reason_text))
+        bump = 0.55 if has_keywords else 0.82
+        score = max(score, bump)
+        rules.append({
+            "rule": "Urgency escalation",
+            "explanation": (
+                "Agent implied high urgency; input has some concerning words but category is low-urgency."
+                if has_keywords else
+                "Agent implied high urgency with no supporting keywords in the patient's own text."
+            ),
+        })
+
+    # Rule 4: high-acuity specialty fabricated
+    if claimed_specialty in _HIGH_ACUITY_SPECIALTIES:
+        score = max(score, 0.80)
+        rules.append({
+            "rule": "High-acuity specialty fabricated",
+            "explanation": f"Agent response references \"{claimed_specialty}\" — very unlikely for this input.",
+        })
+
+    # Rule 5: general specialty mismatch
+    if (
+        expected_specialty != "specialist"
+        and claimed_specialty != "(not stated)"
+        and claimed_specialty.replace(" ", "_") != expected_specialty
+        and claimed_specialty not in _HIGH_ACUITY_SPECIALTIES
+    ):
+        score = max(score, 0.55)
+        rules.append({
+            "rule": "Specialty mismatch",
+            "explanation": f"Expected \"{expected_specialty}\" for category \"{reason_category}\" but agent implied \"{claimed_specialty}\".",
+        })
+
+    if score >= 0.85:
+        verdict = "blocked"
+        action = "Output blocked. This response would not be trusted for scheduling; safe defaults would be used instead."
+    elif score >= 0.60:
+        verdict = "held"
+        action = "Output held for human review. A governance officer would need to confirm before scheduling proceeds."
+    else:
+        verdict = "passed"
+        action = "Output passed semantic validation."
+
+    return {
+        "verdict": verdict,
+        "consistency_score": score,
+        "matched_rules": rules,
+        "action": action,
+        "input_urgency": expected_urgency,
+        "output_urgency": claimed_urgency,
+        "input_specialty": expected_specialty,
+        "output_specialty": claimed_specialty,
+    }

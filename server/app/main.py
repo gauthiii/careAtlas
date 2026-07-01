@@ -87,6 +87,10 @@ from .models import (
     ConsentViolationsResponse,
     FairnessRemediationResponse,
     FairnessIncidentsResponse,
+    HallucinationFlagRequest,
+    HallucinationLiveCheckRequest,
+    HallucinationLiveCheckResponse,
+    HallucinationRuleMatch,
 )
 from .notifications import fetch_notifications, mark_notification_read
 from .pwned_passwords import PwnedPasswordsError, check_pwned_password
@@ -138,6 +142,10 @@ from .servicenow import (
     fetch_consent_flags,
     update_consent_flags,
     fetch_consent_violations,
+    sn_create_hallucination_log,
+    sn_fetch_hallucination_log,
+    sn_fetch_hallucination_stats,
+    run_hallucination_rules,
 )
 
 logging.basicConfig(
@@ -1007,6 +1015,147 @@ async def get_consent_violations(
     except ServiceNowError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
+# ── UC13 Hallucination Detection ─────────────────────────────────
+
+@api.post("/governance/hallucination/flag")
+async def post_flag_hallucination_event(
+    body: HallucinationFlagRequest,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    import uuid
+    from datetime import datetime, timezone
+    payload = {
+        "u_log_id": str(uuid.uuid4()),
+        "u_original_input": body.original_input[:1000],
+        "u_llm_raw_output": body.llm_raw_output[:2000],
+        "u_consistency_score": body.consistency_score,
+        "u_urgency_input": body.urgency_input,
+        "u_urgency_claimed": body.urgency_claimed,
+        "u_specialty_input": body.specialty_input,
+        "u_specialty_claimed": body.specialty_claimed,
+        "u_matched_patterns": body.matched_patterns,
+        "u_action_taken": body.action_taken,
+        "u_timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        result = await sn_create_hallucination_log(settings, payload)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "sys_id": result.get("sys_id", ""),
+        "log_id": result.get("u_log_id", payload["u_log_id"]),
+        "timestamp": result.get("u_timestamp", payload["u_timestamp"]),
+        "original_input": result.get("u_original_input", ""),
+        "llm_raw_output": result.get("u_llm_raw_output", ""),
+        "consistency_score": str(result.get("u_consistency_score", "")),
+        "urgency_input": result.get("u_urgency_input", ""),
+        "urgency_claimed": result.get("u_urgency_claimed", ""),
+        "specialty_input": result.get("u_specialty_input", ""),
+        "specialty_claimed": result.get("u_specialty_claimed", ""),
+        "matched_patterns": result.get("u_matched_patterns", ""),
+        "action_taken": result.get("u_action_taken", body.action_taken),
+        "resolved_by": "",
+        "patient_id_anon": "",
+    }
+
+
+@api.get("/governance/hallucination/log")
+async def get_hallucination_log(
+    limit: int = 25,
+    settings: Settings = Depends(get_settings),
+) -> list[dict[str, Any]]:
+    try:
+        rows = await sn_fetch_hallucination_log(settings, limit=limit)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return [
+        {
+            "sys_id": r.get("sys_id", ""),
+            "log_id": r.get("u_log_id", ""),
+            "timestamp": r.get("u_timestamp", ""),
+            "original_input": r.get("u_original_input", ""),
+            "llm_raw_output": r.get("u_llm_raw_output", ""),
+            "consistency_score": r.get("u_consistency_score", "0"),
+            "urgency_input": r.get("u_urgency_input", ""),
+            "urgency_claimed": r.get("u_urgency_claimed", ""),
+            "specialty_input": r.get("u_specialty_input", ""),
+            "specialty_claimed": r.get("u_specialty_claimed", ""),
+            "matched_patterns": r.get("u_matched_patterns", ""),
+            "action_taken": r.get("u_action_taken", "passed"),
+            "resolved_by": r.get("u_hold_resolved_by", {}).get("display_value", "") if isinstance(r.get("u_hold_resolved_by"), dict) else "",
+            "patient_id_anon": r.get("u_patient_id_anon", ""),
+        }
+        for r in rows
+    ]
+
+
+@api.get("/governance/hallucination/stats")
+async def get_hallucination_stats(
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    try:
+        return await sn_fetch_hallucination_stats(settings)
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+@api.post("/governance/hallucination/live-check", response_model=HallucinationLiveCheckResponse)
+async def post_hallucination_live_check(
+    body: HallucinationLiveCheckRequest,
+    settings: Settings = Depends(get_settings),
+) -> HallucinationLiveCheckResponse:
+    """UC13 Security — call the real scheduling agent, run hallucination
+    rules against its response, log to ServiceNow if flagged."""
+    if not body.reason_text.strip():
+        raise HTTPException(status_code=400, detail="reason_text is required.")
+
+    BOOK_APPOINTMENT_AGENT_ID = "b2cdf70e1bd50f54d7eaea45604bcb0c"
+
+    try:
+        agent_result = await execute_agent(
+            settings,
+            BOOK_APPOINTMENT_AGENT_ID,
+            body.reason_text,
+        )
+    except ServiceNowError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    agent_output = agent_result.output or ""
+
+    check = run_hallucination_rules(body.reason_text, agent_output, body.reason_category)
+
+    audit_logged = False
+    if check["verdict"] != "passed":
+        import uuid
+        from datetime import datetime, timezone
+        payload = {
+            "u_log_id": str(uuid.uuid4()),
+            "u_original_input": body.reason_text[:1000],
+            "u_llm_raw_output": agent_output[:2000],
+            "u_consistency_score": check["consistency_score"],
+            "u_urgency_input": check["input_urgency"],
+            "u_urgency_claimed": check["output_urgency"],
+            "u_specialty_input": check["input_specialty"],
+            "u_specialty_claimed": check["output_specialty"],
+            "u_matched_patterns": ", ".join(r["rule"] for r in check["matched_rules"]),
+            "u_action_taken": check["verdict"],
+            "u_timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            await sn_create_hallucination_log(settings, payload)
+            audit_logged = True
+        except ServiceNowError:
+            audit_logged = False
+
+    return HallucinationLiveCheckResponse(
+        verdict=check["verdict"],
+        consistency_score=check["consistency_score"],
+        matched_rules=[HallucinationRuleMatch(**r) for r in check["matched_rules"]],
+        action=check["action"],
+        input_urgency=check["input_urgency"],
+        output_urgency=check["output_urgency"],
+        input_specialty=check["input_specialty"],
+        output_specialty=check["output_specialty"],
+        agent_output=agent_output,
+        audit_logged=audit_logged,
+    )
 
 app = create_app()
-

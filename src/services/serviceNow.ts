@@ -1212,3 +1212,104 @@ export async function fetchFairnessIncidents(): Promise<FairnessIncidentsRespons
   if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
   return (await res.json()) as FairnessIncidentsResponse
 }
+
+// ── UC13 Hallucination Detection ──────────────────────────────────────────
+
+export interface HallucinationLogEntry {
+  sys_id: string
+  log_id: string
+  timestamp: string
+  original_input: string
+  llm_raw_output: string
+  consistency_score: string
+  urgency_input: string
+  urgency_claimed: string
+  specialty_input: string
+  specialty_claimed: string
+  matched_patterns: string
+  action_taken: 'passed' | 'held' | 'blocked'
+  resolved_by: string
+  patient_id_anon: string
+}
+
+export interface HallucinationFlagRequest {
+  original_input: string
+  llm_raw_output: string
+  consistency_score: number
+  urgency_input: string
+  urgency_claimed: string
+  specialty_input: string
+  specialty_claimed: string
+  matched_patterns: string
+  action_taken: 'passed' | 'held' | 'blocked'
+}
+
+export interface HallucinationStats {
+  total: number
+  held: number
+  blocked: number
+  passed: number
+  pass_rate: number
+}
+
+export async function flagHallucinationEvent(
+  payload: HallucinationFlagRequest,
+): Promise<HallucinationLogEntry> {
+  const res = await fetch(`${API_BASE}/governance/hallucination/flag`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as HallucinationLogEntry
+}
+
+export async function fetchHallucinationLog(limit = 25): Promise<HallucinationLogEntry[]> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  const res = await fetch(`${API_BASE}/governance/hallucination/log?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as HallucinationLogEntry[]
+}
+
+export async function fetchHallucinationStats(): Promise<HallucinationStats> {
+  const res = await fetch(`${API_BASE}/governance/hallucination/stats`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as HallucinationStats
+
+}
+// ── UC13 Live Hallucination Check ─────────────────────────────────────────
+
+export interface HallucinationRuleMatch {
+  rule: string
+  explanation: string
+}
+
+export interface HallucinationLiveCheckResponse {
+  verdict: 'passed' | 'held' | 'blocked'
+  consistency_score: number
+  matched_rules: HallucinationRuleMatch[]
+  action: string
+  input_urgency: string
+  output_urgency: string
+  input_specialty: string
+  output_specialty: string
+  agent_output: string
+  audit_logged: boolean
+}
+
+export async function checkHallucinationLive(
+  reasonText: string,
+  reasonCategory: string,
+): Promise<HallucinationLiveCheckResponse> {
+  const res = await fetch(`${API_BASE}/governance/hallucination/live-check`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason_text: reasonText, reason_category: reasonCategory }),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${await readError(res)}`)
+  return (await res.json()) as HallucinationLiveCheckResponse
+}

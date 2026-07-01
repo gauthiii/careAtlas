@@ -296,18 +296,18 @@ export function ProfilePage() {
   }, [user?.attributes.email, user?.attributes.name, user?.username, profileRefreshKey])
 
   useEffect(() => {
-    const username = user?.username?.trim() || ''
-    if (!username) return
+    const identifier = loadedProfile?.sys_id || user?.username?.trim() || ''
+    if (!identifier) return
     setIsConsentLoading(true)
-    fetchConsentFlags(username)
+    fetchConsentFlags(identifier)
       .then((data) => setConsentFlags(data.flags))
       .catch(() => {})
       .finally(() => setIsConsentLoading(false))
-  }, [user?.username])
+  }, [loadedProfile?.sys_id, user?.username])
 
   async function handleConsentToggle(value: string) {
-    const username = user?.username?.trim() || ''
-    if (!username) return
+    const identifier = loadedProfile?.sys_id || user?.username?.trim() || ''
+    if (!identifier) return
     const updated = consentFlags.includes(value)
       ? consentFlags.filter((f) => f !== value)
       : [...consentFlags, value]
@@ -315,7 +315,7 @@ export function ProfilePage() {
     setConsentSaving(true)
     setConsentError(null)
     try {
-      await updateConsentFlags(username, updated)
+      await updateConsentFlags(identifier, updated)
     } catch {
       setConsentError('Could not save. Please try again.')
     } finally {

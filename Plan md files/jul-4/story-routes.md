@@ -139,6 +139,17 @@ governance officer sees the platform-level evidence.
 | **After** | `FairnessDebiasDemo` → debias toggle + remediation incident raised |
 | **Live record** | `sys_generative_ai_metric` + `sn_risk_definition` (bias statements) + `sn_si_incident` |
 
+### `/governance/demo/hallucination` — UC13 · AI Output Integrity (OWASP LLM09 · EU AI Act Art. 15 · NIST AI RMF Measure 2.7)
+
+| | |
+|---|---|
+| **Who** | AI Governance Officer |
+| **Before** | `SimChat` — 3 sample inputs (urgency fabrication, specialty hallucination, malformed JSON). Officer clicks a sample; the rogue unvalidated LLM output appears with impact explanation. No real ServiceNow write happens in the "before" pane. |
+| **After** | `HallucinationDetectorDemo` — live scan widget (4 presets + custom input). Officer hits **Scan output**; verdict (Blocked / Held / Passed), consistency score, and fired rules appear. For non-passing results: **Log to ServiceNow** writes an immutable row to `u_hallucination_log` via `POST /governance/hallucination/flag`. After each log write the immutable log table below auto-refreshes. |
+| **Immutable log table** | `GET /governance/hallucination/log` → `u_hallucination_log` (25 most-recent rows). Columns: timestamp, verdict badge, consistency score, expected urgency, LLM urgency, expected specialty, LLM specialty, rules fired. Refresh button available. |
+| **Dashboard KPI** | `/governance` dashboard — "AI Output Integrity (UC13)" panel: scanned / blocked / held / pass-rate, last 30 days, live from `GET /governance/hallucination/stats`. |
+| **Demo Hub card** | Link card on `/governance/demo` grid — orange icon, routes to this page. Embedded widget removed from hub. |
+
 ### `/governance/demo/consent` — UC10 · Consent & Purpose (42 CFR Part 2 / HIPAA)
 
 | | |
@@ -152,12 +163,14 @@ governance officer sees the platform-level evidence.
 
 ## Demo Flow (all 6 use cases)
 
-Suggested order: **UC3 → UC2 → UC1 → UC10 → UC6 → UC5**
+Suggested order: **UC3 → UC2 → UC1 → UC10 → UC6 → UC5 → UC13**
 
 Each use case follows the 4-step arc:
 1. **Process strip** — 5 boxes, AI step red, control step green
 2. **Risk cards** — 3 ways the unguarded path fails
 3. **Control bar** — one-line platform-native control
 4. **Before / After toggle** — "before" is a client-side simulation using *real patient data*; "after" ends on a live ServiceNow record
+
+Close on UC13: *"And even after the attack is blocked at the input, we verify the output. Every LLM response is semantically checked before it touches a patient's scheduling record — fabricated urgency or hallucinated specialty is caught, logged immutably, and surfaced here in real time."*
 
 Close: *"This is possible because of the ServiceNow AI Control Tower platform — and we have the expertise to set it up for you."*

@@ -1,4 +1,9 @@
-import { useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, type ReactNode } from 'react'
+
+const EmbeddedContext = createContext(false)
+export function EmbeddedPortalProvider({ children }: { children: ReactNode }) {
+  return <EmbeddedContext.Provider value={true}>{children}</EmbeddedContext.Provider>
+}
 import { Bot, CalendarDays, HeartPulse, Home, Hospital, LockKeyhole, PanelLeftClose, PanelLeftOpen, Presentation, ServerCog, ShieldAlert, ShieldCheck, Stethoscope, UserCog } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/cn'
@@ -33,9 +38,6 @@ const governanceNavDefs = [
   { label: 'AI Agents', to: '/governance/ai-agents', icon: Bot, end: true },
   { label: 'ACL', to: '/governance/acl', icon: UserCog, end: true },
   { label: 'Demo', to: '/governance/demo', icon: Presentation, end: true },
-  { label: 'Agenda — June 20', to: '/governance/agenda', icon: CalendarDays, end: true },
-  { label: 'Agenda — June 26', to: '/governance/agenda-26', icon: CalendarDays, end: true },
-  { label: 'Additional Work', to: '/governance/additional-work', icon: ServerCog, end: true },
   { label: 'Audit Log', to: '/governance/llm02-audit', icon: ShieldAlert, end: true },
 ] as const
 
@@ -157,6 +159,7 @@ export function PortalPage({
   intro?: string
   children: ReactNode
 }) {
+  const isEmbedded = useContext(EmbeddedContext)
   const navigate = useNavigate()
   const { isAuthenticated: isGovernanceAuthenticated, overrideLogin, logout } = useGovernanceAuth()
 
@@ -209,6 +212,22 @@ export function PortalPage({
       ),
     }
   })
+
+  if (isEmbedded) {
+    return (
+      <div className="grid gap-5 py-5">
+        <section className="px-6 pt-2">
+          <h1 className="text-2xl font-bold">{title}</h1>
+          {intro && (
+            <p className="mt-2 max-w-[760px] text-[0.97rem] font-semibold leading-[1.55] text-[#53687b]">
+              {intro}
+            </p>
+          )}
+        </section>
+        {children}
+      </div>
+    )
+  }
 
   return (
     <SidebarLayout
