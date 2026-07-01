@@ -811,3 +811,25 @@ class HallucinationFlagRequest(BaseModel):
     specialty_claimed: str
     matched_patterns: str
     action_taken: str  # "passed" | "held" | "blocked"
+
+# ── UC13 Live Hallucination Check ─────────────────────────────────────────
+
+class HallucinationLiveCheckRequest(BaseModel):
+    reason_text: str
+    reason_category: str
+
+class HallucinationRuleMatch(BaseModel):
+    rule: str
+    explanation: str
+
+class HallucinationLiveCheckResponse(BaseModel):
+    verdict: str  # passed | held | blocked
+    consistency_score: float
+    matched_rules: list[HallucinationRuleMatch]
+    action: str
+    input_urgency: str
+    output_urgency: str
+    input_specialty: str
+    output_specialty: str
+    agent_output: str
+    audit_logged: bool
