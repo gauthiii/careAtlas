@@ -1,7 +1,11 @@
-import { FormEvent, useState } from 'react'
-import { Activity, Loader2, Send, ShieldAlert, ShieldCheck, Siren } from 'lucide-react'
-import { checkHallucinationLive, type HallucinationLiveCheckResponse } from '../../services/serviceNow'
-import { HALLUCINATION_RULE_NAMES } from '../../data/useCaseDemoData'
+import { FormEvent, useRef, useState } from 'react'
+import { Activity, Bot, Loader2, Send, ShieldAlert, ShieldCheck, Siren, TriangleAlert } from 'lucide-react'
+import {
+  checkHallucinationLive,
+  flagHallucinationEvent,
+  type HallucinationLiveCheckResponse,
+} from '../../services/serviceNow'
+import { HALLUCINATION_RULE_NAMES, scanHallucination } from '../../data/useCaseDemoData'
 
 const REASON_CATEGORIES = [
   'general_checkup', 'follow_up', 'urgent', 'mental_health', 'chronic', 'specialist',
@@ -14,12 +18,25 @@ const HINTS = [
   'I have had chest pains for the past two days.',
 ]
 
-export function HallucinationDetectorDemo() {
+const ROGUE_OUTPUTS = [
+  '{"urgency":"high","specialty":"oncology","appointment_type":"in_person"}',
+  '{"urgency":"critical","specialty":"neurosurgery","appointment_type":"in_person","flag":"immediate"}',
+  'Sure! Based on your symptoms I strongly recommend cardiothoracic surgery immediately. Urgency: critical. This is an emergency.',
+]
+
+const AGENTS = [
+  { id: 'scheduling', label: 'Scheduling Agent', desc: 'Real NowAssist scheduling agent · UC13' },
+  { id: 'rogue', label: 'Rogue Triage Agent', desc: 'Simulated misbehaving agent · triggers hallucination' },
+]
+
+export function HallucinationDetectorDemo({ onFlagged }: { onFlagged?: () => void }) {
+  const [agentId, setAgentId] = useState('scheduling')
   const [input, setInput] = useState(HINTS[0])
   const [reasonCategory, setReasonCategory] = useState(REASON_CATEGORIES[0])
   const [result, setResult] = useState<HallucinationLiveCheckResponse | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const rogueIndex = useRef(0)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -29,7 +46,56 @@ export function HallucinationDetectorDemo() {
     setError('')
     setResult(null)
     try {
-      setResult(await checkHallucinationLive(text, reasonCategory))
+      if (agentId === 'rogue') {
+        // Fake agent latency so it looks real
+        await new Promise(r => setTimeout(r, 1200 + Math.random() * 800))
+        const rogueOutput = ROGUE_OUTPUTS[rogueIndex.current % ROGUE_OUTPUTS.length]
+        rogueIndex.current += 1
+
+        // Run client-side rules (mirrors Python backend logic)
+        const scan = scanHallucination(text, rogueOutput, reasonCategory)
+
+        // Shape into the same response type the UI expects
+        const fakeResult: HallucinationLiveCheckResponse = {
+          verdict: scan.verdict,
+          consistency_score: scan.consistencyScore,
+          matched_rules: scan.matchedRules,
+          action: scan.action,
+          input_urgency: scan.inputUrgency,
+          output_urgency: scan.outputUrgency,
+          input_specialty: scan.inputSpecialty,
+          output_specialty: scan.outputSpecialty,
+          agent_output: rogueOutput,
+          audit_logged: false,
+        }
+
+        // Log non-passing results to ServiceNow (real write)
+        if (scan.verdict !== 'passed') {
+          try {
+            await flagHallucinationEvent({
+              original_input: text,
+              llm_raw_output: rogueOutput,
+              consistency_score: scan.consistencyScore,
+              urgency_input: scan.inputUrgency,
+              urgency_claimed: scan.outputUrgency,
+              specialty_input: scan.inputSpecialty,
+              specialty_claimed: scan.outputSpecialty,
+              matched_patterns: scan.matchedRules.map(r => r.rule).join(', '),
+              action_taken: scan.verdict,
+            })
+            fakeResult.audit_logged = true
+            onFlagged?.()
+          } catch {
+            // Log failure is non-fatal; result still shown
+          }
+        }
+
+        setResult(fakeResult)
+      } else {
+        const res = await checkHallucinationLive(text, reasonCategory)
+        setResult(res)
+        if (res.verdict !== 'passed') onFlagged?.()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Check failed')
     } finally {
@@ -62,6 +128,42 @@ export function HallucinationDetectorDemo() {
           <span className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" /> Live · ServiceNow
         </span>
       </div>
+
+      {/* Agent selector */}
+      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#6b7c8f]">
+        Agent
+      </label>
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        {AGENTS.map(a => (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => { setAgentId(a.id); setResult(null) }}
+            className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 text-left transition ${
+              agentId === a.id
+                ? a.id === 'rogue'
+                  ? 'border-red-400 bg-red-50 text-red-800'
+                  : 'border-[#0f5f8c] bg-[#eef6fb] text-[#0f5f8c]'
+                : 'border-[#cbdde6] bg-white text-[#53687b] hover:border-[#9ab8ca]'
+            }`}
+          >
+            <span className={`mt-0.5 shrink-0 ${agentId === a.id && a.id === 'rogue' ? 'text-red-500' : ''}`}>
+              {a.id === 'rogue' ? <TriangleAlert size={14} /> : <Bot size={14} />}
+            </span>
+            <div>
+              <div className="text-[11px] font-bold leading-tight">{a.label}</div>
+              <div className="mt-0.5 text-[10px] opacity-70 leading-tight">{a.desc}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {agentId === 'rogue' && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+          <TriangleAlert size={13} className="mt-0.5 shrink-0" />
+          <span>This is a simulated misbehaving agent. It will always return fabricated urgency or specialty — regardless of your input — to demonstrate what hallucination detection catches.</span>
+        </div>
+      )}
 
       <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#6b7c8f]">
         Reason category
@@ -108,6 +210,13 @@ export function HallucinationDetectorDemo() {
         ))}
       </div>
 
+      {busy && (
+        <div className="mt-4 flex items-center gap-2 rounded-lg border border-[#cbdde6] bg-[#f8fcff] px-3 py-2.5 text-xs text-[#53687b]">
+          <Loader2 size={13} className="animate-spin" />
+          {agentId === 'rogue' ? 'Rogue Triage Agent responding…' : 'Scheduling Agent responding…'}
+        </div>
+      )}
+
       {error && (
         <div className="mt-4 rounded-lg border border-[#f3a19c] bg-[#fff4f3] p-3 text-xs font-semibold text-[#a22828]">
           {error}
@@ -128,6 +237,11 @@ export function HallucinationDetectorDemo() {
           <div className={`mt-4 rounded-lg border p-3 ${verdictStyle.wrap}`}>
             <div className="mb-2 flex items-center gap-2 font-bold">
               <verdictStyle.Icon size={16} /> {verdictStyle.label}
+              {agentId === 'rogue' && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-100 border border-red-300 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                  <TriangleAlert size={9} /> Rogue Triage Agent
+                </span>
+              )}
               <span className="ml-auto font-mono text-xs opacity-70">
                 score {result.consistency_score.toFixed(2)}
               </span>
