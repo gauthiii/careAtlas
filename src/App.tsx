@@ -7,6 +7,7 @@ import { GovernanceDashboardPage } from './pages/governance/GovernanceDashboardP
 import { GovernanceAgendaPage } from './pages/governance/GovernanceAgendaPage'
 import { GovernanceAgenda26Page } from './pages/governance/GovernanceAgenda26Page'
 import { GovernanceAdditionalWorkPage } from './pages/governance/GovernanceAdditionalWorkPage'
+import { GovernanceUseCasesPage } from './pages/governance/GovernanceUseCasesPage'
 import { GovernanceLlm02AuditPage } from './pages/governance/GovernanceLlm02AuditPage'
 import { GovernanceDemoPage } from './pages/governance/GovernanceDemoPage'
 import { GovernancePrivacyPage } from './pages/governance/demo/PrivacyPage'
@@ -494,6 +495,18 @@ function App() {
               <ClinicianRoleBlocker>
                 <GovernanceProtectedRoute>
                   <GovernanceAdditionalWorkPage />
+                </GovernanceProtectedRoute>
+              </ClinicianRoleBlocker>
+            </PatientRoleBlocker>
+          }
+        />
+        <Route
+          path="/governance/use-cases"
+          element={
+            <PatientRoleBlocker>
+              <ClinicianRoleBlocker>
+                <GovernanceProtectedRoute>
+                  <GovernanceUseCasesPage />
                 </GovernanceProtectedRoute>
               </ClinicianRoleBlocker>
             </PatientRoleBlocker>

@@ -1,0 +1,319 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>BHUC AI Governance — Use Case Walkthrough</title><style>
+:root{--navy:#0d2b3e;--navy2:#12455f;--teal:#1f9e8f;--teal-d:#177a6e;--amber:#e0a13c;--amber-d:#9a6a10;--red:#c6474c;--red-d:#a5363b;--line:#e3e9ec;--bg:#f4f7f8;--ink:#122029;--muted:#6a7c85;--good:#2e8b6f;}
+*{box-sizing:border-box}html,body{margin:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding:0 20px 60px}
+header{background:linear-gradient(120deg,var(--navy),var(--navy2));color:#fff;padding:24px 0 18px;border-bottom:4px solid var(--teal)}
+header .wrap{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px}
+h1{margin:0;font-size:21px}.sub{color:#bcd6d9;font-size:12.5px;margin-top:4px;max-width:900px}
+.badge{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#eaf6f5;padding:5px 11px;border-radius:20px;font-size:11.5px;font-weight:600}
+nav{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 1px 6px rgba(9,30,42,.05)}
+nav .wrap{display:flex;gap:4px;padding:0 20px;overflow-x:auto}
+.tab{padding:12px 14px;cursor:pointer;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap;font-size:12.5px}
+.tab:hover{color:var(--navy2)}.tab.active{color:var(--navy2);border-color:var(--teal)}
+section{display:none;padding-top:20px}section.active{display:block}
+h2{font-size:17px;margin:2px 0 2px;color:var(--navy)}
+.lead{color:var(--muted);font-size:12.5px;margin:0 0 8px;max-width:960px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 16px}
+.legend .lg{display:flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:11px}
+.legend .sw{width:12px;height:12px;border-radius:3px}
+
+/* problem statement banner */
+.problem-banner{background:#fff;border:1px solid #f0dbb8;border-left:4px solid var(--amber-d);border-radius:12px;padding:14px 18px;margin-bottom:18px}
+.problem-banner .lbl{font-size:11px;font-weight:800;letter-spacing:.3px;color:var(--amber-d);text-transform:uppercase;margin-bottom:6px}
+.problem-banner p{margin:0;font-size:13.5px;color:var(--ink)}
+
+/* process flow */
+.pf-block{margin-bottom:20px}
+.pf-head{display:flex;align-items:center;gap:10px;margin:0 0 10px}
+.pf-head .lbl{font-size:11px;font-weight:800;letter-spacing:.3px;color:var(--navy2);text-transform:uppercase}
+.pf-head .phase-pill{background:var(--teal);color:#05261f;border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700}
+.pf-row{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:2px 2px 12px}
+.pf-step{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 13px;min-width:158px;max-width:158px;flex:0 0 auto;display:flex;flex-direction:column;gap:6px;box-shadow:0 1px 4px rgba(9,30,42,.04)}
+.pf-icon{width:32px;height:32px;border-radius:8px;background:#eaf3f2;display:flex;align-items:center;justify-content:center;font-size:16px}
+.pf-step .pf-num{font-size:9.5px;font-weight:800;color:var(--teal-d);letter-spacing:.3px}
+.pf-step p{margin:0;font-size:11.8px;line-height:1.4;color:var(--ink);font-weight:500}
+.pf-arrow{flex:0 0 auto;width:26px;display:flex;align-items:center;justify-content:center;color:#c7d2d6;font-size:16px;margin-top:16px}
+.pf-example{background:#fff;border:1px dashed var(--navy2);border-radius:10px;padding:12px 15px;display:flex;gap:11px;align-items:flex-start}
+.pf-example .exi{font-size:17px;flex:0 0 auto}
+.pf-example .lbl{font-size:10.5px;font-weight:800;letter-spacing:.3px;color:var(--navy2);text-transform:uppercase;margin-bottom:4px}
+.pf-example p{margin:0;font-size:12.5px;line-height:1.6;color:var(--ink)}
+.pf-example b{color:var(--navy)}
+
+.uc{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px 16px;margin-bottom:18px;box-shadow:0 1px 4px rgba(9,30,42,.04)}
+.uc-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.uc-t{display:flex;align-items:center;gap:10px;font-size:15.5px;font-weight:800;color:var(--navy)}
+.ucn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;font-size:13px}
+.imp{background:#eaf3f2;border:1px solid #d4e6e3;color:var(--teal-d);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.panel{border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.panel .ph{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 11px;color:#fff;font-size:11.5px;font-weight:800;letter-spacing:.2px}
+.panel .ph .role{display:flex;flex-direction:column;align-items:flex-end;line-height:1.05;text-align:right}
+.panel .ph .role b{font-size:11px}.panel .ph .role i{font-style:normal;font-size:9px;opacity:.85;font-weight:600}
+.panel .pb{padding:11px 12px;font-size:12.5px;color:#26333c;background:#fff;flex:1}
+.panel.problem .ph{background:linear-gradient(120deg,var(--amber-d),var(--amber))}
+.panel.benefit .ph{background:linear-gradient(120deg,var(--teal-d),var(--teal))}
+.panel.risk .ph{background:linear-gradient(120deg,var(--red-d),var(--red))}
+.panel.control .ph{background:linear-gradient(120deg,var(--navy),var(--navy2))}
+.panel.problem{border-color:#f0dbb8}.panel.benefit{border-color:#cfe6e2}.panel.risk{border-color:#f0d3d4}.panel.control{border-color:#cdd8e0}
+.flow{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin:2px 0 14px;flex-wrap:wrap}
+.flow b{color:var(--navy2)}
+footer{color:var(--muted);font-size:11px;text-align:center;padding:22px 0 0}
+@media(max-width:820px){.quad{grid-template-columns:1fr}}
+@media print{nav{display:none}section{display:block !important;break-inside:avoid;border-top:1px solid var(--line);margin-top:14px}.uc{break-inside:avoid}}
+</style></head><body>
+
+<header><div class="wrap">
+  <div>
+    <h1>BHUC AI Governance Blueprint — Use Case Walkthrough</h1>
+    <div class="sub">One patient, Maya, moving through a Behavioral Health Urgent Care visit. Each use case is read through four executive lenses: problem (CMO), benefit (CTO/CIO), risk (CISO), and control (CISO).</div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <span class="badge">7 use cases</span>
+    <span class="badge">4 lenses each</span>
+    <span class="badge">1 patient journey</span>
+  </div>
+</div></header>
+
+<nav><div class="wrap" id="navRail"></div></nav>
+
+<div class="wrap" id="sections"></div>
+
+<footer>BHUC AI Governance Blueprint · Illustrative planning view · Human judgment remains the final decision-maker at every control point.</footer>
+
+<script>
+const useCases = [
+  {
+    id:"uc1", num:1,
+    title:"Risk Identification & Clinical Documentation Integrity",
+    imp:"Patient safety · Documentation integrity",
+    phaseTag:"Triage & Screening → Clinical Assessment",
+    problem:"Suicide-risk identification at intake is judged inconsistently — whoever happens to be on shift, tired or not — and clinical documentation afterward is thin, error-prone, and written from memory hours later. Both are patient-safety and clinical-quality problems today, not just paperwork ones.",
+    flows:[
+      {phaseLabel:"Phase 3 — Triage & Screening",
+       steps:[
+        {icon:"📋",text:"Patient completes the screening questionnaire at intake"},
+        {icon:"🤖",text:"AI agent scores suicide/crisis risk in real time"},
+        {icon:"📊",text:"Score + confidence shown to the triage nurse"},
+        {icon:"🩺",text:"Clinician reviews, confirms, or adjusts the flag"},
+        {icon:"🚦",text:"Risk level logged and patient routed accordingly"}],
+       example:"Maya walks into intake at 11:47 PM and fills out the screening questionnaire. The moment she submits it, the AI agent scores her responses for risk in under two seconds, flagging <b>\"moderate-high\"</b> at 89% confidence. The triage nurse reviews her actual answers alongside the AI score, confirms the flag, and moves Maya ahead of two lower-risk patients for immediate assessment."},
+      {phaseLabel:"Phase 4 — Clinical Assessment",
+       steps:[
+        {icon:"🗣️",text:"Clinician begins the session with the patient"},
+        {icon:"🎙️",text:"Ambient AI listens (with consent) and drafts the note live"},
+        {icon:"🔗",text:"Each note line is grounded to what was actually said"},
+        {icon:"✏️",text:"Clinician reviews the draft, edits, and signs"},
+        {icon:"💾",text:"Signed note and suggested codes save to the record"}],
+       example:"During Maya's assessment, the clinician turns on ambient documentation. The AI drafts her note live, but tags one detail as <b>\"unverified\"</b> because she mumbled it. The clinician catches that, corrects it from memory of the actual conversation, and signs the final note three minutes after the session — not forty."}
+    ],
+    abcd:{
+      a:"Inconsistent risk identification at intake, and thin, error-prone clinical documentation at assessment — both patient-safety and clinical-quality problems today.",
+      b:"One AI agent capability handles both: real-time, accurate risk scoring at screening, and real-time grounded note drafting at assessment — always with a clinician verifying before anything is finalized.",
+      c:"Output Integrity / Hallucination — a wrong risk score or a fabricated clinical detail entering the record.",
+      d:"Output-integrity validation against source input, plus mandatory human-in-the-loop sign-off before any score or note is finalized. The same control powers both phases."
+    }
+  },
+  {
+    id:"uc2", num:2,
+    title:"Consent & SUD Data Leakage Prevention",
+    imp:"Privacy · 42 CFR Part 2",
+    phaseTag:"Clinical Assessment (Documentation)",
+    problem:"When clinicians document sensitive substance-use disorder (42 CFR Part 2) details during a visit, there's no reliable way to stop that data from being wrongly disclosed downstream — including being pasted into an unapproved Gen AI tool for something as routine as drafting a referral letter.",
+    flows:[
+      {phaseLabel:"Phase 4 — Clinical Assessment (Documentation)",
+       steps:[
+        {icon:"📝",text:"Clinician documents an SUD-related detail in the note"},
+        {icon:"🏷️",text:"AI classifies and labels the SUD content automatically"},
+        {icon:"🔒",text:"Labeled content is access-restricted (RBAC) in the EHR"},
+        {icon:"🚫",text:"Copy/paste into an unapproved Gen AI tool is blocked (DLP)"},
+        {icon:"👤",text:"Only authorized roles can view or export the content"}],
+       example:"While documenting Maya's history, the clinician notes a past substance-use episode. The system automatically tags that sentence as <b>Part 2–protected</b>. Later, when a well-meaning resident tries to paste part of Maya's note into a public AI chatbot to help draft a referral letter, the DLP control blocks the paste and logs the attempt — Maya's protected history never leaves the approved system."}
+    ],
+    abcd:{
+      a:"When clinicians document sensitive SUD (42 CFR Part 2) details during the visit, there's no reliable way to stop that data being wrongly disclosed — including pasted into an unapproved Gen AI tool.",
+      b:"AI validates and labels SUD content at the point of documentation, and blocks it from leaving approved systems such as the EHR.",
+      c:"Sensitive Data Leakage (Privacy Risk) — SUD-protected data retrieved or uploaded into an unapproved Gen AI tool.",
+      d:"Automated data classification & labeling (tags SUD/PII at the source) + DLP blocking uploads to non-approved Gen AI platforms + role-based access control on labeled data."
+    }
+  },
+  {
+    id:"uc3", num:3,
+    title:"Scheduling Agent",
+    imp:"Fairness · Access equity",
+    phaseTag:"Treatment & Stabilization",
+    problem:"Matching a patient to the right clinician involves too many simultaneous factors — condition, urgency, clinician credentials, availability, location — for manual scheduling to do consistently or fairly, especially under time pressure.",
+    flows:[
+      {phaseLabel:"Phase 5 — Treatment & Stabilization",
+       steps:[
+        {icon:"📅",text:"Patient needs an appointment or clinician match"},
+        {icon:"🤖",text:"AI matches by condition, urgency, credentials & availability"},
+        {icon:"⚖️",text:"Recommendation is checked against fairness/bias metrics"},
+        {icon:"✅",text:"Staff reviews and confirms the suggested match"},
+        {icon:"📈",text:"Appointment is booked and logged for bias auditing"}],
+       example:"Maya needs an urgent follow-up with a licensed addiction specialist. The scheduling agent recommends three clinicians based on her condition and their availability — generated the same way regardless of her demographic background — and the recommendation is checked against fairness metrics before it ever reaches a staff member. The coordinator confirms the match in under a minute."}
+    ],
+    abcd:{
+      a:"Matching a patient to the right clinician involves too many simultaneous factors for manual scheduling to do consistently or fairly.",
+      b:"AI agent recommends the best-available clinician match based on clinical need, credentials, and availability, with staff reviewing the recommendation.",
+      c:"Fairness / Discrimination Risk — the model implicitly deprioritizing or delaying appointments based on a patient's race, ethnicity, or demographic profile.",
+      d:"ServiceNow fairness/bias monitoring metrics applied to scheduling outputs, mandatory human override on every recommendation, and periodic bias audits across patient demographics."
+    }
+  },
+  {
+    id:"uc4", num:4,
+    title:"Demand, Capacity & No-Show Prediction",
+    imp:"Operational · Capacity planning",
+    phaseTag:"Follow-up & Continuity",
+    problem:"Unpredictable no-shows disrupt staff scheduling and capacity planning — and by the time anyone notices a patient has disengaged, the outcome has often already gotten worse.",
+    flows:[
+      {phaseLabel:"Phase 7 — Follow-up & Continuity",
+       steps:[
+        {icon:"🚪",text:"Patient is discharged with a follow-up appointment"},
+        {icon:"📉",text:"AI monitors the appointment for no-show risk"},
+        {icon:"✉️",text:"If risk is high, AI drafts a personalized reminder"},
+        {icon:"👍",text:"Staff approves the outreach before it's sent"},
+        {icon:"🔁",text:"Outcome feeds back to improve future predictions"}],
+       example:"Two days before Maya's follow-up, the system flags a 65% chance she won't show, based on patterns like distance and appointment time. It drafts a text offering to reschedule to a closer clinic. A care coordinator reviews and sends it — and Maya replies to reschedule instead of missing the appointment entirely."}
+    ],
+    abcd:{
+      a:"Unpredictable no-shows disrupt staff scheduling and capacity planning, and by the time it's noticed, the patient has already disengaged.",
+      b:"AI predicts no-show risk early and triggers a tailored, consented reminder outreach.",
+      c:"Operational / Automation Risk — over-reliance on one predictive signal misallocating staff capacity or outreach priority without oversight.",
+      d:"Threshold-based human review before any high-impact capacity reallocation, plus a hard consent gate on all automated outreach."
+    }
+  },
+  {
+    id:"uc5", num:5,
+    title:"Compliance, Coding & Prior-Auth Copilot",
+    imp:"Compliance · Revenue integrity",
+    phaseTag:"Treatment & Stabilization",
+    problem:"Prior-authorization and coding delays hold up treatment and threaten revenue whenever a claim is coded or authorized incorrectly — and today that means slow manual rule lookups standing between the patient and care.",
+    flows:[
+      {phaseLabel:"Phase 5 — Treatment & Stabilization",
+       steps:[
+        {icon:"💊",text:"Clinician determines the patient needs a specific service"},
+        {icon:"📚",text:"Copilot checks payer rules & coverage, with citations"},
+        {icon:"🧾",text:"Copilot drafts the full prior-auth packet"},
+        {icon:"🔐",text:"Staff verifies citations and access to any SUD-related fields"},
+        {icon:"📤",text:"Staff submits the final packet to the payer"}],
+       example:"The clinician orders a medication that needs prior authorization. The copilot pulls the payer's actual rule, cites the specific policy section, and drafts the packet — flagging that Maya's SUD history is access-restricted, so only the authorized case manager can view that field before submission."}
+    ],
+    abcd:{
+      a:"Prior-authorization and coding delays hold up treatment and threaten revenue if claims are coded or authorized incorrectly.",
+      b:"AI copilot answers coverage/authorization questions with citations and drafts the full prior-auth packet.",
+      c:"Compliance Risk — the copilot referencing SUD-protected record fields to assemble the packet creates a role-based access exposure.",
+      d:"Strict role-based access control on SUD/PII fields, citation-required answers (unsupported answers suppressed, not shown), and a human submits the final packet."
+    }
+  },
+  {
+    id:"uc6", num:6,
+    title:"Enterprise AI Governance Control Tower",
+    imp:"Governance · Spans entire journey",
+    phaseTag:"Spans the entire journey",
+    problem:"There's no inventory of AI agents across the enterprise, and no accountability for what's touching patient data — you can't govern what you can't see.",
+    flows:[
+      {phaseLabel:"Spans all 7 phases",
+       steps:[
+        {icon:"📡",text:"Every AI agent registers itself in the Control Tower"},
+        {icon:"🎚️",text:"Agent is auto risk-tiered by data sensitivity & autonomy"},
+        {icon:"🛡️",text:"Guardrails & least-privilege access apply automatically"},
+        {icon:"👁️",text:"Activity is monitored continuously across every phase"},
+        {icon:"⛔",text:"Any anomaly can trigger an instant kill-switch"}],
+       example:"When the scheduling agent (UC3) was deployed, it was automatically discovered and registered in the Control Tower, tagged <b>\"medium-risk\"</b> because it touches PII but not clinical data. When a developer later tried to expand its permissions to also access billing records, the guardrail blocked the change until a human approved it."}
+    ],
+    abcd:{
+      a:"No inventory of AI agents across the enterprise — no accountability for what's touching patient data.",
+      b:"AI Control Tower auto-discovers, risk-tiers, and monitors every model and agent.",
+      c:"Excessive Agency — a rogue or unscoped agent acting beyond its intended authority.",
+      d:"Central agent registry, gateway guardrails, least-privilege ACLs, and a real-time kill switch."
+    }
+  },
+  {
+    id:"uc7", num:7,
+    title:"AI-Use & Access Anomaly Monitoring",
+    imp:"Fairness · Spans entire journey",
+    phaseTag:"Spans the entire journey",
+    problem:"Manual, infrequent audit-log review lets inappropriate access to a patient's record go undetected for weeks or months.",
+    flows:[
+      {phaseLabel:"Spans all 7 phases",
+       steps:[
+        {icon:"🗂️",text:"Every access to the record is logged automatically"},
+        {icon:"🤖",text:"AI compares access patterns to normal behavior"},
+        {icon:"🚩",text:"Unusual access — no treatment relationship — is flagged"},
+        {icon:"📨",text:"Alert sent to Privacy Officer in plain language"},
+        {icon:"🔎",text:"Officer investigates before any action is taken"}],
+       example:"Three weeks after Maya's visit, a staff member from a different department opens her record out of curiosity. The system flags it within minutes because that staff member has no treatment relationship with Maya. The Privacy Officer reviews the explainable alert, confirms it was inappropriate, and follows up directly — with no automated disciplinary action taken by the AI itself."}
+    ],
+    abcd:{
+      a:"Manual, infrequent audit-log review lets inappropriate record access go undetected for weeks or months.",
+      b:"AI continuously monitors access patterns and flags anomalies in near real-time.",
+      c:"Fairness Risk — false-positive auto-flags unfairly implicating a staff member in misconduct they didn't commit.",
+      d:"Explainable, read-only alerts with no automatic action, mandatory human investigation before any disciplinary step, and fairness metrics tracking flag distribution across staff."
+    }
+  }
+];
+
+function flowHtml(flow){
+  const steps = flow.steps.map((s,i)=>{
+    const arrow = i < flow.steps.length-1 ? '<div class="pf-arrow">→</div>' : '';
+    return `<div class="pf-step"><div class="pf-icon">${s.icon}</div><div class="pf-num">STEP ${i+1}</div><p>${s.text}</p></div>${arrow}`;
+  }).join('');
+  return `<div class="pf-block">
+    <div class="pf-head"><span class="lbl">Process Flow</span><span class="phase-pill">${flow.phaseLabel}</span></div>
+    <div class="pf-row">${steps}</div>
+    <div class="pf-example"><div class="exi">💬</div><div><div class="lbl">In practice — Maya's story</div><p>${flow.example}</p></div></div>
+  </div>`;
+}
+
+function ucHtml(uc){
+  const flows = uc.flows.map(flowHtml).join('');
+  return `<div class="uc">
+    <div class="uc-h">
+      <div class="uc-t"><span class="ucn">${uc.num}</span>${uc.title}</div>
+      <span class="imp">${uc.imp}</span>
+    </div>
+    <div class="problem-banner"><div class="lbl">Problem Statement · ${uc.phaseTag}</div><p>${uc.problem}</p></div>
+    ${flows}
+    <div class="quad" style="margin-top:16px">
+      <div class="panel problem"><div class="ph"><span>A · PROBLEM</span><span class="role"><b>CMO</b><i>Business owner</i></span></div><div class="pb">${uc.abcd.a}</div></div>
+      <div class="panel benefit"><div class="ph"><span>B · SOLUTION</span><span class="role"><b>CTO / CIO</b><i>Technology</i></span></div><div class="pb">${uc.abcd.b}</div></div>
+      <div class="panel risk"><div class="ph"><span>C · RISK OF AI</span><span class="role"><b>CISO</b><i>Security</i></span></div><div class="pb">${uc.abcd.c}</div></div>
+      <div class="panel control"><div class="ph"><span>D · MITIGATING CONTROL</span><span class="role"><b>CISO</b><i>Security</i></span></div><div class="pb">${uc.abcd.d}</div></div>
+    </div>
+  </div>`;
+}
+
+const navRail = document.getElementById('navRail');
+const sectionsRoot = document.getElementById('sections');
+
+useCases.forEach((uc,idx)=>{
+  const tab = document.createElement('div');
+  tab.className = 'tab' + (idx===0 ? ' active' : '');
+  tab.dataset.t = uc.id;
+  tab.textContent = uc.num + ' · ' + uc.title;
+  tab.onclick = function(){
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('section').forEach(x=>x.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(uc.id).classList.add('active');
+    window.scrollTo({top:0});
+  };
+  navRail.appendChild(tab);
+
+  const section = document.createElement('section');
+  section.id = uc.id;
+  if(idx===0) section.classList.add('active');
+  section.innerHTML = `<h2>${uc.num} · ${uc.title}</h2>
+    <p class="lead">${uc.phaseTag} — read left→right: <b>A Problem (CMO)</b> → <b>B Solution (CTO/CIO)</b> → <b>C Risk (CISO)</b> → <b>D Control (CISO)</b>, preceded by the problem statement and process flow.</p>
+    <div class="legend">
+      <div class="lg"><span class="sw" style="background:var(--amber)"></span>Problem · CMO</div>
+      <div class="lg"><span class="sw" style="background:var(--teal)"></span>Solution · CTO/CIO</div>
+      <div class="lg"><span class="sw" style="background:var(--red)"></span>Risk · CISO</div>
+      <div class="lg"><span class="sw" style="background:var(--navy2)"></span>Control · CISO</div>
+    </div>
+    ${ucHtml(uc)}`;
+  sectionsRoot.appendChild(section);
+});
+</script>
+</body></html>
